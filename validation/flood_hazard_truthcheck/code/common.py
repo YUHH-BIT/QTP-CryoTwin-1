@@ -25,6 +25,9 @@ HAZARD_TIF = (PROJ / "data/webgis/outputs/risk_results"
 # 汛期对照结果（保留 7-8 月被检验版本）
 HAZARD_TIF_FLOOD = (PROJ / "data/webgis/outputs/risk_results"
                     / "2024-07-01_to_2024-08-31_basin-all_hazard.tif")
+# 全时段合成结果（1980-2025 全部径流取时段最大，2026-09-28 用更新后的径流重算）
+HAZARD_TIF_FULL = (PROJ / "data/webgis/outputs/risk_results"
+                   / "1980-01-01_to_2025-12-31_basin-all_hazard.tif")
 RUNOFF_DIR = PROJ / "data/webgis/outputs/runoff_results"
 THRESHOLD_DIR = PROJ / "data/raw/thresholds"
 TP_BOUNDARY = PROJ / "data/raw/geo/boundary" / "TP_China.geojson"

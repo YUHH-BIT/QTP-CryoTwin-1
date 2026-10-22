@@ -73,6 +73,10 @@ class Config:
     # 现等价于 OUTPUTS_DIR。仅为兼容存量脚本保留，新代码一律用 OUTPUTS_DIR。
     STATIC_BACKEND_DIR = OUTPUTS_DIR
 
+    # 品牌资源（桌面快捷方式图标 / favicon 同源，见 assets/branding/README.md）
+    BRANDING_DIR = os.path.join(BASE_DIR, 'assets', 'branding')
+    APP_ICON = os.path.join(BRANDING_DIR, 'app-icon.ico')
+
     # 数据库配置
     DATABASE_PATH = os.environ.get(
         'DATABASE_PATH',

@@ -180,6 +180,12 @@ def create_app(config_name=None):
 
     @app.route('/favicon.ico')
     def favicon():
+        # 品牌图标（assets/branding/app-icon.ico，与桌面快捷方式同源）；
+        # 文件缺失时退化为 204，避免浏览器控制台报错。
+        if os.path.isfile(app.config['APP_ICON']):
+            return send_from_directory(
+                app.config['BRANDING_DIR'], 'app-icon.ico',
+                mimetype='image/x-icon')
         return ('', 204)
 
     # ---------------- 健康检查 ----------------

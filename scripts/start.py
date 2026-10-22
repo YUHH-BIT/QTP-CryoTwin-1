@@ -16,6 +16,7 @@ import socket
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
@@ -38,6 +39,23 @@ def port_free(port):
         return False
     finally:
         s.close()
+
+
+def open_browser_when_ready(url, port, timeout=300):
+    """等服务真正就绪再开浏览器。
+
+    冷启动时 app.py 要 import torch/rasterio 等重依赖，实测约 1 分钟；
+    原来固定 5 秒就 webbrowser.open，用户看到的是"无法访问此页面"。
+    这里轮询端口，连上后再开；超时也照样开（让用户看到地址自行刷新）。
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            with socket.create_connection(('127.0.0.1', port), timeout=1):
+                break
+        except OSError:
+            time.sleep(1.0)
+    webbrowser.open(url)
 
 
 def main():
@@ -124,7 +142,9 @@ def main():
     print()
 
     if not a.no_browser:
-        threading.Timer(5.0, lambda: webbrowser.open(url)).start()
+        threading.Thread(
+            target=open_browser_when_ready,
+            args=(url, port), daemon=True).start()
 
     try:
         return subprocess.run([PY, APP], cwd=ROOT, env=env).returncode

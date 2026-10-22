@@ -5,6 +5,7 @@
 标题标注命中率；图例为分级色块 + 点位符号（两列）。
 输出：outputs/figures/hit_rate_map.png（300 dpi）/.pdf
 """
+import argparse
 import numpy as np
 import pandas as pd
 import geopandas as gpd
@@ -32,17 +33,30 @@ plt.rcParams["axes.unicode_minus"] = False
 # 等级配色：0 未淹没白 / 1 蓝 / 2 浅蓝 / 3 黄 / 4 橙 / 5 红
 LVL_COLORS = ["#f7f7f7", "#2c7bb6", "#abd9e9", "#ffffbf", "#fdae61", "#d7191c"]
 
+# 0) 参数（默认 = 2024 年主口径；全时段检验用 --hazard/--points/--out 覆盖）
+ap = argparse.ArgumentParser(description="洪水点位命中率空间分布图")
+ap.add_argument("--hazard", default=str(HAZARD_TIF), help="危险性栅格 tif")
+ap.add_argument("--points", default=str(OUT_DIR / "points_2024_tp_levels.csv"),
+                help="点位等级表 csv（含 source / lon / lat / level_*km）")
+ap.add_argument("--out", default="hit_rate_map", help="输出文件名（不含扩展名）")
+ap.add_argument("--title", default="2024 年洪水危险性等级与历史洪水点位分布")
+ap.add_argument("--radius", type=float, default=1.0, help="主口径位置容差 km")
+ap.add_argument("--source", default="shp_combined", help="参与统计的点位来源")
+args = ap.parse_args()
+lvl_col = f"level_{int(args.radius)}km" if args.radius == int(args.radius) \
+    else f"level_{str(args.radius).replace('.', '_')}km"
+
 # 1) 读危险性栅格（分级 0–5）与 TP 边界
-with rasterio.open(HAZARD_TIF) as src:
+with rasterio.open(args.hazard) as src:
     arr = src.read(1).astype(np.int16)
     transform, crs = src.transform, src.crs
 bnd = gpd.read_file(TP_BOUNDARY).to_crs(crs)
 
-# 2) 读 SHP 点位，命中 = level_1km > 0
-df = pd.read_csv(OUT_DIR / "points_2024_tp_levels.csv", encoding="utf-8-sig")
-shp = df[df.source == "shp_combined"]
-hit = shp[shp.level_1km > 0]
-miss = shp[shp.level_1km <= 0]
+# 2) 读 SHP 点位，命中 = level > 0
+df = pd.read_csv(args.points, encoding="utf-8-sig")
+shp = df[df.source == args.source]
+hit = shp[shp[lvl_col] > 0]
+miss = shp[shp[lvl_col] <= 0]
 rate = len(hit) / len(shp)
 
 # 3) 绘图
@@ -72,8 +86,8 @@ ax.legend(handles=handles, loc="lower left", ncol=2, frameon=False,
 ax.set_xlabel("经度 (°E)"); ax.set_ylabel("纬度 (°N)")
 ax.set_xlim(73, 105); ax.set_ylim(25, 40)
 ax.set_aspect(1 / np.cos(np.radians(35)))
-ax.set_title("2024 年洪水危险性等级与历史洪水点位分布", fontsize=12)
-fig.savefig(FIG_DIR / "hit_rate_map.png", dpi=300)
-fig.savefig(FIG_DIR / "hit_rate_map.pdf")
+ax.set_title(args.title, fontsize=12)
+fig.savefig(FIG_DIR / f"{args.out}.png", dpi=300)
+fig.savefig(FIG_DIR / f"{args.out}.pdf")
 print(f"命中率 {rate:.1%}（{len(hit)}/{len(shp)}）")
-print("输出 outputs/figures/hit_rate_map.png/.pdf")
+print(f"输出 outputs/figures/{args.out}.png/.pdf")
