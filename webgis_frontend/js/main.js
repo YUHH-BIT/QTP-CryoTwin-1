@@ -3589,7 +3589,10 @@ function initNavHighlightByPage() {
     'simulate.html': '.dropdown-toggle[data-page="simulate"]',
     'alert.html': '.dropdown-toggle[data-page="alert"]',
     'decision.html': '.dropdown-toggle[data-page="decision"]',
-    'admin.html': '.dropdown-toggle[data-page="admin"]'
+    'admin.html': '.dropdown-toggle[data-page="admin"]',
+    // 三维示范区是决策支持下拉里的一个普通入口（独立页面），
+    // 停留时把「决策支持」这个导航项点亮
+    'terrain3d.html': '.dropdown-toggle[data-page="decision"]'
   };
   const pageName = (window.location.pathname.split('/').pop() || 'index.html');
   const selector = pageMap[pageName];

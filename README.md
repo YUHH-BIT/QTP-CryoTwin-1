@@ -11,13 +11,14 @@
 | 模拟预测 | `simulate.html` | LSTM 径流模拟（/api/simulate/runoff）、洪水淹没分析（/api/simulate/flood-inundation）、融雪洪水识别（/api/snowmelt/identify），支持导出淹没统计CSV与结果GeoTIFF |
 | 风险评估 | `alert.html` | 栅格像元级洪水风险评估 R = 危险性 × 暴露度 × 脆弱性（/api/alert/risk_assessment），输出 5 级分级 GeoTIFF，支持导出统计CSV / 下载GeoTIFF / 保存图表PNG |
 | 决策支持 | `decision.html` | 决策支持智能体（/api/llm/chat，SSE 流式，**检索增强**：回答自动引用系统真实灾害案例/县域数据/方法学并标注 [数据源]）+ **院士专家名录**（/api/expert/profiles）+ **防灾实例 / 工程措施 / 非工程措施**（/api/decision/content），密钥仅存后端 |
+| 三维地形 | `terrain3d.html` | **雅鲁藏布江流域三维地形**（Three.js 引擎）：按流域边界裁剪的立体地形块 + 贴合地形的边界线；Terrarium 公开高程 + 三维卫星影像 / 地形明暗图双贴图，可垂直夸张、切贴图、自动旋转；数据由 `scripts/build_terrain_page.py --basin 雅鲁藏布江 --region-id yarlung --zoom 10 --mesh 700` 生成（4.4MB），渲染完全本地。入口：各页「决策支持」下拉第一项「三维示范区」 |
 | 系统管理 | `admin.html` | 用户 / 角色 / 权限 CRUD、操作日志与图表统计、系统状态、数据文件管理（阈值/模型/上传数据）、决策智能体提示词设置，需登录 |
 
 ## 技术栈
 
 - 后端：Flask（蓝图 + 会话认证）、SQLite（`admin.db` 用户/角色/日志；`TibetanPlateau_index.db` / `era5_index.db` 数据索引）
 - 计算：rasterio / geopandas / shapely / scipy / numpy / torch（LSTM）/ matplotlib（出图与 GIF）
-- 前端：原生 HTML/JS/CSS，OpenLayers / ECharts / Font Awesome / Google Fonts 均本地托管（js/lib、css/lib、css/fonts），可离线运行（在线高德底图瓦片除外）
+- 前端：原生 HTML/JS/CSS，OpenLayers / ECharts / Font Awesome / Google Fonts 均本地托管（js/lib、css/lib、css/fonts），可离线运行（在线高德底图瓦片除外）；三维示范区用 Cesium 1.146（`webgis_frontend/cesium/` 自托管，quantized-mesh 地形瓦片本地生成）
 - 外部服务：高德地理编码 API（`/modules/geocode`）、DeepSeek API（决策智能体）
 
 ## 快速开始
@@ -117,10 +118,11 @@ Cryo-floods/
 │   │   └── utils.py           # 公共工具（缓存 / 路径安全校验）
 ├── webgis_frontend/           # 前端（Flask 直接托管）
 │   ├── *.html                 # index / query / simulate / alert / decision / admin / login
-│   ├── js/                    # main / query / simulate / alert / decision / admin / login / geotiff / ui-components
+│   ├── cesium/                # Cesium 1.146 Build（三维示范区自托管引擎，Apache-2.0）
+│   ├── js/                    # main / query / simulate / alert / decision / admin / login / geotiff / scene3d / ui-components
 │   └── css/                   # styles.css / components.css
 ├── docs/                      # 项目文档（分层编号，见下）
-│   ├── 01_技术思路/           # 00 总览索引 + 首页 / 灾害库 / 过程模拟 / 风险评估 / 决策支持 / 系统管理
+│   ├── 01_技术思路/           # 00 总览索引 + 首页 / 灾害库 / 过程模拟 / 风险评估 / 决策支持 / 系统管理 / 三维示范区建设方案
 │   ├── 02_模块技术说明/       # 洪水风险评估 / 专家咨询 / 决策支持内容
 │   ├── 03_评估与汇报/         # 经济数据方案 / 数据缺口对照 / 工作汇报 / 径流优化审查
 │   ├── 04_论文与规划/         # 论文架构设计文档
@@ -129,6 +131,7 @@ Cryo-floods/
 ├── scripts/                   # 独立维护脚本（非后端运行时依赖，路径均按项目根解析）
 │   ├── preprocess_economy.py      # 经济数据 xlsx → 系统规范 CSV / JSON
 │   ├── preprocess_osm_landuse.py  # OSM landuse → 多波段权重掩膜 GeoTIFF
+│   ├── build_3d_tiles.py          # 三维瓦片生成：DEM 填洞 / quantized-mesh 地形瓦片 / 矢量简化 / 影像缓存
 │   └── benchmark/             # 性能基准脚本
 │       ├── bench_runoff_speed.py  # 径流模拟端到端耗时基线
 │       └── bench_before_after.py  # 新旧实现实测对比
@@ -149,7 +152,11 @@ Cryo-floods/
 │   │       └── socioeconomic/ # 县域边界
 │   ├── processed/             # 中间成果（2.5GB）
 │   │   ├── economy/           # 县域人口/耕地/粮食/牲畜派生 CSV
-│   │   └── db/ geo/ dem/ GLDAS_snowmelt_max/
+│   │   ├── db/ dem/ geo/ GLDAS_snowmelt_max/
+│   │   └── 3d/                # 三维示范区数据区（scripts/build_3d_tiles.py 生成）
+│   │       ├── regions.json   #   区域注册表（新增区域只加记录，前后端零改动）
+│   │       ├── dem_filled.tif #   DEM 空洞全域确定性填充产物
+│   │       └── tp_full/       #   全域区域：terrain/（quantized-mesh 瓦片+layer.json）、vectors/（简化矢量）
 │   └── webgis/                # WebGIS 子系统数据区（路径常量见 config.py）
 │       ├── content/           # 业务内容数据：决策知识库 / 专家名录 JSON（入库）
 │       ├── uploads/           # 用户上传的经济数据（入库）
@@ -169,6 +176,9 @@ Cryo-floods/
 ```bash
 # 自动化冒烟测试：验证核心 API 与知识库（无需启动服务，使用 Flask test client）
 python tests/smoke_test.py
+
+# pytest 套件（含三维示范区回归测试：瓦片网格契约 / 编解码往返 / 接缝连续性 / 路由安全）
+python -m pytest tests/ -q
 ```
 
 覆盖：健康检查 / 专家名录 / 决策内容 / 灾害库 / 图层路由 / LLM 状态 / 登录鉴权 / 知识库构建与 RAG 检索。退出码 0 表示全部通过。
@@ -184,10 +194,12 @@ python tests/smoke_test.py
 - 智能体：`/api/llm/chat`（SSE，检索增强：自动注入系统真实数据并要求 [数据源] 标注）、`/api/llm/health`
 - 专家名录：`/api/expert/profiles`（支持 `?field=` 领域筛选、`?q=` 搜索）、`/api/expert/fields`（领域分类）
 - 决策内容：`/api/decision/content`（防灾实例 10 例 / 工程措施 20 条 / 非工程措施 12 条，含来源）
+- 三维示范区：`/api/3d/regions`、`/api/3d/regions/<id>`；地形瓦片 `/tiles3d/<region>/terrain/layer.json` 与 `/tiles3d/<region>/terrain/<z>/<x>/<y>.terrain`（quantized-mesh，TMS 网格 2^(z+1)×2^z）；矢量 `/tiles3d/<region>/vectors/<name>.geojson`；引擎静态资源 `/cesium/*`
 - 系统：`/api/system/status`、`/api/health`；管理：`/api/admin/*`（需登录+权限）
 
 ## 已知边界与后续规划
 
 - 动画/路径规划/应急资源调度等决策支持功能为“构想/待完善”状态（详见 `docs/04_论文与规划/青藏高原冰冻圈灾害数字孪生系统构建.md`）。
-- 已有自动化冒烟测试（`tests/smoke_test.py`），尚未接入 CI；风险评估与模拟为同步计算，长时段任务会阻塞请求线程，建议后续引入任务队列与进度轮询。
+- 三维示范区（决策支持 → 三维示范区页签）：全域地形 z0–z12 已本地化，影像为高德在线瓦片（需联网；断网时地形/矢量仍可用）。DEM 为 SRT 源（约90m），含空洞回填痕迹，陡峰高程偏低；掩膜外远场为常量填充的平缓地形。三维数据一次性生成命令见 `docs/01_技术思路/07_三维示范区建设方案.md`。
+- 已有自动化冒烟测试（`tests/smoke_test.py`）与 pytest 套件（`tests/test_scene3d.py` 等），尚未接入 CI；风险评估与模拟为同步计算，长时段任务会阻塞请求线程，建议后续引入任务队列与进度轮询。
 - 前端库/字体已本地化，离线可用；地图底图瓦片仍走高德在线服务，完全离线需另配本地瓦片服务或预缓存。

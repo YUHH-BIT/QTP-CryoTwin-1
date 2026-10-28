@@ -69,6 +69,15 @@ class Config:
     UPLOADS_DIR = os.path.join(WEBGIS_DATA_DIR, 'uploads')
     OUTPUTS_DIR = os.path.join(WEBGIS_DATA_DIR, 'outputs')
 
+    # ---- 三维示范区数据区（Cesium quantized-mesh 地形 / 简化矢量 / 区域注册表）----
+    # 由 scripts/build_3d_tiles.py 生成；接口契约见 modules/scene3d.py。
+    #   regions.json          全域注册表（区域唯一入口，新增区域只加记录不改代码）
+    #   dem_filled.tif        DEM 空洞全域确定性填充产物
+    #   <region>/terrain/     地形瓦片 + layer.json
+    #   <region>/vectors/     裁剪+简化矢量
+    SCENE3D_DIR = os.path.join(BASE_DIR, 'data', 'processed', '3d')
+    SCENE3D_MANIFEST = os.path.join(SCENE3D_DIR, 'regions.json')
+
     # 已废弃别名：STATIC_BACKEND_DIR 原指向 webgis_backend/static，
     # 现等价于 OUTPUTS_DIR。仅为兼容存量脚本保留，新代码一律用 OUTPUTS_DIR。
     STATIC_BACKEND_DIR = OUTPUTS_DIR
@@ -161,7 +170,8 @@ class Config:
         for d in (cls.RUNOFF_OUTPUT_DIR, cls.FLOOD_INUNDATION_DIR,
                   cls.RISK_RESULTS_DIR, cls.MASKS_DIR, cls.PNGS_DIR,
                   cls.ANIMATIONS_DIR, cls.MODELS_DIR, cls.THRESHOLDS_DIR,
-                  cls.CONTENT_DIR, cls.GLDAS_SNOWMELT_MAX_DIR, cls.UPLOADS_DIR):
+                  cls.CONTENT_DIR, cls.GLDAS_SNOWMELT_MAX_DIR, cls.UPLOADS_DIR,
+                  cls.SCENE3D_DIR):
             os.makedirs(d, exist_ok=True)
 
 

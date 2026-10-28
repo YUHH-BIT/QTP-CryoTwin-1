@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>青藏高原冰冻圈灾害数字孪生系统</title>
+  <!-- 与其余页面保持完全一致的样式引入顺序 -->
+  <link rel="stylesheet" href="css/lib/ol.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/components.css" />
+  <link href="css/lib/font-awesome.min.css" rel="stylesheet">
+  <!-- Three.js 本地托管（js/lib/，npm 包解出，非 CDN）。不使用 importmap：
+       OrbitControls 已改为相对路径 import './three.module.js'，
+       少一层解析、也少一类"映射没生效就整页不跑"的故障。 -->
+  <style>
+    html, body { margin: 0; height: 100%; background: #070b14; color: #e2e8f0;
+      font-family: -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; }
+    #stage { position: fixed; top: var(--nav-height); left: 0; right: 0; bottom: 0; }
+    #stage canvas { display: block; }
+    /* 天空渐变：canvas 透明，用它当背景，比纯色更像三维场景 */
+    #stage {
+      background: linear-gradient(180deg, #0b1a2b 0%, #14304a 42%, #2b4a5e 68%, #6d7f86 100%);
+    }
+    .hud { position: fixed; z-index: 10; pointer-events: none; }
+    .panel {
+      pointer-events: auto;
+      background: rgba(12, 20, 33, 0.82);
+      border: 1px solid rgba(125, 211, 252, 0.18);
+      border-radius: 12px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+    }
+    #title { display: none; }
+    #controls { display: none; }
+    /* 右上角区域信息卡（流域名称 + 指标），不再塞进图层面板 */
+    #info {
+      top: calc(var(--nav-height) + 16px); right: 16px; width: 306px;
+      padding: 12px 14px;
+    }
+    #info .basin-name {
+      margin: 0 0 6px; font-size: 15px; font-weight: 600; color: #7dd3fc;
+    }
+    #info .basin-meta {
+      font-size: 11px; line-height: 1.7; color: #94a3b8;
+    }
+    .sidepanel .mode-switch { margin-bottom: 12px; }
+    .layer-item.sidepanel-slider {
+      flex-direction: column; align-items: stretch; gap: 6px;
+    }
+    .layer-item.sidepanel-slider label {
+      display: flex; justify-content: space-between; font-size: 12px;
+      color: #94a3b8;
+    }
+    .sidepanel-btn {
+      width: 100%; padding: 7px 8px; font-size: 12px; cursor: pointer;
+      border-radius: 7px; border: 1px solid rgba(125, 211, 252, 0.22);
+      background: rgba(56, 189, 248, 0.12); color: #cbd5e1;
+      transition: background .18s ease;
+    }
+    .sidepanel-btn:hover { background: rgba(56, 189, 248, 0.26); }
+    input[type=range] { width: 100%; accent-color: #38bdf8; }
+    /* 冰冻圈业务图层雪花图标：统一为白色（与其它分类图标一致） */
+    #sidepanel .category-header .fa-snowflake-o { color: #fff; }
+    /* 加载遮罩：复用系统统一 .loading-overlay（css/styles.css），
+       这里只补错误态：隐藏转圈、文字转红、停止闪烁 */
+    #loading-overlay.error .loading-spinner { display: none; }
+    #loading-overlay.error .loading-text {
+      color: #fca5a5; animation: none;
+    }
+    .peak-label {
+      font-size: 11px; color: #fff; background: rgba(12, 20, 33, 0.72);
+      border: 1px solid rgba(125, 211, 252, 0.35); border-radius: 5px;
+      padding: 1px 5px; white-space: nowrap; pointer-events: none;
+    }
+    .back-link { display: inline-block; margin-top: 6px; font-size: 12px;
+      color: #7dd3fc; }
+    /* 业务图层图例（左下角） */
+    #legend {
+      bottom: 14px; right: 16px; padding: 10px 12px; font-size: 11px;
+      line-height: 1.9; color: #cbd5e1;
+    }
+    #legend .lg-title { color: #7dd3fc; font-weight: 600; margin-bottom: 4px;
+      text-align: center; }
+    #legend .lg-row { display: flex; align-items: center; gap: 7px; }
+    #legend .sw { width: 12px; height: 12px; border-radius: 3px; flex: 0 0 auto;
+      border: 1px solid rgba(255,255,255,0.25); }
+    /* 点击查询弹出的详情卡 */
+    #popup {
+      display: none; max-width: 280px; padding: 11px 13px; font-size: 12px;
+      line-height: 1.7; color: #e2e8f0; z-index: 30;
+    }
+    #popup .pp-title { font-size: 13px; font-weight: 700; color: #7dd3fc;
+      margin-bottom: 4px; }
+    #popup .pp-row { color: #94a3b8; }
+    #popup .pp-row b { color: #e2e8f0; font-weight: 600; }
+    #popup .pp-close { position: absolute; top: 6px; right: 9px; cursor: pointer;
+      color: #94a3b8; font-size: 14px; }
+    #popup .pp-close:hover { color: #e2e8f0; }
+  </style>
+</head>
+<body>
+  <!-- 顶部导航：与 index/decision 等页面逐字一致（本页不加载 main.js，故末尾内联一份下拉交互） -->
+  <div class="topbar">
+    <div class="topbar-row1">
+      <div class="logo">青藏高原冰冻圈灾害数字孪生系统</div>
+      <div class="user">
+        <span><i style="font-size:11px;"></i></span>
+      </div>
+    </div>
+    <div class="topbar-row2">
+      <div class="nav-links">
+        <a href="index.html">首页</a>
+        <div class="dropdown-container">
+          <a href="#" class="dropdown-toggle" data-page="query">灾害数据库</a>
+          <div class="dropdown-menu" id="disaster-dropdown">
+            <a href="query.html?cat=flood" class="dropdown-item" data-category="flood">洪水灾害数据库</a>
+            <a href="query.html?cat=snow" class="dropdown-item" data-category="snow">积雪灾害数据库</a>
+            <a href="query.html?cat=ice" class="dropdown-item" data-category="ice">冰川灾害数据库</a>
+            <a href="query.html?cat=permafrost" class="dropdown-item" data-category="permafrost">冻土灾害数据库</a>
+          </div>
+        </div>
+        <div class="dropdown-container">
+          <a href="#" class="dropdown-toggle" data-page="simulate">灾害过程模拟</a>
+          <div class="dropdown-menu" id="simulate-dropdown">
+            <a href="simulate.html?cat=flood-simulate" class="dropdown-item" data-category="flood-simulate">洪水灾害过程模拟</a>
+            <a href="simulate.html?cat=snow-simulate" class="dropdown-item" data-category="snow-simulate">积雪灾害过程模拟</a>
+            <a href="simulate.html?cat=ice-simulate" class="dropdown-item" data-category="ice-simulate">冰川灾害过程模拟</a>
+            <a href="simulate.html?cat=permafrost-simulate" class="dropdown-item" data-category="permafrost-simulate">冻土灾害过程模拟</a>
+          </div>
+        </div>
+        <div class="dropdown-container">
+          <a href="#" class="dropdown-toggle" data-page="alert">风险评估</a>
+          <div class="dropdown-menu" id="alert-dropdown">
+            <a href="alert.html?cat=flood" class="dropdown-item" data-category="flood">洪水灾害风险评估</a>
+            <a href="alert.html?cat=snow" class="dropdown-item" data-category="snow">积雪灾害风险评估</a>
+            <a href="alert.html?cat=ice" class="dropdown-item" data-category="ice">冰川灾害风险评估</a>
+            <a href="alert.html?cat=permafrost" class="dropdown-item" data-category="permafrost">冻土灾害风险评估</a>
+          </div>
+        </div>
+        <div class="dropdown-container">
+          <a href="#" class="dropdown-toggle active" data-page="decision">决策支持</a>
+          <div class="dropdown-menu" id="decision-dropdown">
+            <a href="terrain3d.html" class="dropdown-item">三维示范区</a>
+            <a href="decision.html?cat=llm" class="dropdown-item" data-category="llm">决策支持智能体</a>
+            <a href="decision.html?cat=expert" class="dropdown-item" data-category="expert">专家咨询</a>
+            <a href="decision.html?cat=prevention-example" class="dropdown-item" data-category="prevention-example">防灾实例</a>
+            <a href="decision.html?cat=non-engineering" class="dropdown-item" data-category="non-engineering">非工程措施</a>
+            <a href="decision.html?cat=engineering" class="dropdown-item" data-category="engineering">工程措施</a>
+          </div>
+        </div>
+        <div class="dropdown-container">
+          <a href="#" class="dropdown-toggle" data-page="admin">系统管理</a>
+          <div class="dropdown-menu" id="admin-dropdown">
+            <a href="admin.html?cat=user" class="dropdown-item" data-category="user">用户管理</a>
+            <a href="admin.html?cat=role" class="dropdown-item" data-category="role">角色管理</a>
+            <a href="admin.html?cat=permission" class="dropdown-item" data-category="permission">权限管理</a>
+            <a href="admin.html?cat=log" class="dropdown-item" data-category="log">系统日志</a>
+            <a href="admin.html?cat=data" class="dropdown-item" data-category="data">数据管理</a>
+            <a href="admin.html?cat=agent" class="dropdown-item" data-category="agent">智能体设置</a>
+            <a href="admin.html?cat=setting" class="dropdown-item" data-category="setting">系统设置</a>
+            <a href="admin.html?cat=status" class="dropdown-item" data-category="status">系统状态</a>
+          </div>
+        </div>
+      </div>
+      <div class="searchbar">
+        <input type="search" id="place-search" placeholder="搜索地点或流域…" />
+        <button id="search-btn" title="搜索">🔍</button>
+      </div>
+    </div>
+  </div>
+<script>
+// 下拉菜单交互（与 main.js 中 initUnifiedDropdowns 行为一致，本页独立实现）
+(function () {
+  document.querySelectorAll('.dropdown-toggle').forEach(function (t) {
+    t.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var menu = t.nextElementSibling;
+      document.querySelectorAll('.dropdown-menu.active').forEach(function (m) {
+        if (m !== menu) m.classList.remove('active');
+      });
+      if (menu) menu.classList.toggle('active');
+    });
+  });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.dropdown-container')) {
+      document.querySelectorAll('.dropdown-menu.active').forEach(function (m) {
+        m.classList.remove('active');
+      });
+    }
+  });
+
+  // 搜索框：本页是三维地形视图，不做二维地图的地名定位。
+  // 与其"点了没反应"，不如给一句明确说明。
+  var input = document.getElementById('place-search');
+  var btn = document.getElementById('search-btn');
+  function searchHint() {
+    var el = document.getElementById('status');
+    if (el) {
+      el.innerHTML = '<span class="err">三维示范区当前仅覆盖雅鲁藏布江流域（按流域边界裁剪）；' +
+        '地名搜索请在二维地图页面使用。</span>';
+    }
+  }
+  if (btn) {
+    btn.addEventListener('click', function () {
+      if (input && input.value.trim() === '') { input.focus(); return; }
+      searchHint();
+    });
+  }
+  if (input) {
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') searchHint();
+    });
+  }
+})();
+</script>
+
+<div id="stage"></div>
+
+<!-- 右上角区域信息卡：流域名称与指标 -->
+<div id="info" class="hud panel">
+  <div class="basin-name" id="basin-name">加载中…</div>
+  <div class="basin-meta" id="basin-meta"></div>
+</div>
+
+<!-- 左侧图层管理面板：与其余页面同一套 DOM 与行为
+     （.sidepanel-head 标题 + 收起按钮；收起后由 .sidepanel-toggle 圆钮展开） -->
+<div class="sidepanel" id="sidepanel">
+  <div class="sidepanel-head">
+    <span class="sidepanel-head-title"><i class="fa fa-th-large"></i>图层管理</span>
+    <button type="button" class="sidepanel-collapse-btn" title="收起面板">&times;</button>
+  </div>
+
+  <div class="mode-switch">
+    <button class="active" data-tex="satellite"
+            title="三维地形表面显示卫星影像（Esri World Imagery，已离线缓存）">三维卫星影像</button>
+    <button data-tex="hillshade"
+            title="地形明暗图：由高程算出光照明暗，不看照片纯看起伏（本地生成，完全离线）">地形明暗图</button>
+  </div>
+
+  <div class="category-container">
+    <div class="category">
+      <div class="category-header">
+        <span><i class="fa fa-globe"></i> 叠加图层</span>
+        <i class="fa fa-chevron-down toggle-icon"></i>
+      </div>
+      <div class="category-content">
+        <div class="layer-item">
+          <input type="checkbox" id="lyr-boundary" class="layer-checkbox" checked>
+          <label for="lyr-boundary">流域边界</label>
+        </div>
+        <div class="layer-item">
+          <input type="checkbox" id="lyr-wire" class="layer-checkbox">
+          <label for="lyr-wire">线框网格</label>
+        </div>
+        <div class="layer-item">
+          <input type="checkbox" id="lyr-auto" class="layer-checkbox" checked>
+          <label for="lyr-auto">自动旋转</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="category">
+      <div class="category-header">
+        <span><i class="fa fa-snowflake-o"></i> 冰冻圈业务图层</span>
+        <i class="fa fa-chevron-down toggle-icon"></i>
+      </div>
+      <div class="category-content">
+        <div class="layer-item">
+          <input type="checkbox" id="lyr-glacier" class="layer-checkbox" checked>
+          <label for="lyr-glacier">冰川</label>
+        </div>
+        <div class="layer-item">
+          <input type="checkbox" id="lyr-lake" class="layer-checkbox" checked>
+          <label for="lyr-lake">冰湖</label>
+        </div>
+        <div class="layer-item">
+          <input type="checkbox" id="lyr-disaster" class="layer-checkbox" checked>
+          <label for="lyr-disaster">灾害点</label>
+        </div>
+        <div class="layer-item">
+          <input type="checkbox" id="lyr-avalanche" class="layer-checkbox" checked>
+          <label for="lyr-avalanche">雪崩危害</label>
+        </div>
+        <div class="layer-item">
+          <input type="checkbox" id="lyr-blizzard" class="layer-checkbox" checked>
+          <label for="lyr-blizzard">风吹雪危害</label>
+        </div>
+        <div class="layer-item">
+          <input type="checkbox" id="lyr-rts" class="layer-checkbox" checked>
+          <label for="lyr-rts">多年冻土热融滑塌</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="category">
+      <div class="category-header">
+        <span><i class="fa fa-sliders"></i> 显示设置</span>
+        <i class="fa fa-chevron-down toggle-icon"></i>
+      </div>
+      <div class="category-content">
+        <div class="layer-item sidepanel-slider">
+          <label for="exag">垂直夸张 <span id="exag-val">1.5×</span></label>
+          <input type="range" id="exag" min="0.5" max="3" step="0.1" value="1.5">
+        </div>
+        <div class="layer-item">
+          <button id="btn-reset" class="sidepanel-btn">重置视角</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 面板收起后的展开圆钮（与 main.js 的 initSidepanelFloat 同一套：body.sidepanel-collapsed 时显示） -->
+<button type="button" class="sidepanel-toggle" id="sidepanel-toggle" title="展开图层面板">
+  <i class="fa fa-th-large"></i>
+</button>
+
+<div id="legend" class="hud panel">
+  <div class="lg-title">图例</div>
+  <div class="lg-row"><span class="sw" style="background:#bfe9ff"></span>冰川</div>
+  <div class="lg-row"><span class="sw" style="background:#2f7fd6"></span>冰湖</div>
+  <div class="lg-row"><span class="sw" style="background:#ff4d4d"></span>冰湖溃决洪水</div>
+  <div class="lg-row"><span class="sw" style="background:#b266ff"></span>滑坡堰塞湖溃决洪水</div>
+  <div class="lg-row"><span class="sw" style="background:#ff9f43"></span>降雨型洪水</div>
+  <div class="lg-row"><span class="sw" style="background:#ffe14d"></span>融雪洪水</div>
+  <div class="lg-row"><span class="sw" style="background:#ff6b9d"></span>雪崩危害</div>
+  <div class="lg-row"><span class="sw" style="background:#6be3ff"></span>风吹雪危害</div>
+  <div class="lg-row"><span class="sw" style="background:#8d6e63"></span>多年冻土热融滑塌</div>
+</div>
+
+<div id="popup" class="hud panel">
+  <span class="pp-close" id="popup-close">×</span>
+  <div id="popup-body"></div>
+</div>
+
+<div class="loading-overlay active" id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loading-text">系统正在加载，请稍后...</div>
+</div>
+
+<script>
+// 先注册错误捕获（普通脚本，一定先于 module 执行）：
+// 任何"脚本没跑起来 / 模块加载失败 / 顶层抛错"以前只会让覆盖层停在初始文案，
+// 现在会把真实原因直接打到画面上。
+(function () {
+  function show(title, detail) {
+    var ov = document.getElementById('loading-overlay');
+    var t = document.getElementById('loading-text');
+    if (!ov) return;
+    ov.classList.add('active');
+    ov.classList.add('error');
+    if (t) t.innerHTML = title +
+      (detail ? '<br><span style="font-size:12px;color:#94a3b8;">' + detail + '</span>' : '');
+  }
+  window.__terrainShowError = show;
+
+  window.addEventListener('error', function (e) {
+    var el = e.target;
+    if (el && el.tagName === 'SCRIPT') {
+      show('脚本加载失败', '没能取到：' + (el.src || '(inline)') +
+        '<br>当前页面地址：' + location.href);
+    } else if (e.message) {
+      show('脚本执行出错', (e.message || '') + '<br>' +
+        (e.filename || '') + ':' + (e.lineno || ''));
+    }
+  }, true);
+
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    show('异步加载失败', (r && (r.message || r)) ? String(r.message || r) : '未知错误');
+  });
+
+  // 看门狗：12 秒还没进入场景，就把卡点（含当前地址）顯示出来
+  setTimeout(function () {
+    var ov = document.getElementById('loading-overlay');
+    if (ov && ov.classList.contains('active')) {
+      show('加载卡住（12 秒）',
+        '当前页面地址：<b>' + location.href + '</b><br>' +
+        '若这不是 http://127.0.0.1:5000/terrain3d.html，请改用该地址打开' +
+        '（相对路径的 js/lib 与 terrain3d 数据需要由 Flask 提供）。<br>' +
+        '也可能是浏览器不支持 WebGL2，或 js/lib/three.module.js 没取到。');
+    }
+  }, 12000);
+})();
+</script>
+
+<script type="module">
+import * as THREE from './js/lib/three.module.js';
+import { OrbitControls } from './js/lib/OrbitControls.js';
+
+const REGION = new URLSearchParams(location.search).get('region') || 'yarlung';
+const DATA_BASE = `terrain3d/${REGION}/`;
+
+const overlay = document.getElementById('loading-overlay');
+const loadingText = document.getElementById('loading-text');
+const statusEl = document.getElementById('status');
+
+function fail(title, detail) {
+  overlay.classList.add('active');
+  overlay.classList.add('error');
+  loadingText.innerHTML = title +
+    (detail ? '<br><span style="font-size:12px;color:#94a3b8;">' + detail + '</span>' : '');
+  if (statusEl) statusEl.innerHTML = `<span class="err">${title}</span>`;
+}
+
+function ok(html) { if (statusEl) statusEl.innerHTML = `<span class="ok">${html}</span>`; }
+
+// ---------------------------------------------------------------- 数据加载
+async function loadMeta() {
+  const r = await fetch(DATA_BASE + 'meta.json', { cache: 'no-store' });
+  if (!r.ok) throw new Error(`meta.json 读取失败（HTTP ${r.status}）`);
+  return r.json();
+}
+
+async function loadHeights(meta) {
+  const r = await fetch(DATA_BASE + meta.heights, { cache: 'no-store' });
+  if (!r.ok) throw new Error(`${meta.heights} 读取失败（HTTP ${r.status}）`);
+  const buf = await r.arrayBuffer();
+  const n = meta.meshSize + 1;
+  const expect = n * n * 2;
+  if (buf.byteLength !== expect) {
+    throw new Error(`高度场长度不符：期望 ${expect}B，实际 ${buf.byteLength}B`);
+  }
+  return new Int16Array(buf);
+}
+
+// 流域掩膜：n×n（每个四边形一格），1 = 在流域内
+async function loadMask(meta) {
+  if (!meta.mask) return null;
+  const r = await fetch(DATA_BASE + meta.mask, { cache: 'no-store' });
+  if (!r.ok) {
+    console.warn('掩膜读取失败，退化为整块矩形地形');
+    return null;
+  }
+  const m = new Uint8Array(await r.arrayBuffer());
+  const expect = meta.meshSize * meta.meshSize;
+  if (m.length !== expect) {
+    console.warn(`掩膜长度不符（${m.length} vs ${expect}），忽略`);
+    return null;
+  }
+  return m;
+}
+
+function loadTexture(url) {
+  return new Promise((resolve, reject) => {
+    new THREE.TextureLoader().load(url, (t) => {
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = 8;
+      resolve(t);
+    }, undefined, () => reject(new Error(`贴图加载失败：${url}`)));
+  });
+}
+
+// ---------------------------------------------------------------- 场景
+// 放在 initScene() 里、由 main() 的 try 调用：WebGL 上下文创建失败等顶层错误
+// 才能落到 catch 里显示出来，而不是让覆盖层一直停在"正在加载"。
+let renderer = null, scene = null, camera = null, controls = null;
+
+function initScene() {
+  const stage = document.getElementById('stage');
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  stage.appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x24384a, 400000, 1200000);
+
+  camera = new THREE.PerspectiveCamera(48, innerWidth / innerHeight, 200, 4000000);
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.maxPolarAngle = Math.PI * 0.495;   // 不允许翻到地平线以下
+  controls.minDistance = 8000;
+  controls.maxDistance = 1600000;
+  // 默认自动旋转（与左侧「自动旋转」勾选框默认勾选一致）
+  controls.autoRotate = true;
+  controls.autoRotateSpeed = 0.55;
+}
+
+let mesh = null, metaRef = null, heightsRef = null, exag = 1.5;
+let textures = {};
+let basinMask = null;        // n×n Uint8：1=流域内
+let outlineGroup = null;     // 流域边界线
+
+// 用掩膜只生成流域内的四边形（不再是整块矩形）
+function buildTerrain(meta, heightsAmplified) {
+  const n = meta.meshSize;
+  const N = n + 1;
+  const sizeX = meta.sizeMeters.x;
+  const sizeZ = meta.sizeMeters.z;
+
+  const positions = new Float32Array(N * N * 3);
+  const uvs = new Float32Array(N * N * 2);
+  for (let r = 0; r < N; r++) {
+    for (let c = 0; c < N; c++) {
+      const i = r * N + c;
+      positions[3 * i] = -sizeX / 2 + sizeX * c / n;        // x 西→东
+      positions[3 * i + 1] = heightsAmplified[i];           // y 高程
+      positions[3 * i + 2] = -sizeZ / 2 + sizeZ * r / n;    // z 北→南
+      uvs[2 * i] = c / n;
+      uvs[2 * i + 1] = 1 - r / n;
+    }
+  }
+
+  const indices = [];
+  for (let r = 0; r < n; r++) {
+    for (let c = 0; c < n; c++) {
+      if (basinMask && !basinMask[r * n + c]) continue;     // 流域外不画
+      const a = r * N + c, b = a + 1, cc = a + N + 1, d = a + N;
+      indices.push(a, cc, b, a, d, cc);                     // 法线朝 +Y
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+  geo.setIndex(indices);
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  geo.computeBoundingBox();
+  console.log(`[terrain3d] 四边形 ${indices.length / 6} / ${n * n}，`
+    + `顶点 ${N * N}`);
+
+  const mat = new THREE.MeshStandardMaterial({
+    map: textures.satellite || textures.hillshade,
+    roughness: 0.96,
+    metalness: 0.0,
+    side: THREE.DoubleSide,     // 边界处可能有单面三角形，双面更稳
+  });
+  return new THREE.Mesh(geo, mat);
+}
+
+// 流域边界线（贴着地形画）
+function buildOutline(meta) {
+  const grp = new THREE.Group();
+  const bn = meta.basin;
+  if (!bn || !bn.boundary || !bn.boundary.length) return grp;
+  const b = meta.bbox;
+  const cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
+  const kx = 111320 * Math.cos((b[1] + b[3]) / 2 * Math.PI / 180);
+  const kz = 110540;
+  const mat = new THREE.LineBasicMaterial({ color: 0xffd166 });
+  for (const ring of bn.boundary) {
+    const pts = [];
+    for (const [lon, lat] of ring) {
+      const y = terrainHeightAt(lon, lat) + 800;
+      pts.push(new THREE.Vector3((lon - cx) * kx, y, -(lat - cy) * kz));
+    }
+    grp.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
+  }
+  return grp;
+}
+
+function updateOutlineHeights(meta) {
+  if (!outlineGroup || !meta.basin) return;
+  const b = meta.bbox;
+  const cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
+  const kx = 111320 * Math.cos((b[1] + b[3]) / 2 * Math.PI / 180);
+  const kz = 110540;
+  let idx = 0;
+  for (const ring of meta.basin.boundary) {
+    const line = outlineGroup.children[idx++];
+    if (!line) continue;
+    const attr = line.geometry.getAttribute('position');
+    ring.forEach(([lon, lat], k) => {
+      attr.setY(k, terrainHeightAt(lon, lat) + 800);
+    });
+    attr.needsUpdate = true;
+    line.geometry.computeBoundingSphere();
+  }
+}
+
+function applyExaggeration(factor) {
+  if (!mesh || !heightsRef || !metaRef) return;
+  const pos = mesh.geometry.attributes.position;
+  const base = metaRef.minHeight;
+  for (let i = 0; i < pos.count; i++) {
+    pos.setY(i, base + heightsRef[i] * factor);
+  }
+  pos.needsUpdate = true;
+  mesh.geometry.computeVertexNormals();
+  mesh.geometry.computeBoundingSphere();
+  updateOutlineHeights(metaRef);
+  redrapeOverlays();
+  document.getElementById('exag-val').textContent = factor.toFixed(1) + '×';
+}
+
+// 给定经纬度取该点地形高度（流域边界线贴地用）
+function terrainHeightAt(lon, lat) {
+  const m = metaRef;
+  if (!m || !heightsRef) return m ? m.minHeight : 0;
+  const n = m.meshSize + 1;
+  const col = Math.round((lon - m.bbox[0]) / (m.bbox[2] - m.bbox[0]) * m.meshSize);
+  const row = Math.round((m.bbox[3] - lat) / (m.bbox[3] - m.bbox[1]) * m.meshSize);
+  const c = Math.min(Math.max(col, 0), n - 1);
+  const r = Math.min(Math.max(row, 0), n - 1);
+  return m.minHeight + heightsRef[r * n + c] * exag;
+}
+
+function resetView() {
+  if (!metaRef) return;
+  const sx = metaRef.sizeMeters.x, sz = metaRef.sizeMeters.z;
+  // 按长宽比取景：宽条形（流域多为东西向狭长）从南侧斜看，别退到太远
+  const dist = Math.max(sz * 1.5, sx * 0.5);
+  camera.position.set(0, dist * 0.55, dist * 0.85);
+  controls.target.set(0, metaRef.minHeight, 0);
+  camera.far = Math.max(sx, sz) * 6;
+  camera.updateProjectionMatrix();
+  controls.update();
+}
+
+// ---------------------------------------------------------------- 交互
+// 贴图切换（.mode-switch 里的两个按钮）
+document.querySelector('.sidepanel .mode-switch').addEventListener('click', (e) => {
+  const btn = e.target.closest('button');
+  if (!btn || !mesh) return;
+  const key = btn.dataset.tex;
+  if (!textures[key]) return;
+  document.querySelectorAll('.sidepanel .mode-switch button')
+    .forEach(b => b.classList.toggle('active', b === btn));
+  mesh.material.map = textures[key];
+  mesh.material.needsUpdate = true;
+});
+
+document.getElementById('exag').addEventListener('input', (e) => {
+  exag = parseFloat(e.target.value) || 1;
+  applyExaggeration(exag);
+});
+
+document.getElementById('lyr-wire').addEventListener('change', (e) => {
+  if (!mesh) return;
+  mesh.material.wireframe = e.target.checked;
+});
+
+document.getElementById('lyr-boundary').addEventListener('change', (e) => {
+  if (outlineGroup) outlineGroup.visible = e.target.checked;
+});
+
+document.getElementById('lyr-auto').addEventListener('change', (e) => {
+  if (!controls) return;
+  controls.autoRotate = e.target.checked;
+});
+
+// ---------------------------------------------------------------- 面板折叠
+// 与 main.js 的 initCategoryFold / initSidepanelFloat 同一套行为：
+//   ① 分类手风琴（初始全部收起，点一个收起其他，箭头旋转 180°）
+//   ② 面板头部「×」收起整个面板 → 左侧圆钮 .sidepanel-toggle 点击展开
+(function initPanelFold() {
+  const panel = document.getElementById('sidepanel');
+  const toggleBtn = document.getElementById('sidepanel-toggle');
+
+  document.querySelectorAll('.category-header').forEach((header) => {
+    const content = header.parentElement.querySelector('.category-content');
+    const toggleIcon = header.querySelector('.toggle-icon');
+    content.classList.remove('expanded');
+    header.classList.remove('active');
+    if (toggleIcon) toggleIcon.style.transform = 'rotate(0deg)';
+    header.setAttribute('tabindex', '0');
+
+    header.addEventListener('click', function () {
+      const isExpanded = content.classList.contains('expanded');
+      if (isExpanded) {
+        content.classList.remove('expanded');
+        header.classList.remove('active');
+        if (toggleIcon) toggleIcon.style.transform = 'rotate(0deg)';
+        content.style.transition = 'max-height 0.3s ease';
+        content.style.maxHeight = '0';
+      } else {
+        // 手风琴：先收起其他已展开的分类
+        document.querySelectorAll('.category-content.expanded').forEach((other) => {
+          if (other === content) return;
+          other.classList.remove('expanded');
+          const oh = other.parentElement.querySelector('.category-header');
+          if (oh) oh.classList.remove('active');
+          const oi = other.parentElement.querySelector('.toggle-icon');
+          if (oi) oi.style.transform = 'rotate(0deg)';
+          other.style.maxHeight = '0';
+        });
+        content.classList.add('expanded');
+        header.classList.add('active');
+        if (toggleIcon) toggleIcon.style.transform = 'rotate(180deg)';
+        content.style.maxHeight = content.scrollHeight + 'px';
+      }
+    });
+    header.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); this.click(); }
+    });
+  });
+
+  const collapseBtn = panel && panel.querySelector('.sidepanel-collapse-btn');
+  if (collapseBtn) {
+    collapseBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      panel.classList.add('collapsed');
+      document.body.classList.add('sidepanel-collapsed');
+    });
+  }
+  if (toggleBtn && panel) {
+    toggleBtn.addEventListener('click', function () {
+      panel.classList.remove('collapsed');
+      document.body.classList.remove('sidepanel-collapsed');
+    });
+  }
+})();
+
+document.getElementById('btn-reset').addEventListener('click', resetView);
+
+addEventListener('resize', () => {
+  if (!camera || !renderer) return;
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+// ---------------------------------------------------------------- 业务图层
+// 冰川 / 冰湖 / 灾害点（与二维地图同源，按流域裁剪），支持点击查询
+let glacierMesh = null, lakeGroup = null, disasterGroup = null, hazardGroups = {};
+let glacierCentroids = null;          // 冰川质心索引：点击就近查具体冰川
+let bizReady = false;
+const GLACIER_OFFSET = 70, LAKE_OFFSET = 45, DISASTER_OFFSET = 900;
+let DISASTER_RADIUS = 4000;
+let downX = 0, downY = 0;
+
+const DISASTER_COLORS = { GLOF: 0xff4d4d, LLOF: 0xb266ff, PF: 0xff9f43, SF: 0xffe14d };
+
+// 危害范围多边形样式（颜色/不透明度/离地高度）
+const HAZARD_STYLE = {
+  avalanche: { color: 0xff6b9d, opacity: 0.5, offset: 30 },
+  blizzard:  { color: 0x6be3ff, opacity: 0.5, offset: 30 },
+  rts:       { color: 0x8d6e63, opacity: 0.55, offset: 18 },
+};
+
+// 经纬度 <-> 局部坐标（与 buildOutline / 地形顶点完全一致）
+function _kx() { const b = metaRef.bbox; return 111320 * Math.cos((b[1] + b[3]) / 2 * Math.PI / 180); }
+function _kz() { return 110540; }
+function xOf(lon) { const b = metaRef.bbox, cx = (b[0] + b[2]) / 2; return (lon - cx) * _kx(); }
+function zOf(lat) { const b = metaRef.bbox, cy = (b[1] + b[3]) / 2; return -(lat - cy) * _kz(); }
+function lonOf(x) { const b = metaRef.bbox, cx = (b[0] + b[2]) / 2; return x / _kx() + cx; }
+function latOf(z) { const b = metaRef.bbox, cy = (b[1] + b[3]) / 2; return cy - z / _kz(); }
+
+// 冰川：由同分辨率栅格掩膜生成，仅取流域内单元，贴合地形
+function buildGlacierMask(maskArr) {
+  const n = metaRef.meshSize, sizeX = metaRef.sizeMeters.x, sizeZ = metaRef.sizeMeters.z;
+  const b = metaRef.bbox;
+  const positions = [], lonlat = [], cells = [];
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    if (!maskArr[r * n + c]) continue;
+    if (basinMask && !basinMask[r * n + c]) continue;
+    cells.push([r, c]);
+  }
+  for (const [r, c] of cells) {
+    const corners = [[r, c], [r, c + 1], [r + 1, c + 1], [r + 1, c]];
+    const tris = [[0, 3, 1], [0, 2, 3]];
+    for (const t of tris) for (const k of t) {
+      const rr = corners[k][0], cc = corners[k][1];
+      const x = -sizeX / 2 + sizeX * cc / n, z = -sizeZ / 2 + sizeZ * rr / n;
+      const lon = b[0] + (cc / n) * (b[2] - b[0]), lat = b[3] - (rr / n) * (b[3] - b[1]);
+      positions.push(x, terrainHeightAt(lon, lat) + GLACIER_OFFSET, z);
+      lonlat.push(lon, lat);
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.computeVertexNormals(); geo.computeBoundingSphere();
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xbfe9ff, transparent: true, opacity: 0.55, roughness: 0.85,
+    metalness: 0.0, side: THREE.DoubleSide, depthWrite: false });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData.lonlat = new Float32Array(lonlat); mesh.userData.offset = GLACIER_OFFSET;
+  mesh.renderOrder = 2;
+  return mesh;
+}
+
+// 冰湖：由矢量多边形（已裁剪到流域）生成，THREE.Shape 自动三角化（含空洞）
+function buildLake(rings) {
+  const shape = new THREE.Shape();
+  const o = rings.outer;
+  shape.moveTo(xOf(o[0][0]), zOf(o[0][1]));
+  for (let i = 1; i < o.length; i++) shape.lineTo(xOf(o[i][0]), zOf(o[i][1]));
+  for (const h of (rings.holes || [])) {
+    const p = new THREE.Path();
+    p.moveTo(xOf(h[0][0]), zOf(h[0][1]));
+    for (let i = 1; i < h.length; i++) p.lineTo(xOf(h[i][0]), zOf(h[i][1]));
+    shape.holes.push(p);
+  }
+  const geo = new THREE.ShapeGeometry(shape);
+  const pos = geo.attributes.position, cnt = pos.count;
+  const arr = new Float32Array(cnt * 3), lonlat = [];
+  for (let i = 0; i < cnt; i++) {
+    const lx = pos.getX(i), lz = pos.getY(i);
+    const lon = lonOf(lx), lat = latOf(lz);
+    arr[3 * i] = lx; arr[3 * i + 1] = terrainHeightAt(lon, lat) + LAKE_OFFSET; arr[3 * i + 2] = lz;
+    lonlat.push(lon, lat);
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+  geo.computeVertexNormals(); geo.computeBoundingSphere();
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0x2f7fd6, transparent: true, opacity: 0.72, roughness: 0.25,
+    metalness: 0.15, side: THREE.DoubleSide, depthWrite: false });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData.lonlat = new Float32Array(lonlat); mesh.userData.offset = LAKE_OFFSET;
+  mesh.renderOrder = 3;
+  return mesh;
+}
+
+function buildDisasters(list) {
+  const grp = new THREE.Group();
+  const sphere = new THREE.SphereGeometry(1, 14, 12);
+  for (const d of list) {
+    const mat = new THREE.MeshBasicMaterial({ color: DISASTER_COLORS[d.type] || 0xffffff });
+    const m = new THREE.Mesh(sphere, mat);
+    m.scale.setScalar(DISASTER_RADIUS);
+    m.position.set(xOf(d.lon), terrainHeightAt(d.lon, d.lat) + DISASTER_OFFSET, zOf(d.lat));
+    m.userData = { disaster: { type: d.type, label: d.label, lon: d.lon, lat: d.lat, props: d.props },
+                   lon: d.lon, lat: d.lat, offset: DISASTER_OFFSET };
+    grp.add(m);
+  }
+  return grp;
+}
+
+// 危害范围多边形（可含多个环/空洞），贴合地形生成半透明面
+function buildHazard(entry, style) {
+  const grp = new THREE.Group();
+  for (const rings of (entry.rings || [])) {
+    const shape = new THREE.Shape();
+    const o = rings.outer;
+    shape.moveTo(xOf(o[0][0]), zOf(o[0][1]));
+    for (let i = 1; i < o.length; i++) shape.lineTo(xOf(o[i][0]), zOf(o[i][1]));
+    for (const h of (rings.holes || [])) {
+      const p = new THREE.Path();
+      p.moveTo(xOf(h[0][0]), zOf(h[0][1]));
+      for (let i = 1; i < h.length; i++) p.lineTo(xOf(h[i][0]), zOf(h[i][1]));
+      shape.holes.push(p);
+    }
+    const geo = new THREE.ShapeGeometry(shape);
+    const pos = geo.attributes.position, cnt = pos.count;
+    const arr = new Float32Array(cnt * 3), lonlat = [];
+    for (let i = 0; i < cnt; i++) {
+      const lx = pos.getX(i), lz = pos.getY(i);
+      const lon = lonOf(lx), lat = latOf(lz);
+      arr[3 * i] = lx; arr[3 * i + 1] = terrainHeightAt(lon, lat) + style.offset; arr[3 * i + 2] = lz;
+      lonlat.push(lon, lat);
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    geo.computeVertexNormals(); geo.computeBoundingSphere();
+    const mat = new THREE.MeshStandardMaterial({
+      color: style.color, transparent: true, opacity: style.opacity, roughness: 0.6,
+      metalness: 0.0, side: THREE.DoubleSide, depthWrite: false });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.userData.lonlat = new Float32Array(lonlat); mesh.userData.offset = style.offset;
+    mesh.userData.hazard = entry.label; mesh.renderOrder = 4;
+    grp.add(mesh);
+  }
+  return grp;
+}
+
+async function loadBusiness() {
+  const biz = metaRef.business;
+  window.__t3d = { biz: 'pending' };
+  console.log('[biz] enter REGION=', REGION, 'DATA_BASE=', DATA_BASE, 'biz=', JSON.stringify(biz && Object.keys(biz)));
+  if (!biz) { bizReady = true; window.__t3d = { biz: 'none' }; return; }
+  DISASTER_RADIUS = Math.max(metaRef.sizeMeters.x, metaRef.sizeMeters.z) * 0.0035;
+  console.log('[biz] radius=', DISASTER_RADIUS);
+  try {
+    if (biz.glacier) {
+      console.log('[biz] fetching glacier', DATA_BASE + biz.glacier);
+      const r = await fetch(DATA_BASE + biz.glacier, { cache: 'no-store' });
+      console.log('[biz] glacier fetch done', r.status);
+      if (r.ok) {
+        const m = new Uint8Array(await r.arrayBuffer());
+        console.log('[biz] glacier bytes', m.length);
+        if (m.length === metaRef.meshSize * metaRef.meshSize) {
+          glacierMesh = buildGlacierMask(m);
+          glacierMesh.visible = document.getElementById('lyr-glacier').checked;
+          scene.add(glacierMesh);
+          console.log('[biz] glacier mesh built');
+        }
+      }
+    }
+    if (biz.glaciers) {
+      const r = await fetch(DATA_BASE + biz.glaciers, { cache: 'no-store' });
+      if (r.ok) glacierCentroids = await r.json();
+    }
+    if (biz.lakes) {
+      const r = await fetch(DATA_BASE + biz.lakes, { cache: 'no-store' });
+      if (r.ok) {
+        const lakes = await r.json();
+        if (lakes.length) {
+          lakeGroup = new THREE.Group();
+          for (const lv of lakes) {
+            const mesh = buildLake(lv.rings[0]);
+            mesh.userData.lakeId = lv.id; mesh.userData.lakeArea = lv.area;
+            lakeGroup.add(mesh);
+          }
+          lakeGroup.visible = document.getElementById('lyr-lake').checked;
+          scene.add(lakeGroup);
+        }
+      }
+    }
+    if (biz.disasters) {
+      const r = await fetch(DATA_BASE + biz.disasters, { cache: 'no-store' });
+      if (r.ok) {
+        const list = await r.json();
+        if (list.length) {
+          disasterGroup = buildDisasters(list);
+          disasterGroup.visible = document.getElementById('lyr-disaster').checked;
+          scene.add(disasterGroup);
+        }
+      }
+    }
+    if (biz.hazards) {
+      for (const [key, fn] of Object.entries(biz.hazards)) {
+        const r = await fetch(DATA_BASE + fn, { cache: 'no-store' });
+        if (!r.ok) continue;
+        const list = await r.json();
+        if (!list.length) continue;
+        const grp = new THREE.Group();
+        for (const e of list) grp.add(buildHazard(e, HAZARD_STYLE[key]));
+        grp.visible = document.getElementById('lyr-' + key).checked;
+        scene.add(grp);
+        hazardGroups[key] = grp;
+      }
+    }
+    wireBusinessToggles();
+    renderer.domElement.addEventListener('pointerdown', (e) => { downX = e.clientX; downY = e.clientY; });
+    renderer.domElement.addEventListener('click', (e) => {
+      if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) return;  // 拖动旋转不算点击
+      onPick(e);
+    });
+    document.getElementById('popup-close').addEventListener('click', hidePopup);
+    bizReady = true;
+    window.__t3d = {
+      biz: 'ok',
+      glacier: !!glacierMesh, glacierCells: glacierMesh ? glacierMesh.geometry.attributes.position.count / 6 : 0,
+      lakes: lakeGroup ? lakeGroup.children.length : 0,
+      disasters: disasterGroup ? disasterGroup.children.length : 0,
+      hazards: Object.fromEntries(Object.entries(hazardGroups).map(([k, g]) => [k, g.children.length])),
+    };
+  } catch (err) {
+    console.warn('业务图层加载失败：', err);
+    bizReady = true;
+    window.__t3d = { biz: 'fail', err: String(err) };
+  }
+}
+
+function wireBusinessToggles() {
+  const g = document.getElementById('lyr-glacier');
+  g.addEventListener('change', (e) => { if (glacierMesh) glacierMesh.visible = e.target.checked; });
+  const l = document.getElementById('lyr-lake');
+  l.addEventListener('change', (e) => { if (lakeGroup) lakeGroup.visible = e.target.checked; });
+  const d = document.getElementById('lyr-disaster');
+  d.addEventListener('change', (e) => { if (disasterGroup) disasterGroup.visible = e.target.checked; });
+  for (const key of Object.keys(HAZARD_STYLE)) {
+    const el = document.getElementById('lyr-' + key);
+    if (el) el.addEventListener('change', (e) => {
+      if (hazardGroups[key]) hazardGroups[key].visible = e.target.checked;
+    });
+  }
+}
+
+// ---- 点击查询 ----
+const _ray = new THREE.Raycaster();
+const _ptr = new THREE.Vector2();
+
+function onPick(e) {
+  if (!bizReady) return;
+  const rect = renderer.domElement.getBoundingClientRect();
+  _ptr.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+  _ptr.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  _ray.setFromCamera(_ptr, camera);
+  const targets = [];
+  if (glacierMesh && glacierMesh.visible) targets.push(glacierMesh);
+  if (lakeGroup && lakeGroup.visible) targets.push(...lakeGroup.children);
+  if (disasterGroup && disasterGroup.visible) targets.push(...disasterGroup.children);
+  for (const k in hazardGroups)
+    if (hazardGroups[k] && hazardGroups[k].visible) targets.push(...hazardGroups[k].children);
+  if (!targets.length) { hidePopup(); return; }
+  const hits = _ray.intersectObjects(targets, false);
+  if (!hits.length) { hidePopup(); return; }
+  const hit = hits[0], obj = hit.object;
+  if (obj.userData && obj.userData.disaster) showDisaster(obj.userData.disaster, hit.point);
+  else if (obj.userData && obj.userData.hazard) showHazard(obj.userData.hazard, hit.point);
+  else if (obj === glacierMesh) showGlacierAt(hit.point);
+  else if (lakeGroup && lakeGroup.children.indexOf(obj) >= 0) showLake(obj);
+}
+
+function showDisaster(d, point) {
+  const p = d.props || {};
+  const map = { Country: '国家', Elevation: '海拔(m)', Time: '时间', Maincause: '成因',
+    Began_time: '起始', Ended_time: '结束', MainCause: '成因', Dealth: '死亡',
+    Dead: '死亡', Displaced: '迁移人口', F5: '地点', F11: '位置', Reference: '来源',
+    Regions: '区域', Severity: '严重度' };
+  const rows = [];
+  for (const k in map) if (p[k] != null && p[k] !== '') rows.push(
+    `<div class="pp-row">${map[k]}：<b>${String(p[k])}</b></div>`);
+  showPopup(`<div class="pp-title">${d.label}</div>` +
+    `<div class="pp-row">坐标：<b>${d.lon.toFixed(3)}, ${d.lat.toFixed(3)}</b></div>` +
+    rows.join(''), point);
+}
+
+function showHazard(label, point) {
+  showPopup(`<div class="pp-title">${label}</div>` +
+    `<div class="pp-row">危害范围（按流域边界裁剪）</div>`, point);
+}
+
+function showGlacierAt(point) {
+  const lon = lonOf(point.x), lat = latOf(point.z);
+  let best = null, bd = 1e9;
+  if (glacierCentroids) {
+    for (const c of glacierCentroids) {
+      const dx = c.lo - lon, dy = c.la - lat, dd = dx * dx + dy * dy;
+      if (dd < bd) { bd = dd; best = c; }
+    }
+  }
+  if (best && bd < 0.02 * 0.02) {
+    showPopup(`<div class="pp-title">冰川</div>` +
+      (best.n ? `<div class="pp-row">名称：<b>${best.n}</b></div>` : '') +
+      `<div class="pp-row">面积：<b>${best.a} km²</b></div>` +
+      `<div class="pp-row">高程：<b>${best.z0}–${best.z1} m</b></div>` +
+      `<div class="pp-row">坐标：<b>${best.lo}, ${best.la}</b></div>`, point);
+  } else {
+    const s = metaRef.business.stats.glacier;
+    showPopup(`<div class="pp-title">冰川分布区</div>` +
+      `<div class="pp-row">流域内冰川：<b>${s.count} 个</b></div>` +
+      `<div class="pp-row">总面积：<b>${s.areaKm2} km²</b></div>` +
+      `<div class="pp-row">流域面积约 ${(metaRef.basin.areaKm2 / 1e4).toFixed(1)} 万 km²</div>`, point);
+  }
+}
+
+function showLake(obj) {
+  const v = new THREE.Vector3(); obj.getWorldPosition(v);
+  showPopup(`<div class="pp-title">冰湖</div>` +
+    `<div class="pp-row">编号：<b>${obj.userData.lakeId}</b></div>` +
+    `<div class="pp-row">面积：<b>${obj.userData.lakeArea} km²</b></div>`, v);
+}
+
+function showPopup(html, worldPoint) {
+  const el = document.getElementById('popup');
+  document.getElementById('popup-body').innerHTML = html;
+  el.style.display = 'block';
+  const v = worldPoint.clone().project(camera);
+  const sx = (v.x * 0.5 + 0.5) * innerWidth;
+  const sy = (-v.y * 0.5 + 0.5) * innerHeight;
+  el.style.left = Math.min(Math.max(sx + 14, 8), innerWidth - 296) + 'px';
+  el.style.top = Math.min(Math.max(sy + 14, 8), innerHeight - 180) + 'px';
+}
+function hidePopup() { document.getElementById('popup').style.display = 'none'; }
+
+// 垂直夸张变化时，业务图层跟着重新贴合地形
+function redrapeOverlays() {
+  const objs = [];
+  if (glacierMesh) objs.push(glacierMesh);
+  if (lakeGroup) lakeGroup.children.forEach(o => objs.push(o));
+  if (disasterGroup) disasterGroup.children.forEach(o => objs.push(o));
+  for (const k in hazardGroups) if (hazardGroups[k]) hazardGroups[k].children.forEach(o => objs.push(o));
+  for (const obj of objs) {
+    if (obj.userData.lonlat) {
+      const ll = obj.userData.lonlat, pos = obj.geometry.attributes.position;
+      for (let i = 0; i < pos.count; i++)
+        pos.setY(i, terrainHeightAt(ll[2 * i], ll[2 * i + 1]) + obj.userData.offset);
+      pos.needsUpdate = true; obj.geometry.computeVertexNormals(); obj.geometry.computeBoundingSphere();
+    } else if (obj.userData.disaster) {
+      obj.position.y = terrainHeightAt(obj.userData.lon, obj.userData.lat) + obj.userData.offset;
+    }
+  }
+}
+
+// ---------------------------------------------------------------- 主流程
+(async function main() {
+  try {
+    initScene();               // 先建渲染器；失败会进 catch 显示在画面上
+    const meta = await loadMeta();
+    metaRef = meta;
+    // 流域名称与指标 → 右上角信息卡（图层面板只管图层）
+    const bn = meta.basin;
+    document.getElementById('basin-name').textContent = meta.name || '三维地形';
+    const areaTxt = bn ? `${(bn.areaKm2 / 1e4).toFixed(1)} 万 km²` : '—';
+    document.getElementById('basin-meta').innerHTML =
+      `范围：${(meta.sizeMeters.x / 1000).toFixed(0)}×${(meta.sizeMeters.z / 1000).toFixed(0)} km，` +
+      `面积 ${areaTxt}` +
+      `<br>高程：${meta.minHeight.toFixed(0)}–${meta.maxHeight.toFixed(0)} m`;
+
+    loadingText.textContent = '读取高度场与流域边界…';
+    const hq = await loadHeights(meta);
+    // 高度场是 int16 相对最小高程
+    heightsRef = new Float32Array(hq.length);
+    for (let i = 0; i < hq.length; i++) heightsRef[i] = hq[i];
+    basinMask = await loadMask(meta);   // 无掩膜则为 null（整块矩形）
+
+    loadingText.textContent = '加载贴图…';
+    if (meta.textures && meta.textures.satellite) {
+      try { textures.satellite = await loadTexture(DATA_BASE + meta.textures.satellite); }
+      catch (e) { console.warn(e); }
+    }
+    if (meta.textures && meta.textures.hillshade) {
+      try { textures.hillshade = await loadTexture(DATA_BASE + meta.textures.hillshade); }
+      catch (e) { console.warn(e); }
+    }
+    if (!textures.satellite && !textures.hillshade) {
+      throw new Error('两张贴图都没能加载');
+    }
+    if (!textures.satellite) {
+      const b = document.querySelector('[data-tex="satellite"]');
+      b.disabled = true; b.style.opacity = '0.4';
+      document.querySelector('[data-tex="hillshade"]').classList.add('active');
+      b.classList.remove('active');
+    }
+
+    // 构建网格
+    const amplified = new Float32Array(heightsRef.length);
+    for (let i = 0; i < heightsRef.length; i++) {
+      amplified[i] = meta.minHeight + heightsRef[i] * exag;
+    }
+    mesh = buildTerrain(meta, amplified);
+    scene.add(mesh);
+
+    // 流域边界线（贴着地形）
+    outlineGroup = buildOutline(meta);
+    if (outlineGroup.children.length) scene.add(outlineGroup);
+    outlineGroup.visible = document.getElementById('lyr-boundary').checked;
+
+    // 光照：方位与晕渲一致（西北 315°/45°），保证两种贴图观感一致
+    const sun = new THREE.DirectionalLight(0xfff2e0, 2.6);
+    const s = Math.max(meta.sizeMeters.x, meta.sizeMeters.z);
+    sun.position.set(-s * 0.55, s * 0.85, -s * 0.55);
+    scene.add(sun);
+    scene.add(new THREE.HemisphereLight(0x9fc4e8, 0x2a2018, 1.15));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.32));
+
+    resetView();
+    overlay.classList.remove('active');
+
+    // 业务图层：与地形同源、按流域裁剪（冰川/冰湖/灾害点）
+    loadBusiness();
+    if (metaRef.business && metaRef.business.stats) {
+      const s = metaRef.business.stats;
+      const bm = document.getElementById('basin-meta');
+      if (bm) {
+        let hz = '';
+        if (s.hazard) for (const k in s.hazard) {
+          const short = s.hazard[k].label.replace('危害', '');
+          hz += `、${short} ${s.hazard[k].count}`;
+        }
+        bm.innerHTML += `<br>要素：冰川 ${s.glacier.count}、冰湖 ${s.lake.count}` +
+          `、灾害点 ${s.disaster.total}${hz}`;
+      }
+    }
+
+    // 自检：把关键数字直接摆出来，避免"看着像不像"
+    const quads = mesh.geometry.index.count / 6;
+    ok(`已加载 ${REGION}：流域内四边形 ${quads} / ${meta.meshSize ** 2}，` +
+       `高程 ${meta.minHeight.toFixed(0)}–${meta.maxHeight.toFixed(0)} m，` +
+       `贴图 ${textures.satellite ? '卫星+晕渲' : '仅晕渲'}，` +
+       `垂直夸张 ${exag.toFixed(1)}×`);
+
+    renderer.setAnimationLoop(() => {
+      controls.update();
+      renderer.render(scene, camera);
+    });
+  } catch (err) {
+    console.error(err);
+    const dataUrl = new URL(DATA_BASE + 'meta.json', location.href).href;
+    fail('三维地形加载失败',
+      String(err.message || err) +
+      '<br>页面：' + location.href +
+      '<br>数据地址：' + dataUrl +
+      '<br>（若是路径问题：请用 http://127.0.0.1:5000/terrain3d.html 打开，' +
+      '并确认已运行 python scripts/build_terrain_page.py --region-id yarlung --basin 雅鲁藏布江）');
+  }
+})();
+</script>
+</body>
+</html>

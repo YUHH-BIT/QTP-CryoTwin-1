@@ -4898,3 +4898,169 @@ position: absolute;
   cursor: default;
 }
 
+
+/* ==================== 三维示范区（Cesium） ==================== */
+/* Cesium 容器：挂在 #map 内的绝对定位覆盖层，z-index 继承 #map(1)，
+   天然位于左侧图层面板(25)与右侧决策侧栏(30)之下。
+   注意：不隐藏 .cesium-viewer-bottom（Cesium/数据署名条，需保留）。 */
+.cesium-container {
+  position: absolute;
+  inset: 0;
+  display: none;
+  background: #0f172a;
+}
+
+.scene3d-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.scene3d-control-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scene3d-control-row > label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.scene3d-control-row select {
+  background: var(--input-bg, rgba(15, 23, 42, 0.6));
+  color: var(--text-primary);
+  border: 1px solid var(--sidebar-border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.scene3d-control-row .mode-switch button {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.scene3d-camera-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.scene3d-camera-btns button {
+  flex: 1;
+  min-width: 80px;
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid var(--sidebar-border);
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.scene3d-camera-btns button:hover {
+  background: rgba(56, 189, 248, 0.28);
+}
+
+.scene3d-layer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.scene3d-layer-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.scene3d-layer-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.scene3d-control-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--primary);
+}
+
+.scene3d-status {
+  margin-top: 12px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid var(--sidebar-border);
+  border-radius: 8px;
+  min-height: 20px;
+}
+
+.scene3d-status.error {
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+/* 说明条里的文字整体作为单一 flex 子项：否则 <strong> 会把文本拆成多个
+   flex 子项，各自被压到 1-2 个字宽，渲染成竖排窄条 */
+.decision-content-note > span {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 三维视图自绘署名条（替代 Cesium 默认 creditContainer，后者含 ion 云服务默认署名） */
+.scene3d-credit {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  z-index: 2;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(226, 232, 240, 0.78);
+  background: rgba(10, 17, 31, 0.6);
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  border-radius: 6px;
+  padding: 3px 8px;
+  pointer-events: none;
+  max-width: 60%;
+}
+
+/* 三维场景状态覆盖层：初始化中 / 失败时必须显眼，
+   否则 Cesium 没起来时用户看到的是底下那张二维地图，只会觉得"这根本不是三维" */
+.scene3d-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.9;
+  color: #dbeafe;
+  background: rgba(8, 14, 26, 0.88);
+}
+
+.scene3d-overlay.error {
+  color: #fecaca;
+}
+
+.scene3d-overlay .sub {
+  font-size: 12px;
+  color: rgba(203, 213, 225, 0.85);
+}
+
+.scene3d-overlay.error .sub {
+  color: rgba(252, 202, 202, 0.85);
+}

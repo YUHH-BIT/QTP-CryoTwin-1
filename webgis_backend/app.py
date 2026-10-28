@@ -19,6 +19,7 @@ from modules.decision import decision_bp
 from modules.auth import auth_bp
 from modules.system import system_bp
 from modules.admin import admin_bp
+from modules.scene3d import scene3d_bp, tiles3d_bp
 from modules import admin_db
 
 # 统一日志配置：模块内仅用 logging.getLogger(__name__)，不重复调用 basicConfig
@@ -63,6 +64,20 @@ def create_app(config_name=None):
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
     app.config['PERMANENT_SESSION_LIFETIME'] = 60 * 60 * 8  # 8 小时
 
+    # 开发/演示期不缓存模板与静态资源：
+    # 非 debug 模式下 Jinja 会把模板缓存在进程内存里，改了 HTML 必须重启进程才生效
+    # （2026-10-28 排查"导航栏改了没变"耗了很久，根因就是这个）。
+    # 打开自动重载后，改模板/静态文件刷新页面即生效。
+    app.config['TEMPLATES_AUTO_RELOAD'] = True
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+    @app.after_request
+    def _no_store_html(resp):
+        """HTML 一律不缓存：页面结构与导航改动频繁，避免浏览器展示旧页面。"""
+        if resp.mimetype in ('text/html', 'application/xhtml+xml'):
+            resp.headers['Cache-Control'] = 'no-store, max-age=0'
+        return resp
+
     # 全局路径配置
     app.config['BACKEND_DIR'] = app.config['BASE_DIR']
     app.config['FRONTEND_DIR'] = os.path.join(
@@ -76,6 +91,8 @@ def create_app(config_name=None):
     app.register_blueprint(auth_bp)
     app.register_blueprint(system_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(scene3d_bp)
+    app.register_blueprint(tiles3d_bp)
     app.register_blueprint(geocode_bp)
     app.register_blueprint(query_bp)
     app.register_blueprint(basin_bp)
@@ -109,6 +126,16 @@ def create_app(config_name=None):
     @app.route('/decision.html')
     def decision_page():
         return render_template('decision.html')
+
+    # 三维地形（简易版）：Three.js 单块地形，数据由 scripts/build_terrain_page.py 生成
+    @app.route('/terrain3d.html')
+    def terrain3d_page():
+        return render_template('terrain3d.html')
+
+    @app.route('/terrain3d/<path:filename>')
+    def serve_terrain3d_data(filename):
+        return send_from_directory(
+            os.path.join(app.config['FRONTEND_DIR'], 'terrain3d'), filename)
 
     @app.route('/login.html')
     def login_page():
@@ -166,6 +193,13 @@ def create_app(config_name=None):
     def serve_css(filename):
         return send_from_directory(
             os.path.join(app.config['FRONTEND_DIR'], 'css'), filename)
+
+    # Cesium 引擎静态资源（自托管 Build/Cesium：Workers/Assets/Widgets/ThirdParty）。
+    # 前端需设置 window.CESIUM_BASE_URL = '/cesium/'，否则 Worker 等资源 404。
+    @app.route('/cesium/<path:filename>')
+    def serve_cesium(filename):
+        return send_from_directory(
+            os.path.join(app.config['FRONTEND_DIR'], 'cesium'), filename)
 
 
     # GeoJSON 数据文件（前端地图图层使用；仅允许 .geojson，避免暴露其他原始文件）
