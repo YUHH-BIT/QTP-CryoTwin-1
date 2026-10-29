@@ -250,10 +250,6 @@
           <label for="lyr-boundary">流域边界</label>
         </div>
         <div class="layer-item">
-          <input type="checkbox" id="lyr-wire" class="layer-checkbox">
-          <label for="lyr-wire">线框网格</label>
-        </div>
-        <div class="layer-item">
           <input type="checkbox" id="lyr-auto" class="layer-checkbox" checked>
           <label for="lyr-auto">自动旋转</label>
         </div>
@@ -628,11 +624,6 @@ document.querySelector('.sidepanel .mode-switch').addEventListener('click', (e) 
 document.getElementById('exag').addEventListener('input', (e) => {
   exag = parseFloat(e.target.value) || 1;
   applyExaggeration(exag);
-});
-
-document.getElementById('lyr-wire').addEventListener('change', (e) => {
-  if (!mesh) return;
-  mesh.material.wireframe = e.target.checked;
 });
 
 document.getElementById('lyr-boundary').addEventListener('change', (e) => {
