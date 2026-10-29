@@ -19,7 +19,7 @@ DISASTER_TYPES = [
     ('glacial_lake_floods', 'GLOFs_HMA.geojson', '冰湖溃决型洪水(GLOFs)'),
     ('landslide_dam_floods', 'LLOFs_HMA.geojson', '滑坡堰塞湖溃决型洪水(LLOFs)'),
     ('glacier_surging', 'surging_glacier_inventory_gamdam_v2.geojson', '冰川跃动'),
-    ('rts_qtp', 'RTS-QTP.geojson', '多年冻土热融滑塌(RTS)'),
+    ('rts_qtp', 'RTS-QTP.geojson', '热融滑塌(RTS)'),
     ('avalanche_hazard', '雪崩危害范围.geojson', '雪崩灾害'),
     ('blizzard_hazard', '风吹雪危害范围.geojson', '风吹雪灾害'),
 ]

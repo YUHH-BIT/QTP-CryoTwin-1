@@ -34,15 +34,29 @@
     #controls { display: none; }
     /* 右上角区域信息卡（流域名称 + 指标），不再塞进图层面板 */
     #info {
-      top: calc(var(--nav-height) + 16px); right: 16px; width: 306px;
-      padding: 12px 14px;
+      top: calc(var(--nav-height) + 16px); right: 16px; width: 250px;
+      padding: 9px 11px;
     }
     #info .basin-name {
-      margin: 0 0 6px; font-size: 15px; font-weight: 600; color: #7dd3fc;
+      margin: 0 0 4px; font-size: 13px; font-weight: 600; color: #7dd3fc;
     }
     #info .basin-meta {
-      font-size: 11px; line-height: 1.7; color: #94a3b8;
+      font-size: 10.5px; line-height: 1.55; color: #94a3b8;
     }
+    /* 面积/流量单位用真上标（km²、m³），不依赖字体的上标字形，也不撑高行高 */
+    #info sup, #popup sup { font-size: 0.78em; line-height: 1; vertical-align: super; }
+    /* 数值与其单位不拆行：避免折行后末尾只剩一个孤立的「km²」 */
+    #info .nb { white-space: nowrap; }
+    /* 顿号并入前一项（中文排版里顿号只能出现在行末，不能出现在行首） */
+    #info .elist .nb:not(:last-child)::after { content: '、'; }
+    /* 清单式指标：名称左、数值右对齐，量纲分开，不再挤成流水账 */
+    #info .kv {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 8px; padding: 0.5px 0;
+    }
+    #info .kv .k { color: #94a3b8; }
+    #info .kv .v { color: #e2e8f0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    #info .hl { border-top: 1px solid rgba(125, 211, 252, 0.14); margin-top: 5px; padding-top: 5px; }
     .sidepanel .mode-switch { margin-bottom: 12px; }
     .layer-item.sidepanel-slider {
       flex-direction: column; align-items: stretch; gap: 6px;
@@ -82,12 +96,16 @@
       color: #7dd3fc; }
     /* 业务图层图例（左下角） */
     #legend {
-      bottom: 14px; right: 16px; padding: 10px 12px; font-size: 11px;
-      line-height: 1.9; color: #cbd5e1;
+      bottom: 14px; right: 16px; padding: 9px 12px; font-size: 11px;
+      line-height: 1.75; color: #cbd5e1;
     }
     #legend .lg-title { color: #7dd3fc; font-weight: 600; margin-bottom: 4px;
       text-align: center; }
-    #legend .lg-row { display: flex; align-items: center; gap: 7px; }
+    /* 两列排布：12 项竖排太高会顶到右上角信息卡，两列后高度减半 */
+    #legend .lg-list { display: grid; grid-template-columns: auto auto;
+      column-gap: 14px; align-items: center; }
+    /* 不折行：否则带单位的项（如面积/单位）会把上标挤到下一行 */
+    #legend .lg-row { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
     #legend .sw { width: 12px; height: 12px; border-radius: 3px; flex: 0 0 auto;
       border: 1px solid rgba(255,255,255,0.25); }
     /* 点击查询弹出的详情卡 */
@@ -276,12 +294,20 @@
       </div>
       <div class="category-content">
         <div class="layer-item">
-          <input type="checkbox" id="lyr-glacier" class="layer-checkbox" checked>
+          <input type="checkbox" id="lyr-glacier" class="layer-checkbox">
           <label for="lyr-glacier">冰川</label>
         </div>
         <div class="layer-item">
-          <input type="checkbox" id="lyr-lake" class="layer-checkbox" checked>
-          <label for="lyr-lake">冰湖</label>
+          <input type="checkbox" id="lyr-lake" class="layer-checkbox">
+          <label for="lyr-lake">大型湖泊</label>
+        </div>
+        <div class="layer-item">
+          <input type="checkbox" id="lyr-perma" class="layer-checkbox">
+          <label for="lyr-perma">多年冻土</label>
+        </div>
+        <div class="layer-item">
+          <input type="checkbox" id="lyr-seasonal" class="layer-checkbox">
+          <label for="lyr-seasonal">季节性冻土</label>
         </div>
         <div class="layer-item">
           <input type="checkbox" id="lyr-river" class="layer-checkbox" checked>
@@ -301,7 +327,7 @@
         </div>
         <div class="layer-item">
           <input type="checkbox" id="lyr-rts" class="layer-checkbox" checked>
-          <label for="lyr-rts">多年冻土热融滑塌</label>
+          <label for="lyr-rts">热融滑塌灾害</label>
         </div>
       </div>
     </div>
@@ -315,8 +341,11 @@
 
 <div id="legend" class="hud panel">
   <div class="lg-title">图例</div>
+  <div class="lg-list">
   <div class="lg-row"><span class="sw" style="background:#bfe9ff"></span>冰川</div>
-  <div class="lg-row"><span class="sw" style="background:#2f7fd6"></span>冰湖</div>
+  <div class="lg-row"><span class="sw" style="background:#2f7fd6"></span>大型湖泊</div>
+  <div class="lg-row"><span class="sw" style="background:#8b5a2b"></span>多年冻土</div>
+  <div class="lg-row"><span class="sw" style="background:#f0a93b"></span>季节性冻土</div>
   <div class="lg-row"><span class="sw" style="background:#00d5ff"></span>河流</div>
   <div class="lg-row"><span class="sw" style="background:#ff4d4d"></span>冰湖溃决洪水</div>
   <div class="lg-row"><span class="sw" style="background:#b266ff"></span>滑坡堰塞湖溃决洪水</div>
@@ -324,7 +353,8 @@
   <div class="lg-row"><span class="sw" style="background:#ffe14d"></span>融雪洪水</div>
   <div class="lg-row"><span class="sw" style="background:#ff6b9d"></span>雪崩危害</div>
   <div class="lg-row"><span class="sw" style="background:#6be3ff"></span>风吹雪危害</div>
-  <div class="lg-row"><span class="sw" style="background:#8d6e63"></span>多年冻土热融滑塌</div>
+  <div class="lg-row"><span class="sw" style="background:#8d6e63"></span>热融滑塌灾害</div>
+  </div>
 </div>
 
 <div id="popup" class="hud panel">
@@ -598,6 +628,18 @@ function terrainHeightAt(lon, lat) {
   return m.minHeight + heightsRef[r * n + c] * exag;
 }
 
+// 真实海拔（不含垂直夸张），用于属性展示
+function terrainTrueHeight(lon, lat) {
+  const m = metaRef;
+  if (!m || !heightsRef) return m ? m.minHeight : 0;
+  const n = m.meshSize + 1;
+  const col = Math.round((lon - m.bbox[0]) / (m.bbox[2] - m.bbox[0]) * m.meshSize);
+  const row = Math.round((m.bbox[3] - lat) / (m.bbox[3] - m.bbox[1]) * m.meshSize);
+  const c = Math.min(Math.max(col, 0), n - 1);
+  const r = Math.min(Math.max(row, 0), n - 1);
+  return m.minHeight + heightsRef[r * n + c];
+}
+
 function resetView() {
   if (!metaRef) return;
   const sx = metaRef.sizeMeters.x, sz = metaRef.sizeMeters.z;
@@ -675,7 +717,14 @@ document.getElementById('lyr-auto').addEventListener('change', (e) => {
         content.classList.add('expanded');
         header.classList.add('active');
         if (toggleIcon) toggleIcon.style.transform = 'rotate(180deg)';
-        content.style.maxHeight = content.scrollHeight + 'px';
+        content.style.maxHeight = (content.scrollHeight + 12) + 'px';
+        // 过渡结束后释放为 none：字体/图标异步加载会让内容变高，
+        // 死守 scrollHeight 那一刻的 px 值会把最后几行裁掉
+        const unlock = () => {
+          content.style.maxHeight = 'none';
+          content.removeEventListener('transitionend', unlock);
+        };
+        content.addEventListener('transitionend', unlock);
       }
     });
     header.addEventListener('keydown', function (e) {
@@ -692,9 +741,11 @@ document.getElementById('lyr-auto').addEventListener('change', (e) => {
     c.classList.add('expanded');
     h.classList.add('active');
     if (ti) ti.style.transform = 'rotate(180deg)';
-    c.style.maxHeight = c.scrollHeight + 'px';
+    c.style.maxHeight = (c.scrollHeight + 12) + 'px';
     // 字体/图标异步加载后高度可能微变，下一帧再校正一次
     requestAnimationFrame(() => { c.style.maxHeight = c.scrollHeight + 'px'; });
+    // 过渡结束后释放为 none：否则字体加载完后变高，末尾项会被裁掉
+    setTimeout(() => { if (c.classList.contains('expanded')) c.style.maxHeight = 'none'; }, 400);
   }
 
   const collapseBtn = panel && panel.querySelector('.sidepanel-collapse-btn');
@@ -726,9 +777,11 @@ addEventListener('resize', () => {
 // 冰川 / 冰湖 / 灾害点（与二维地图同源，按流域裁剪），支持点击查询
 let glacierMesh = null, lakeGroup = null, disasterGroup = null, hazardGroups = {};
 let riverGroup = null, riversData = null;   // 河网（HydroRIVERS，按流域裁剪）
+let permaMeshes = {};                // 冻土分布：{ perma, seasonal } 两块贴地面
 let glacierCentroids = null;          // 冰川质心索引：点击就近查具体冰川
 let bizReady = false;
 const GLACIER_OFFSET = 70, LAKE_OFFSET = 45, DISASTER_OFFSET = 900, RIVER_OFFSET = 110;
+const PERMA_OFFSET = 25;
 let DISASTER_RADIUS = 4000;
 let downX = 0, downY = 0;
 
@@ -738,6 +791,14 @@ const DISASTER_COLORS = { GLOF: 0xff4d4d, LLOF: 0xb266ff, PF: 0xff9f43, SF: 0xff
 const RIVER_STYLE = {
   main:   { color: 0x00d5ff, opacity: 1.0 },
   branch: { color: 0x7fe3ff, opacity: 0.85 },
+};
+
+// 冻土分布：0=季节性冻土、1=多年冻土（2=非冻土、255=无数据，均不绘制）
+// 面积大、格网密，2×2 合并为一格渲染，兼顾观感与帧率
+const PERMA_STEP = 2;
+const PERMA_STYLE = {
+  perma:    { cls: 1, color: 0x8b5a2b, opacity: 0.55, label: '多年冻土' },
+  seasonal: { cls: 0, color: 0xf0a93b, opacity: 0.36, label: '季节性冻土' },
 };
 
 // 危害范围多边形样式（颜色/不透明度/离地高度）
@@ -785,6 +846,53 @@ function buildGlacierMask(maskArr) {
   const mesh = new THREE.Mesh(geo, mat);
   mesh.userData.lonlat = new Float32Array(lonlat); mesh.userData.offset = GLACIER_OFFSET;
   mesh.renderOrder = 2;
+  return mesh;
+}
+
+// 冻土分布：与冰川同网格的分类栅格，按类别生成贴地面（2×2 并格，取块内多数类）
+function buildPermafrost(arr, cls, color, opacity) {
+  const n = metaRef.meshSize, sizeX = metaRef.sizeMeters.x, sizeZ = metaRef.sizeMeters.z;
+  const b = metaRef.bbox;
+  const positions = [], lonlat = [], cells = [];
+  for (let r = 0; r + PERMA_STEP <= n; r += PERMA_STEP) {
+    for (let c = 0; c + PERMA_STEP <= n; c += PERMA_STEP) {
+      if (basinMask && !basinMask[r * n + c]) continue;
+      let hit = 0, tot = 0;
+      for (let dr = 0; dr < PERMA_STEP; dr++)
+        for (let dc = 0; dc < PERMA_STEP; dc++) {
+          const v = arr[(r + dr) * n + (c + dc)];
+          if (v === 255 || v === 2) continue;      // 无数据 / 非冻土
+          tot++; if (v === cls) hit++;
+        }
+      if (!tot || hit * 2 < tot) continue;          // 该类不占多数则跳过
+      cells.push([r, c]);
+    }
+  }
+  for (const [r, c] of cells) {
+    const corners = [[r, c], [r, c + PERMA_STEP], [r + PERMA_STEP, c + PERMA_STEP],
+                     [r + PERMA_STEP, c]];
+    const tris = [[0, 3, 1], [0, 2, 3]];
+    for (const t of tris) for (const k of t) {
+      const rr = corners[k][0], cc = corners[k][1];
+      const x = -sizeX / 2 + sizeX * cc / n, z = -sizeZ / 2 + sizeZ * rr / n;
+      const lon = b[0] + (cc / n) * (b[2] - b[0]), lat = b[3] - (rr / n) * (b[3] - b[1]);
+      positions.push(x, terrainHeightAt(lon, lat) + PERMA_OFFSET, z);
+      lonlat.push(lon, lat);
+    }
+  }
+  if (!positions.length) return null;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.computeBoundingSphere();
+  // 用不受光照的纯色材质：冻土是"分类面"，颜色必须稳定，不能随光照明暗变灰
+  const mat = new THREE.MeshBasicMaterial({
+    color: color, transparent: true, opacity: opacity,
+    side: THREE.DoubleSide, depthWrite: false });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.userData.lonlat = new Float32Array(lonlat);
+  mesh.userData.offset = PERMA_OFFSET;
+  mesh.userData.perma = cls === 1 ? '多年冻土' : '季节性冻土';
+  mesh.renderOrder = 1;
   return mesh;
 }
 
@@ -996,6 +1104,22 @@ async function loadBusiness() {
         }
       }
     }
+    if (biz.permafrost) {
+      const r = await fetch(DATA_BASE + biz.permafrost, { cache: 'no-store' });
+      if (r.ok) {
+        const arr = new Uint8Array(await r.arrayBuffer());
+        if (arr.length === metaRef.meshSize * metaRef.meshSize) {
+          for (const key of ['perma', 'seasonal']) {
+            const st = PERMA_STYLE[key];
+            const mesh = buildPermafrost(arr, st.cls, st.color, st.opacity);
+            if (!mesh) continue;
+            mesh.visible = document.getElementById('lyr-' + key).checked;
+            scene.add(mesh);
+            permaMeshes[key] = mesh;
+          }
+        }
+      }
+    }
     wireBusinessToggles();
     renderer.domElement.addEventListener('pointerdown', (e) => { downX = e.clientX; downY = e.clientY; });
     renderer.domElement.addEventListener('click', (e) => {
@@ -1011,6 +1135,21 @@ async function loadBusiness() {
       rivers: riversData ? riversData.length : 0,
       disasters: disasterGroup ? disasterGroup.children.length : 0,
       hazards: Object.fromEntries(Object.entries(hazardGroups).map(([k, g]) => [k, g.children.length])),
+      permafrost: {
+        perma: permaMeshes.perma ? permaMeshes.perma.geometry.attributes.position.count / 6 : 0,
+        seasonal: permaMeshes.seasonal ? permaMeshes.seasonal.geometry.attributes.position.count / 6 : 0,
+      },
+      // 各图层的实际显示状态（与图层管理勾选保持一致），实时读取，供调试/自测
+      get vis() {
+        return {
+          glacier: !!(glacierMesh && glacierMesh.visible),
+          lake: !!(lakeGroup && lakeGroup.visible),
+          river: !!(riverGroup && riverGroup.visible),
+          disaster: !!(disasterGroup && disasterGroup.visible),
+          perma: !!(permaMeshes.perma && permaMeshes.perma.visible),
+          seasonal: !!(permaMeshes.seasonal && permaMeshes.seasonal.visible),
+        };
+      },
     };
   } catch (err) {
     console.warn('业务图层加载失败：', err);
@@ -1028,6 +1167,12 @@ function wireBusinessToggles() {
   d.addEventListener('change', (e) => { if (disasterGroup) disasterGroup.visible = e.target.checked; });
   const rv = document.getElementById('lyr-river');
   if (rv) rv.addEventListener('change', (e) => { if (riverGroup) riverGroup.visible = e.target.checked; });
+  for (const key of Object.keys(PERMA_STYLE)) {
+    const el = document.getElementById('lyr-' + key);
+    if (el) el.addEventListener('change', (e) => {
+      if (permaMeshes[key]) permaMeshes[key].visible = e.target.checked;
+    });
+  }
   for (const key of Object.keys(HAZARD_STYLE)) {
     const el = document.getElementById('lyr-' + key);
     if (el) el.addEventListener('change', (e) => {
@@ -1056,6 +1201,8 @@ function onPick(e) {
   }
   for (const k in hazardGroups)
     if (hazardGroups[k] && hazardGroups[k].visible) targets.push(...hazardGroups[k].children);
+  for (const k in permaMeshes)
+    if (permaMeshes[k] && permaMeshes[k].visible) targets.push(permaMeshes[k]);
   if (!targets.length) { hidePopup(); return; }
   const hits = _ray.intersectObjects(targets, false);
   if (!hits.length) { hidePopup(); return; }
@@ -1063,6 +1210,7 @@ function onPick(e) {
   if (obj.userData && obj.userData.disaster) showDisaster(obj.userData.disaster, hit.point);
   else if (obj.userData && obj.userData.river) showRiver(obj, hit);
   else if (obj.userData && obj.userData.hazard) showHazard(obj.userData.hazard, hit.point);
+  else if (obj.userData && obj.userData.perma) showPermafrost(obj, hit.point);
   else if (obj === glacierMesh) showGlacierAt(hit.point);
   else if (lakeGroup && lakeGroup.children.indexOf(obj) >= 0) showLake(obj);
 }
@@ -1098,23 +1246,23 @@ function showGlacierAt(point) {
   if (best && bd < 0.02 * 0.02) {
     showPopup(`<div class="pp-title">冰川</div>` +
       (best.n ? `<div class="pp-row">名称：<b>${best.n}</b></div>` : '') +
-      `<div class="pp-row">面积：<b>${best.a} km²</b></div>` +
+      `<div class="pp-row">面积：<b>${best.a} km<sup>2</sup></b></div>` +
       `<div class="pp-row">高程：<b>${best.z0}–${best.z1} m</b></div>` +
       `<div class="pp-row">坐标：<b>${best.lo}, ${best.la}</b></div>`, point);
   } else {
     const s = metaRef.business.stats.glacier;
     showPopup(`<div class="pp-title">冰川分布区</div>` +
       `<div class="pp-row">流域内冰川：<b>${s.count} 个</b></div>` +
-      `<div class="pp-row">总面积：<b>${s.areaKm2} km²</b></div>` +
-      `<div class="pp-row">流域面积约 ${(metaRef.basin.areaKm2 / 1e4).toFixed(1)} 万 km²</div>`, point);
+      `<div class="pp-row">总面积：<b>${s.areaKm2} km<sup>2</sup></b></div>` +
+      `<div class="pp-row">流域面积约 ${(metaRef.basin.areaKm2 / 1e4).toFixed(2)} 万 km<sup>2</sup></div>`, point);
   }
 }
 
 function showLake(obj) {
   const v = new THREE.Vector3(); obj.getWorldPosition(v);
-  showPopup(`<div class="pp-title">冰湖</div>` +
+  showPopup(`<div class="pp-title">大型湖泊</div>` +
     `<div class="pp-row">编号：<b>${obj.userData.lakeId}</b></div>` +
-    `<div class="pp-row">面积：<b>${obj.userData.lakeArea} km²</b></div>`, v);
+    `<div class="pp-row">面积：<b>${obj.userData.lakeArea} km<sup>2</sup></b></div>`, v);
 }
 
 function showRiver(obj, hit) {
@@ -1126,7 +1274,20 @@ function showRiver(obj, hit) {
   showPopup(`<div class="pp-title">${r.n ? r.n : '河流'}</div>` +
     `<div class="pp-row">级别：<b>${r.o} 级</b></div>` +
     `<div class="pp-row">河段长：<b>${r.len} km</b></div>` +
-    `<div class="pp-row">年均流量：<b>${r.q} m³/s</b></div>`, hit.point);
+    `<div class="pp-row">年均流量：<b>${r.q} m<sup>3</sup>/s</b></div>`, hit.point);
+}
+
+function showPermafrost(obj, point) {
+  const label = obj.userData.perma;
+  const lon = lonOf(point.x), lat = latOf(point.z);
+  const st = (metaRef.business && metaRef.business.stats
+              && metaRef.business.stats.permafrost) || {};
+  const cur = st[label];
+  showPopup(`<div class="pp-title">${label}</div>` +
+    `<div class="pp-row">位置：<b>${lon.toFixed(3)}, ${lat.toFixed(3)}</b></div>` +
+    `<div class="pp-row">海拔：<b>${terrainTrueHeight(lon, lat).toFixed(0)} m</b></div>` +
+    (cur ? `<div class="pp-row">流域内面积：<b>${cur.areaWan} 万 km<sup>2</sup></b></div>` : '') +
+    `<div class="pp-row">来源：青藏高原冻土分布图</div>`, point);
 }
 
 function showPopup(html, worldPoint) {
@@ -1149,6 +1310,7 @@ function redrapeOverlays() {
   if (disasterGroup) disasterGroup.children.forEach(o => objs.push(o));
   for (const k in hazardGroups) if (hazardGroups[k]) hazardGroups[k].children.forEach(o => objs.push(o));
   if (riverGroup) riverGroup.children.forEach(o => objs.push(o));
+  for (const k in permaMeshes) if (permaMeshes[k]) objs.push(permaMeshes[k]);
   for (const obj of objs) {
     if (obj.userData.lonlat) {
       const ll = obj.userData.lonlat, pos = obj.geometry.attributes.position;
@@ -1170,11 +1332,14 @@ function redrapeOverlays() {
     // 流域名称与指标 → 右上角信息卡（图层面板只管图层）
     const bn = meta.basin;
     document.getElementById('basin-name').textContent = meta.name || '三维地形';
-    const areaTxt = bn ? `${(bn.areaKm2 / 1e4).toFixed(1)} 万 km²` : '—';
+    const w = (meta.sizeMeters.x / 1000).toFixed(0), h = (meta.sizeMeters.z / 1000).toFixed(0);
+    const areaTxt = bn ? `${(bn.areaKm2 / 1e4).toFixed(2)} 万 km<sup>2</sup>` : '—';
+    // 清单式：名称左 / 数值右，量纲分开；业务要素与口径注脚后续填充
     document.getElementById('basin-meta').innerHTML =
-      `范围：${(meta.sizeMeters.x / 1000).toFixed(0)}×${(meta.sizeMeters.z / 1000).toFixed(0)} km，` +
-      `面积 ${areaTxt}` +
-      `<br>高程：${meta.minHeight.toFixed(0)}–${meta.maxHeight.toFixed(0)} m`;
+      `<div class="kv"><span class="k">范围</span><span class="v">${w}×${h} km</span></div>` +
+      `<div class="kv"><span class="k">高程</span><span class="v">${meta.minHeight.toFixed(0)}–${meta.maxHeight.toFixed(0)} m</span></div>` +
+      `<div class="kv"><span class="k">流域面积</span><span class="v">${areaTxt}</span></div>` +
+      `<div id="biz-kv"></div>`;
 
     loadingText.textContent = '读取高度场与流域边界…';
     const hq = await loadHeights(meta);
@@ -1230,16 +1395,32 @@ function redrapeOverlays() {
     loadBusiness();
     if (metaRef.business && metaRef.business.stats) {
       const s = metaRef.business.stats;
-      const bm = document.getElementById('basin-meta');
-      if (bm) {
-        let hz = '';
-        if (s.hazard) for (const k in s.hazard) {
-          const short = s.hazard[k].label.replace('危害', '');
-          hz += `、${short} ${s.hazard[k].count}`;
+      const bz = document.getElementById('biz-kv');
+      if (bz) {
+        // 清单式：一项一行、名称左数值右。量纲分开（条/km/处/万 km²），
+        // 面积类给出占流域的比例，避免"几个数加不起来"的疑问
+        const wan = (metaRef.basin && metaRef.basin.areaKm2) ? metaRef.basin.areaKm2 / 1e4 : 0;
+        const pct = (v) => (wan ? `（占 ${Math.round(v / wan * 100)}%）` : '');
+        const rows = [];
+        if (s.glacier) rows.push(['冰川',
+          `${s.glacier.count} 条 / ${Math.round(s.glacier.areaKm2)} km<sup>2</sup>`]);
+        if (s.river) rows.push(['河流', `${Math.round(s.river.lengthKm)} km`]);
+        // 数据源是「青藏高原面积 ≥100 km² 的湖泊」编目，不是冰湖，故如实叫「大型湖泊」
+        if (s.lake) rows.push(['大型湖泊', `${s.lake.count} 个`]);
+        if (s.disaster) rows.push(['灾害点', `${s.disaster.total} 处`]);
+        if (s.hazard) {
+          const hz = [];
+          for (const k in s.hazard) hz.push(`${s.hazard[k].label.replace('危害', '')} ${s.hazard[k].count} 处`);
+          if (hz.length) rows.push(['危害范围', hz.join('、')]);
         }
-        const rv = s.river ? `、河流 ${s.river.count} 段` : '';
-        bm.innerHTML += `<br>要素：冰川 ${s.glacier.count}、冰湖 ${s.lake.count}` +
-          `${rv}、灾害点 ${s.disaster.total}${hz}`;
+        if (s.permafrost) {
+          const pm = s.permafrost['多年冻土'], sf = s.permafrost['季节性冻土'];
+          if (pm) rows.push(['多年冻土', `${pm.areaWan} 万 km<sup>2</sup>${pct(pm.areaWan)}`]);
+          if (sf) rows.push(['季节性冻土', `${sf.areaWan} 万 km<sup>2</sup>${pct(sf.areaWan)}`]);
+        }
+        bz.innerHTML = `<div class="hl"></div>` + rows.map(
+          ([k, v]) => `<div class="kv"><span class="k">${k}</span><span class="v">${v}</span></div>`
+        ).join('');
       }
     }
 

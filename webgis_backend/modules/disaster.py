@@ -107,7 +107,7 @@ def get_disaster_types():
         'glacial_lake_floods': ('冰湖溃决型洪水（GLOFs）', '由冰川湖溃决引发的洪水事件'),
         'landslide_dam_floods': ('滑坡堰塞湖溃决型洪水（LLOFs）', '由滑坡形成的堰塞湖溃决引发的洪水事件'),
         'glacier_surging': ('冰川跃动（Surging）', '冰川周期性快速前进引发的灾害事件'),
-        'rts_qtp': ('多年冻土热融滑塌（RTS）', '青藏高原热融滑塌/热喀斯特灾害'),
+        'rts_qtp': ('热融滑塌（RTS）', '青藏高原热融滑塌/热喀斯特灾害'),
         'blizzard_hazard': ('风吹雪危害', '风吹雪导致的积雪与能见度灾害'),
         'avalanche_hazard': ('雪崩危害', '山区雪崩灾害事件'),
     }

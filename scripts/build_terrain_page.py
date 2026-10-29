@@ -185,7 +185,23 @@ def load_basin(keyword):
     geom = unary_union(list(hit.geometry))
     name = str(hit.iloc[0]['BasinName'])
     lat_c = (geom.bounds[1] + geom.bounds[3]) / 2
-    area_km2 = geom.area * (111.32 ** 2) * math.cos(math.radians(lat_c))
+    # 面积优先级：源数据 BasinArea 字段 > WGS84 测地线精确计算 > 经纬粗算。
+    # 旧的「度² × 111.32² × cos(中心纬度)」粗算对跨 4 个纬度的流域会偏高约 0.5%
+    # （雅鲁藏布江：粗算 34.91 万 vs 测地线 34.75 万 km²），故仅作兜底。
+    area_km2 = None
+    if 'BasinArea' in hit.columns:
+        try:
+            v = float(hit.iloc[0]['BasinArea'])
+            if v and v > 0:
+                area_km2 = v
+        except (TypeError, ValueError):
+            area_km2 = None
+    if area_km2 is None:
+        try:
+            from pyproj import Geod
+            area_km2 = abs(Geod(ellps='WGS84').geometry_area_perimeter(geom)[0]) / 1e6
+        except Exception:
+            area_km2 = geom.area * (111.32 ** 2) * math.cos(math.radians(lat_c))
     return geom, name, area_km2
 
 
@@ -257,12 +273,22 @@ RIVER_NAMES_GEO = os.path.join(PROJECT_ROOT, 'data', 'raw', 'geo', 'hydrology',
 # 名称匹配的最大距离（度，约 2 km）：只有主干河段（斯特拉勒级别 >= 6）参与匹配
 RIVER_NAME_MAXDIST = 0.02
 
+# 冻土分布栅格：青藏高原冻土图（Albers 等积投影 ESRI:102025，937.49 m 像元）
+# gridcode 语义（经高程与面积双重校验）：
+#   0 = 季节性冻土  （全高原 138.2 万 km²，高程中位 4747 m）
+#   1 = 多年冻土  （全高原 105.5 万 km²，高程中位 5256 m；文献值 1.06×10⁶ km²）
+#   2 = 非冻土    （全高原   2.9 万 km²，高程中位 2038 m，藏南低海拔谷地）
+# 只导出 0/1 两类；2 属非冻土，不纳入冻土要素。栅格 nodata 记为 255。
+PERMAFROST_TIF = os.path.join(PROJECT_ROOT, 'data', 'raw', 'models',
+                              'Perma_Distr_map21', 'Perma_Distr_map21.tif')
+PERMAFROST_CLASSES = {0: '季节性冻土', 1: '多年冻土'}
+
 # 危害范围多边形 -> （文件名, 中文名）。均为 data/raw/geo/disaster 下
 # 冰川跃动 surging_glacier 体积过大（24MB 要素过多），示范区暂不纳入
 HAZARD_POLYS = {
     'avalanche': ('雪崩危害范围.geojson', '雪崩危害'),
     'blizzard': ('风吹雪危害范围.geojson', '风吹雪危害'),
-    'rts': ('RTS-QTP.geojson', '多年冻土热融滑塌'),
+    'rts': ('RTS-QTP.geojson', '热融滑塌'),
 }
 
 
@@ -461,6 +487,44 @@ def build_business(out_dir, bbox, n, basin_geom, basin_mask_path=None,
                 f'{stats["river"]["lengthKm"]} km，'
                 f'命名 {stats["river"]["named"]} 段')
 
+    # ---- 冻土分布：冻土图栅格重投影到地形网格（与冰川同网格），流域内才画 ----
+    ppath = PERMAFROST_TIF
+    if os.path.isfile(ppath):
+        try:
+            import rasterio
+            from rasterio.warp import reproject as _reproj, Resampling
+            with rasterio.open(ppath) as psrc:
+                sarr = psrc.read(1)
+                a = np.where(sarr == psrc.nodata, 255, sarr)
+                a = np.where((a < 0) | (a > 2), 255, a).astype('uint8')
+                parr = np.full((n, n), 255, dtype='uint8')
+                _reproj(source=a, destination=parr,
+                        src_transform=psrc.transform, src_crs=psrc.crs,
+                        dst_transform=transform, dst_crs='EPSG:4326',
+                        resampling=Resampling.nearest,
+                        src_nodata=255, dst_nodata=255)
+            if basin_mask is not None:
+                parr = np.where(basin_mask > 0, parr, 255).astype('uint8')
+            # 像元面积（km²）：随纬度收敛
+            lats = lat1 - (np.arange(n) + 0.5) * dy
+            cell_km2 = ((dx * 111320.0) * (dy * 110540.0)
+                        * np.cos(np.radians(lats)) / 1e6)
+            area2d = np.repeat(cell_km2[:, None], n, axis=1)
+            pstat = {}
+            for v, nm in PERMAFROST_CLASSES.items():
+                m = (parr == v)
+                km2 = float(area2d[m].sum())
+                pstat[nm] = {'cells': int(m.sum()),
+                             'areaKm2': round(km2, 0),
+                             'areaWan': round(km2 / 1e4, 2)}
+            parr.tofile(os.path.join(out_dir, 'permafrost.bin'))
+            business['permafrost'] = 'permafrost.bin'
+            stats['permafrost'] = pstat
+            log('冻土：' + '、'.join('%s %.2f 万km²' % (nm, v['areaWan'])
+                                 for nm, v in pstat.items()) + '（流域内）')
+        except Exception as e:
+            log(f'  冻土图层跳过：{e}')
+
     # ---- 灾害点：GLOF / PF / SF ----
     import pandas as pd
 
@@ -563,7 +627,8 @@ def build_business(out_dir, bbox, n, basin_geom, basin_mask_path=None,
 
     if business:
         business['stats'] = stats
-        _core = {'glacier.bin', 'glaciers.json', 'lakes.json', 'disasters.json'}
+        _core = {'glacier.bin', 'glaciers.json', 'lakes.json', 'rivers.json',
+                 'permafrost.bin', 'disasters.json'}
         _core |= set(hazards.values())
         total = sum(os.path.getsize(os.path.join(out_dir, fn))
                     for fn in os.listdir(out_dir) if fn in _core)
