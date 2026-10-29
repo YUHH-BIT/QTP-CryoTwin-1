@@ -3891,6 +3891,7 @@
     "glacier": "glacier.bin",
     "glaciers": "glaciers.json",
     "lakes": "lakes.json",
+    "rivers": "rivers.json",
     "disasters": "disasters.json",
     "hazards": {
       "avalanche": "avalanche.json",
@@ -3905,6 +3906,11 @@
       },
       "lake": {
         "count": 2
+      },
+      "river": {
+        "count": 2244,
+        "lengthKm": 6050.1,
+        "named": 583
       },
       "disaster": {
         "total": 83,

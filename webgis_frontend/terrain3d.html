@@ -52,12 +52,18 @@
       color: #94a3b8;
     }
     .sidepanel-btn {
-      width: 100%; padding: 7px 8px; font-size: 12px; cursor: pointer;
-      border-radius: 7px; border: 1px solid rgba(125, 211, 252, 0.22);
-      background: rgba(56, 189, 248, 0.12); color: #cbd5e1;
-      transition: background .18s ease;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; padding: 8px 10px; font-size: 12px; font-weight: 500;
+      cursor: pointer; border-radius: 7px;
+      border: 1px solid rgba(125, 211, 252, 0.3);
+      background: rgba(56, 189, 248, 0.14); color: #dbeafe;
+      transition: background .18s ease, border-color .18s ease, transform .12s ease;
     }
-    .sidepanel-btn:hover { background: rgba(56, 189, 248, 0.26); }
+    .sidepanel-btn:hover {
+      background: rgba(56, 189, 248, 0.3);
+      border-color: rgba(125, 211, 252, 0.55);
+    }
+    .sidepanel-btn:active { transform: scale(0.985); }
     input[type=range] { width: 100%; accent-color: #38bdf8; }
     /* 冰冻圈业务图层雪花图标：统一为白色（与其它分类图标一致） */
     #sidepanel .category-header .fa-snowflake-o { color: #fff; }
@@ -245,12 +251,12 @@
         <i class="fa fa-chevron-down toggle-icon"></i>
       </div>
       <div class="category-content">
+        <div class="layer-item">
+          <button id="btn-reset" class="sidepanel-btn"><i class="fa fa-undo"></i>重置视角</button>
+        </div>
         <div class="layer-item sidepanel-slider">
           <label for="exag">垂直夸张 <span id="exag-val">1.5×</span></label>
           <input type="range" id="exag" min="0.5" max="3" step="0.1" value="1.5">
-        </div>
-        <div class="layer-item">
-          <button id="btn-reset" class="sidepanel-btn">重置视角</button>
         </div>
         <div class="layer-item">
           <input type="checkbox" id="lyr-boundary" class="layer-checkbox" checked>
@@ -276,6 +282,10 @@
         <div class="layer-item">
           <input type="checkbox" id="lyr-lake" class="layer-checkbox" checked>
           <label for="lyr-lake">冰湖</label>
+        </div>
+        <div class="layer-item">
+          <input type="checkbox" id="lyr-river" class="layer-checkbox" checked>
+          <label for="lyr-river">河流</label>
         </div>
         <div class="layer-item">
           <input type="checkbox" id="lyr-disaster" class="layer-checkbox" checked>
@@ -307,6 +317,7 @@
   <div class="lg-title">图例</div>
   <div class="lg-row"><span class="sw" style="background:#bfe9ff"></span>冰川</div>
   <div class="lg-row"><span class="sw" style="background:#2f7fd6"></span>冰湖</div>
+  <div class="lg-row"><span class="sw" style="background:#00d5ff"></span>河流</div>
   <div class="lg-row"><span class="sw" style="background:#ff4d4d"></span>冰湖溃决洪水</div>
   <div class="lg-row"><span class="sw" style="background:#b266ff"></span>滑坡堰塞湖溃决洪水</div>
   <div class="lg-row"><span class="sw" style="background:#ff9f43"></span>降雨型洪水</div>
@@ -672,6 +683,20 @@ document.getElementById('lyr-auto').addEventListener('change', (e) => {
     });
   });
 
+  // 「显示设置」是高频操作（重置视角 / 垂直夸张），默认展开第一个分类
+  const firstCat = document.querySelector('.category');
+  if (firstCat) {
+    const h = firstCat.querySelector('.category-header');
+    const c = firstCat.querySelector('.category-content');
+    const ti = firstCat.querySelector('.toggle-icon');
+    c.classList.add('expanded');
+    h.classList.add('active');
+    if (ti) ti.style.transform = 'rotate(180deg)';
+    c.style.maxHeight = c.scrollHeight + 'px';
+    // 字体/图标异步加载后高度可能微变，下一帧再校正一次
+    requestAnimationFrame(() => { c.style.maxHeight = c.scrollHeight + 'px'; });
+  }
+
   const collapseBtn = panel && panel.querySelector('.sidepanel-collapse-btn');
   if (collapseBtn) {
     collapseBtn.addEventListener('click', function (e) {
@@ -700,13 +725,20 @@ addEventListener('resize', () => {
 // ---------------------------------------------------------------- 业务图层
 // 冰川 / 冰湖 / 灾害点（与二维地图同源，按流域裁剪），支持点击查询
 let glacierMesh = null, lakeGroup = null, disasterGroup = null, hazardGroups = {};
+let riverGroup = null, riversData = null;   // 河网（HydroRIVERS，按流域裁剪）
 let glacierCentroids = null;          // 冰川质心索引：点击就近查具体冰川
 let bizReady = false;
-const GLACIER_OFFSET = 70, LAKE_OFFSET = 45, DISASTER_OFFSET = 900;
+const GLACIER_OFFSET = 70, LAKE_OFFSET = 45, DISASTER_OFFSET = 900, RIVER_OFFSET = 110;
 let DISASTER_RADIUS = 4000;
 let downX = 0, downY = 0;
 
 const DISASTER_COLORS = { GLOF: 0xff4d4d, LLOF: 0xb266ff, PF: 0xff9f43, SF: 0xffe14d };
+
+// 河网：按斯特拉勒级别分两组（主干 / 支流），各用一个 LineSegments 批量绘制
+const RIVER_STYLE = {
+  main:   { color: 0x00d5ff, opacity: 1.0 },
+  branch: { color: 0x7fe3ff, opacity: 0.85 },
+};
 
 // 危害范围多边形样式（颜色/不透明度/离地高度）
 const HAZARD_STYLE = {
@@ -799,6 +831,52 @@ function buildDisasters(list) {
     m.userData = { disaster: { type: d.type, label: d.label, lon: d.lon, lat: d.lat, props: d.props },
                    lon: d.lon, lat: d.lat, offset: DISASTER_OFFSET };
     grp.add(m);
+  }
+  return grp;
+}
+
+// 河网：每条河段拆成线段，按级别归到主干/支流两组，贴合地形
+function buildRivers(list) {
+  const grp = new THREE.Group();
+  const buckets = { main: [], branch: [] };   // 每项：[lon1,lat1,lon2,lat2,segIdx]
+  list.forEach((r, idx) => {
+    const c = r.c || [];
+    if (c.length < 2) return;
+    const key = (r.o >= 6) ? 'main' : 'branch';
+    const b = buckets[key];
+    for (let i = 0; i < c.length - 1; i++) {
+      b.push(c[i][0], c[i][1], c[i + 1][0], c[i + 1][1], idx);
+    }
+  });
+  for (const key of ['branch', 'main']) {
+    const b = buckets[key];
+    if (!b.length) continue;
+    const segCount = b.length / 5;
+    const pos = new Float32Array(segCount * 6);
+    const lonlat = new Float32Array(segCount * 4);
+    const owner = new Int32Array(segCount);
+    for (let s = 0; s < segCount; s++) {
+      const o = 5 * s;
+      const lon1 = b[o], lat1 = b[o + 1], lon2 = b[o + 2], lat2 = b[o + 3];
+      pos[6 * s] = xOf(lon1); pos[6 * s + 1] = terrainHeightAt(lon1, lat1) + RIVER_OFFSET; pos[6 * s + 2] = zOf(lat1);
+      pos[6 * s + 3] = xOf(lon2); pos[6 * s + 4] = terrainHeightAt(lon2, lat2) + RIVER_OFFSET; pos[6 * s + 5] = zOf(lat2);
+      lonlat[4 * s] = lon1; lonlat[4 * s + 1] = lat1;
+      lonlat[4 * s + 2] = lon2; lonlat[4 * s + 3] = lat2;
+      owner[s] = b[o + 4];
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    geo.computeBoundingSphere();
+    geo.userData.owner = owner;          // 线段序号 -> 河段在 list 中的下标
+    const st = RIVER_STYLE[key];
+    const mat = new THREE.LineBasicMaterial({
+      color: st.color, transparent: true, opacity: st.opacity, depthWrite: false });
+    const lines = new THREE.LineSegments(geo, mat);
+    lines.userData.lonlat = lonlat;
+    lines.userData.offset = RIVER_OFFSET;
+    lines.userData.river = true;
+    lines.renderOrder = 5;
+    grp.add(lines);
   }
   return grp;
 }
@@ -906,6 +984,18 @@ async function loadBusiness() {
         hazardGroups[key] = grp;
       }
     }
+    if (biz.rivers) {
+      const r = await fetch(DATA_BASE + biz.rivers, { cache: 'no-store' });
+      if (r.ok) {
+        const list = await r.json();
+        if (list.length) {
+          riversData = list;
+          riverGroup = buildRivers(list);
+          riverGroup.visible = document.getElementById('lyr-river').checked;
+          scene.add(riverGroup);
+        }
+      }
+    }
     wireBusinessToggles();
     renderer.domElement.addEventListener('pointerdown', (e) => { downX = e.clientX; downY = e.clientY; });
     renderer.domElement.addEventListener('click', (e) => {
@@ -918,6 +1008,7 @@ async function loadBusiness() {
       biz: 'ok',
       glacier: !!glacierMesh, glacierCells: glacierMesh ? glacierMesh.geometry.attributes.position.count / 6 : 0,
       lakes: lakeGroup ? lakeGroup.children.length : 0,
+      rivers: riversData ? riversData.length : 0,
       disasters: disasterGroup ? disasterGroup.children.length : 0,
       hazards: Object.fromEntries(Object.entries(hazardGroups).map(([k, g]) => [k, g.children.length])),
     };
@@ -935,6 +1026,8 @@ function wireBusinessToggles() {
   l.addEventListener('change', (e) => { if (lakeGroup) lakeGroup.visible = e.target.checked; });
   const d = document.getElementById('lyr-disaster');
   d.addEventListener('change', (e) => { if (disasterGroup) disasterGroup.visible = e.target.checked; });
+  const rv = document.getElementById('lyr-river');
+  if (rv) rv.addEventListener('change', (e) => { if (riverGroup) riverGroup.visible = e.target.checked; });
   for (const key of Object.keys(HAZARD_STYLE)) {
     const el = document.getElementById('lyr-' + key);
     if (el) el.addEventListener('change', (e) => {
@@ -957,6 +1050,10 @@ function onPick(e) {
   if (glacierMesh && glacierMesh.visible) targets.push(glacierMesh);
   if (lakeGroup && lakeGroup.visible) targets.push(...lakeGroup.children);
   if (disasterGroup && disasterGroup.visible) targets.push(...disasterGroup.children);
+  if (riverGroup && riverGroup.visible) {
+    _ray.params.Line.threshold = DISASTER_RADIUS * 0.5;   // 线要素没有粗细，放宽命中半径
+    targets.push(...riverGroup.children);
+  }
   for (const k in hazardGroups)
     if (hazardGroups[k] && hazardGroups[k].visible) targets.push(...hazardGroups[k].children);
   if (!targets.length) { hidePopup(); return; }
@@ -964,6 +1061,7 @@ function onPick(e) {
   if (!hits.length) { hidePopup(); return; }
   const hit = hits[0], obj = hit.object;
   if (obj.userData && obj.userData.disaster) showDisaster(obj.userData.disaster, hit.point);
+  else if (obj.userData && obj.userData.river) showRiver(obj, hit);
   else if (obj.userData && obj.userData.hazard) showHazard(obj.userData.hazard, hit.point);
   else if (obj === glacierMesh) showGlacierAt(hit.point);
   else if (lakeGroup && lakeGroup.children.indexOf(obj) >= 0) showLake(obj);
@@ -1019,6 +1117,18 @@ function showLake(obj) {
     `<div class="pp-row">面积：<b>${obj.userData.lakeArea} km²</b></div>`, v);
 }
 
+function showRiver(obj, hit) {
+  const owner = obj.geometry.userData.owner;
+  if (!riversData || !owner) { hidePopup(); return; }
+  const segIdx = Math.floor((hit.index || 0) / 2);
+  const r = riversData[owner[segIdx]];
+  if (!r) { hidePopup(); return; }
+  showPopup(`<div class="pp-title">${r.n ? r.n : '河流'}</div>` +
+    `<div class="pp-row">级别：<b>${r.o} 级</b></div>` +
+    `<div class="pp-row">河段长：<b>${r.len} km</b></div>` +
+    `<div class="pp-row">年均流量：<b>${r.q} m³/s</b></div>`, hit.point);
+}
+
 function showPopup(html, worldPoint) {
   const el = document.getElementById('popup');
   document.getElementById('popup-body').innerHTML = html;
@@ -1038,6 +1148,7 @@ function redrapeOverlays() {
   if (lakeGroup) lakeGroup.children.forEach(o => objs.push(o));
   if (disasterGroup) disasterGroup.children.forEach(o => objs.push(o));
   for (const k in hazardGroups) if (hazardGroups[k]) hazardGroups[k].children.forEach(o => objs.push(o));
+  if (riverGroup) riverGroup.children.forEach(o => objs.push(o));
   for (const obj of objs) {
     if (obj.userData.lonlat) {
       const ll = obj.userData.lonlat, pos = obj.geometry.attributes.position;
@@ -1126,8 +1237,9 @@ function redrapeOverlays() {
           const short = s.hazard[k].label.replace('危害', '');
           hz += `、${short} ${s.hazard[k].count}`;
         }
+        const rv = s.river ? `、河流 ${s.river.count} 段` : '';
         bm.innerHTML += `<br>要素：冰川 ${s.glacier.count}、冰湖 ${s.lake.count}` +
-          `、灾害点 ${s.disaster.total}${hz}`;
+          `${rv}、灾害点 ${s.disaster.total}${hz}`;
       }
     }
 

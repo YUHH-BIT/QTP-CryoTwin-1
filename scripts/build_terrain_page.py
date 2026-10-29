@@ -230,6 +230,9 @@ BUSINESS_GEO = {
                             'TP_China_glaciers.geojson'),
     'lake': os.path.join(PROJECT_ROOT, 'data', 'raw', 'geo', 'hydrology',
                          'TP_China_Lake.geojson'),
+    # 河网：HydroRIVERS（含斯特拉勒级别 ORD_STRA、年均流量 DIS_AV_CMS）
+    'river': os.path.join(PROJECT_ROOT, 'data', 'raw', 'geo', 'hydrology',
+                          'river.geojson'),
     'glof': os.path.join(PROJECT_ROOT, 'data', 'raw', 'geo', 'disaster',
                        'GLOFs_HMA.geojson'),
     'llof': os.path.join(PROJECT_ROOT, 'data', 'raw', 'geo', 'disaster',
@@ -247,6 +250,12 @@ DISASTER_TYPES = {
     'pf': ('PF', '降雨型洪水'),
     'sf': ('SF', '融雪洪水'),
 }
+
+# 河流名称来源：国家级 1:400 万水系（含 NAME 中文名），用于给主干河段补名称
+RIVER_NAMES_GEO = os.path.join(PROJECT_ROOT, 'data', 'raw', 'geo', 'hydrology',
+                               'TP_China_rivers.geojson')
+# 名称匹配的最大距离（度，约 2 km）：只有主干河段（斯特拉勒级别 >= 6）参与匹配
+RIVER_NAME_MAXDIST = 0.02
 
 # 危害范围多边形 -> （文件名, 中文名）。均为 data/raw/geo/disaster 下
 # 冰川跃动 surging_glacier 体积过大（24MB 要素过多），示范区暂不纳入
@@ -376,6 +385,81 @@ def build_business(out_dir, bbox, n, basin_geom, basin_mask_path=None,
             business['lakes'] = 'lakes.json'
             stats['lake'] = {'count': len(lakes)}
             log(f'冰湖/湖泊：{len(lakes)} 个（流域内）')
+
+    # ---- 河流：HydroRIVERS 线要素（裁剪到流域），运行时贴地渲染 ----
+    rpath = BUSINESS_GEO['river']
+    if os.path.isfile(rpath):
+        rdf = _read_gdf(rpath)
+        rdf = rdf[rdf.geometry.intersects(clip.buffer(0))]
+        # 名称来源：国家级 1:400 万水系（含中文名），只给主干河段补名
+        named = []
+        if os.path.isfile(RIVER_NAMES_GEO):
+            try:
+                ndf = _read_gdf(RIVER_NAMES_GEO)
+                ndf = ndf[ndf.geometry.intersects(clip.buffer(0))]
+                names = ndf['NAME'] if 'NAME' in ndf.columns else None
+                if names is not None:
+                    for g, nm in zip(ndf.geometry, names):
+                        if g is None or g.is_empty or not nm:
+                            continue
+                        nm = str(nm).strip()
+                        if nm and nm.lower() != 'nan':
+                            named.append((g, nm))
+            except Exception as e:
+                log(f'  河流名称索引跳过：{e}')
+
+        rivers = []
+        for _, row in rdf.iterrows():
+            g = row.geometry
+            if g is None or g.is_empty:
+                continue
+            g = g.intersection(clip.buffer(0))
+            if g.is_empty:
+                continue
+            lines = (g.geoms if g.geom_type == 'MultiLineString'
+                     else ([g] if g.geom_type == 'LineString' else []))
+            try:
+                o = int(row.get('ORD_STRA') or 0)
+            except (TypeError, ValueError):
+                o = 0
+            # 主干河段（级别 >= 6）就近取名称
+            name = None
+            if o >= 6 and named:
+                try:
+                    mid = g.centroid
+                    best, bd = None, None
+                    for ng, nm in named:
+                        d = mid.distance(ng)
+                        if bd is None or d < bd:
+                            best, bd = nm, d
+                    if best and bd is not None and bd <= RIVER_NAME_MAXDIST:
+                        name = best
+                except Exception:
+                    name = None
+            for ln in lines:
+                coords = [[round(x, 5), round(y, 5)] for x, y in ln.coords]
+                if len(coords) < 2:
+                    continue
+                rivers.append({
+                    'o': o,
+                    'len': round(float(row.get('LENGTH_KM') or 0), 2),
+                    'q': round(float(row.get('DIS_AV_CMS') or 0), 1),
+                    'n': name,
+                    'c': coords,
+                })
+        if rivers:
+            with open(os.path.join(out_dir, 'rivers.json'), 'w',
+                      encoding='utf-8') as f:
+                json.dump(rivers, f, ensure_ascii=False, separators=(',', ':'))
+            business['rivers'] = 'rivers.json'
+            stats['river'] = {
+                'count': len(rivers),
+                'lengthKm': round(sum(r['len'] for r in rivers), 1),
+                'named': sum(1 for r in rivers if r['n']),
+            }
+            log(f'河流：{len(rivers)} 段（流域内），总长 '
+                f'{stats["river"]["lengthKm"]} km，'
+                f'命名 {stats["river"]["named"]} 段')
 
     # ---- 灾害点：GLOF / PF / SF ----
     import pandas as pd
