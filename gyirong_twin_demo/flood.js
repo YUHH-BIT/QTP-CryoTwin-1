@@ -41,6 +41,10 @@ const T_SCALE = 1600.0;            // 源纹理 R 通道：T / 1600 → [0,1]
 const T_FIELD = 470.0;             // 演示比例 1.0 对应的场时间（s）
 const ETA_MAX = 8.0;               // 波面振幅上限（场景单位）
 const REF_RISE = 240.0;            // 地形约束漫延的参考抬升（场景单位，视觉包络）
+// 横向视觉展宽（口径 C）：对低淹没势做幂次抬升，等效把横向衰减长度放大约 1.6×。
+// 在 bakeSource 烘焙阶段一次性生效，GPU 水面顶点 / GPU 波面状态 / CPU 碎冰粒子
+// 读的是同一份展宽后的场，刚体与粒子不会脱节。仅便于观察，不代表实测淹没边界。
+const POT_WIDEN_GAMMA = 0.60;
 const RISE_TAU = 52.0;             // 涨水惯性时间常数（场秒）
 const C2 = 0.22;                   // (c·dt/dx)²，二维 5 点拉普拉斯稳定域内
 const N_ICE = 260, N_ROCK = 220;   // 碎冰 / 冰碛物实例数
@@ -73,11 +77,14 @@ float riseFn(float dt) {
   float r = 1.0 - exp(-1.35*x) * (cos(1.05*x) + 0.42*sin(1.05*x));
   return clamp(r, 0.0, 1.16) * (1.0 - 0.30 * smoothstep(230.0, 470.0, dt));
 }
-/* 哈希值噪声：正弦叠加会产生规整的人字纹 / 编织纹（实测踩过），
-   必须用格点白噪声做插值才是不规则湍流。两个倍频共 8 次 sin，
-   仍是软件渲染可承受的成本。 */
+/* 哈希值噪声：格点白噪声插值才是不规则湍流。
+   2026-11-10 换成 Dave Hoskins 无三角函数 hash —— 旧的 fract(sin(dot(p,...))*43758)
+   在 uv 随时间滚动、坐标变大后 sin 的小数精度被截断，会产生矩形面片与直角网格纹
+   （WebGL 水面避坑的公认问题）。新 hash 只有乘加与 fract，大坐标下稳定。 */
 float hash12(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
 }
 float vnoise(vec2 p) {
   vec2 i = floor(p), f = fract(p);
@@ -232,7 +239,9 @@ void main() {
   // 高频波面：顺流向拉长的解析波纹，补足状态网格分辨率以下的细节
   vec2 w = vec2(p.x, p.z);
   // 低频相位扰动：纯正弦会织出「一块规则波纹布」，加入噪声后才像湍流
-  float warp = vnoise(uv * vec2(19.0, 11.0)) * 4.6 + vnoise(uv * vec2(47.0, 28.0)) * 1.7;
+  // warp 用世界坐标而非网格 uv：uv 在近景局部几乎线性（变化尺度数百米），
+  // 打散不了 26 m 周期的解析波纹；世界坐标 17~48 m 尺度才与波纹同量级。
+  float warp = vnoise(w * 0.021) * 4.6 + vnoise(w * 0.058) * 1.7;
   float ph = dot(w, vFlow) * 0.055 - uClock * 2.35 + warp;
   float ripple = sin(ph)*0.62 + sin(ph*1.83 + 1.1)*0.28
                + sin(dot(w, vec2(-vFlow.y, vFlow.x))*0.11 + uClock*1.4 + warp*0.7)*0.34;
@@ -246,7 +255,7 @@ const WATER_FRAG = GLSL_COMMON + `
 uniform sampler2D uSat;       // Esri 真实影像：浅水折射透出阶地 / 农田 / 道路
 uniform sampler2D uNormal0, uNormal1;  // three.js r160 官方真实水法线贴图（双相位）
 uniform vec2  uNormalScale;   // 贴图在世界范围内的重复次数（等比例，避免拉伸）
-uniform float uHasNormals, uNormalStrength, uFlowSpeed;
+uniform float uHasNormals, uNormalStrength, uFlowSpeed, uMuddy;
 uniform vec3  uSun, uSky;
 uniform float uClock, uAlpha, uExagToMeters, uPeak;
 varying vec3  vWorld;
@@ -265,7 +274,7 @@ void main() {
   // --- 法线：几何坡度（dFdx/dFdy）叠加多尺度波纹坡度 → 明暗 / 反射随坡度变化 ---
   vec3 gN = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
   if (gN.y < 0.0) gN = -gN;
-  float warp = vnoise(vUv * vec2(19.0, 11.0)) * 4.6 + vnoise(vUv * vec2(47.0, 28.0)) * 1.7;
+  float warp = vnoise(vWorld.xz * 0.021) * 4.6 + vnoise(vWorld.xz * 0.058) * 1.7;
   float p1 = dot(vWorld.xz, f)*0.055 - uClock*2.35 + warp;
   float p2 = dot(vWorld.xz, fc)*0.11 + uClock*1.40 + warp*0.7;
   float p3 = dot(vWorld.xz, f)*0.24 - uClock*3.60 + depthM*0.035 + warp*1.6;
@@ -291,14 +300,20 @@ void main() {
   float flowLerp = abs(cycle * 0.5 - ph0) / (cycle * 0.5);
   vec2 baseUv = vUv * uNormalScale;
   vec3 c0 = texture2D(uNormal0, baseUv + f * ph0).rgb;
-  vec3 c1 = texture2D(uNormal1, baseUv + f * ph1).rgb;
+  // 第二层用不同缩放 + 横向漂移：同缩放只差相位（Water2 原法）在近景仍会
+  // 看出同一组波纹重复；1.73× 叠加才真正打散周期性。
+  vec3 c1 = texture2D(uNormal1, baseUv * 1.73 + fc * ph1 * 0.9).rgb;
   vec3 nc = mix(c0, c1, flowLerp);
   // 官方贴图通道约定是 R→x, G→z, B→y（不是标准切线空间法线），照抄 Water2
   vec3 texN = normalize(vec3(nc.r * 2.0 - 1.0, nc.b, nc.g * 2.0 - 1.0));
   vec2 slopeTex = vec2(texN.x, texN.z) * uNormalStrength;
 
-  // 贴图细节为主、程序化波纹只留 35% 作大尺度基底；贴图缺失时自动全量回退
-  vec2 slope = slopeProc * mix(1.0, 0.35, uHasNormals) + slopeTex * uHasNormals;
+  // 贴图细节为主、程序化波纹只留 25% 作大尺度基底（35% 在近景仍会织出条带）；
+  // 贴图缺失时自动全量回退
+  vec2 slope = slopeProc * mix(1.0, 0.25, uHasNormals) + slopeTex * uHasNormals;
+  // 近景泥浆（uMuddy→1）：高频法线坡度衰减到 22%。法线贴图内部的高频波纹
+  // 在 600 m 视距被放大成密集平行条纹，衰减后只剩 GPU 波面的大尺度起伏。
+  slope *= 1.0 - 0.78 * uMuddy;
   vec3 N = normalize(vec3(-slope.x*1.5, 1.0, -slope.y*1.5));
   // gN 是逐三角形常数，哪怕只借 10% 也会在俯视全景里显出细密的三角形人字纹；
   // 压到 3%，只保留极轻微的地形起伏感。
@@ -310,35 +325,46 @@ void main() {
   // 高光不能一片过曝：乘以噪声遮罩，只在波峰的碎点上闪
   float detail = min(aa1, min(aa2, aa3));
   float spec = (pow(ndh, 96.0)*0.62 + pow(ndh, 20.0)*0.11) *
-               (0.35 + 0.65*fn) * (0.30 + 0.70*detail);
+               (0.35 + 0.65*fn) * (0.30 + 0.70*detail) * (1.0 - 0.85*uMuddy);
   float fres = pow(1.0 - max(dot(N, V), 0.0), 4.0);
   float diff = 0.58 + 0.42*max(dot(N, L), 0.0);
 
-  // --- 水体颜色：浅水透出真实底图，深水为冰川岩屑流浑浊灰褐 ---
+  // --- 水体颜色：冰川岩屑流（泥流）浑浊黄褐，不是清水的青灰镜面 ---
+  // 上一版深水色偏青黑、再被 26% 天空菲涅尔与强高光洗一遍，近景就成了
+  // 「灰白锡纸」，和两侧山坡混在一起，看不出灾害主体。这里改成暖泥色为主，
+  // 卫星底图只透少量、高光压到碎点，让水面在绿色山谷里一眼可辨。
   // texSat 是 TextureLoader（flipY=true），而水面 uv 行 0 = 北 = DataTexture 行 0，
   // 两者 v 方向相反，这里必须翻回来，否则折射出来的是别处的山谷。
   vec2 ruv = vec2(vUv.x, 1.0 - vUv.y) + N.xz*0.0022*(1.0 + depthM*0.012);
   ruv = clamp(ruv, 0.002, 0.998);
   vec3 ground = texture2D(uSat, ruv).rgb;
   float ext = 1.0 - exp(-depthM * 0.105);
-  vec3 shallow = vec3(0.29, 0.255, 0.195);
-  vec3 deep    = vec3(0.055, 0.080, 0.085);
+  vec3 shallow = vec3(0.46, 0.355, 0.235);   // 浑浊泥黄（浅水）
+  vec3 deep    = vec3(0.185, 0.135, 0.095);  // 深泥褐（主槽）
   vec3 body = mix(shallow, deep, clamp(depthM/18.0, 0.0, 1.0));
-  body = mix(body, vec3(0.085, 0.135, 0.155), 0.24*smoothstep(6.0, 26.0, depthM));
-  // 浅水也至少留 44% 水色，否则只是「变暗的碎石底图」，看不出被淹
-  body = mix(ground * vec3(0.52, 0.52, 0.48), body, 0.44 + 0.56*ext);
-  vec3 col = body * diff + uSky * fres * 0.26 + vec3(1.0, 0.965, 0.88) * spec;
+  // 卫星底图只透出少量并压暖；浅水也至少留 72% 水色，否则只是「变暗的碎石底图」
+  body = mix(ground * vec3(0.46, 0.42, 0.34), body, 0.72 + 0.28*ext);
+  // 悬浮泥沙（口径 C）：泥流的颜色来自高浓度颗粒散射，不是清水表面吸收。
+  // 低频 fbm 斑驳代替高频波光，Unity HDRP「Dirty river」/Vortex Suspension 同源做法。
+  float sediment = fbm(vWorld.xz * 0.035 + f * uClock * 0.40);
+  body *= 1.0 - uMuddy * (0.22 - 0.40 * sediment);
+  vec3 col = body * diff + uSky * fres * mix(0.10, 0.02, uMuddy)
+             + vec3(1.0, 0.94, 0.80) * spec * 0.55;
 
-  // --- 湍流条纹：顺流向拉长，粗糙度（⑥ 语义分区）决定强度 ---
-  float turb = sin(dot(vWorld.xz, f)*0.30 - uClock*4.3 + fn*6.0);
-  col *= 0.93 + 0.115*turb*(0.35 + vRough);
+  // --- 湍流：噪声主导，不再用顺流向正弦 ---
+  // sin(dot(world.xz, f)*0.30) 的周期约 21 m，在 600 m 视距下正好是屏幕上
+  // 约 30 px 一道的等间距横纹，截图里把水面刷成「搓衣板」。改成同一份 fbm
+  // 噪声做调制，条纹被打散成浑浊泥流的斑驳质感；粗糙度仍决定起伏强弱。
+  float turb = (fn - 0.5) * 2.0;
+  col *= 0.96 + 0.055*turb*(0.35 + vRough);
 
   // --- 泡沫 / 浪花：只在窄前锋带、波峰破碎处与湿边出现 ---
   float crest = smoothstep(ETA_MAX*0.34, ETA_MAX*0.90, vEta);
   float edge  = 1.0 - smoothstep(0.0, 1.8, vH);
   float foamK = clamp(vFoam*0.78 + vFront*0.88 + crest*vFront*0.55 + edge*0.20, 0.0, 1.0);
   foamK *= 0.28 + 0.82*fn;
-  vec3 foamCol = mix(vec3(0.72, 0.77, 0.77), vec3(1.0, 0.995, 0.97), fn);
+  // 泥流的泡沫不是纯白，而是夹着细颗粒的暖白
+  vec3 foamCol = mix(vec3(0.66, 0.63, 0.54), vec3(0.99, 0.96, 0.88), fn);
   col = mix(col, foamCol, clamp(foamK, 0.0, 0.78));
   // 湿边压暗形成水线，泡沫边缘的高光碎点模拟《后天》式溃坝浪花颗粒
   col *= 1.0 - 0.24 * edge;
@@ -472,6 +498,11 @@ export class FloodSystem {
       pot *= 1 - smoothstep(1200, 4200, dist);
       pot = Math.max(pot, Math.min(D / 18, 1) * 0.90);
       pot = clamp(pot, 0, 1);
+      // 展示口径 C：低淹没势区做幂次抬升 → 横向衰减长度放大约 1.6×，
+      // 让 180 m 的窄湿区在跟拍画面里能占住合理宽度。写回 srcPot 与纹理 G 通道，
+      // 使 GPU 顶点高度、GPU 波面、CPU 碎冰/粒子采样三者共用同一份场。
+      // 这不是二维数值解，也不是实测淹没边界。
+      pot = Math.pow(pot, POT_WIDEN_GAMMA);
       const slopeK = smoothstep(4, 90, delta);
       const rough = clamp(0.20 + 0.34 * slopeK + 0.62 * bldMask[q] + 0.12 * (D / 18), 0, 1);
       const core = clamp(D / 18, 0, 1);
@@ -617,6 +648,9 @@ export class FloodSystem {
         uNormalScale: { value: new THREE.Vector2(260, 146) },
         uNormalStrength: { value: 0.30 },
         uFlowSpeed: { value: 0.10 },
+        // 按视距混合的「泥浆模式」：近景→1 高频法线与高光衰减、悬浮泥沙斑驳为主；
+        // 远景→0 保留清水式波光，让 22 km 全景仍能辨识水面存在。
+        uMuddy: { value: 0 },
         uSrcTexel: { value: new THREE.Vector2(1 / SW, 1 / SH) },
         uTField: { value: 0 }, uPeak: { value: 0 }, uClock: { value: 0 },
         uExagToMeters: { value: 1 / (this.exag * 1.0) },
@@ -783,6 +817,9 @@ export class FloodSystem {
     const ns = 260 + 980 * (1 - smoothstep(900, 14000, camDist));
     const u = this.waterMat && this.waterMat.uniforms.uNormalScale;
     if (u && Math.abs(u.value.x - ns) > 8) u.value.set(ns, ns * 146 / 260);
+    // 近景（<900 m）走泥浆材质，2600 m 外回到清水波光，中间连续过渡。
+    const um = this.waterMat && this.waterMat.uniforms.uMuddy;
+    if (um) um.value = 1 - smoothstep(900, 2600, camDist);
   }
 
   /* ---------- 前锋（与水面自身到达时间一致） ---------- */
@@ -1103,6 +1140,10 @@ export class FloodSystem {
       substeps: SUBSTEPS, steps: this.diag.steps, resets: this.diag.resets,
       tField: +this.tField.toFixed(1), peak: +this.peak.toFixed(1),
       depthVisual: +this.depthVisual.toFixed(2),
+      // 口径 C：横向视觉展宽系数。wetPct / potCells 均基于展宽后的场，
+      // 只用于观察构图，不能当作实测淹没范围。
+      visualWidenGamma: POT_WIDEN_GAMMA,
+      muddy: this.waterMat ? +this.waterMat.uniforms.uMuddy.value.toFixed(2) : null,
       frontS: Math.round(this.frontS || 0),
       bodies: this.bodies ? this.bodies.length : 0,
       activeBodies: this.diag.activeBodies || 0,

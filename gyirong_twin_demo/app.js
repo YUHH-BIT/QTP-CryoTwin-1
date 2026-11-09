@@ -4,7 +4,7 @@ import { OrbitControls } from './lib/OrbitControls.js';
 import { PALETTE, material, makeSculpt, assertAnchors, applyDamage,
          diagnose, attachFacade, attachBank, buildDistanceField } from './proc.js';
 // 洪水演进实景层：④ GPU 高度场 + 亚网格连续曲面 + 碎冰 / 飞溅粒子（④②⑤①⑥）
-import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261109c';
+import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261110c';
 
 /* ==========================================================================
    吉隆「8·26」冰岩崩—泥石流灾害链 · 实景三维数字孪生推演（演示级）
@@ -1247,9 +1247,12 @@ function placeRigAt(back, lat, H, ahead) {
 const RIG = {
   // backMin 不要低于搜索验证过的 600 m：再靠近时湿区反而跑到相机背后出框，
   // 实测 t=300 把 back 压到 380 后 fill 从 0.44 掉到 0.28。
-  follow: { back: 600, lat: -220, pitch: 25, fill: 0.42, backMin: 600, backMax: 2200,
+  // 俯角按用户反馈抬高：原 25°/22° 离谷底太近（t=300 离地仅 140 m，贴着地面）。
+  // 试过 32°，水被俯视挤到画面下沿、部分湿点出画（rig.fill 掉到 0），反而更看不见；
+  // 折中取 29°/26°，离地抬到约 200 m 又不把水挤出视野。旧版 38° 更是俯视全谷不可取。
+  follow: { back: 600, lat: -220, pitch: 29, fill: 0.42, backMin: 600, backMax: 2200,
             sRate: 2.4, posRate: 2.6, tgtRate: 2.8, intro: 1.5, ahead: 200 },
-  cine:   { back: 430, lat: -150, pitch: 22, fill: 0.55, backMin: 430, backMax: 1500,
+  cine:   { back: 430, lat: -150, pitch: 26, fill: 0.55, backMin: 430, backMax: 1500,
             sRate: 2.8, posRate: 3.0, tgtRate: 3.2, intro: 1.1, ahead: 140 },
 };
 const rig = { mode: null, s: 0, back: 600, fill: 0, snap: true, introT: 1,
@@ -1285,9 +1288,11 @@ function rigFill(cam, f, s0, L) {
   cam.matrixWorldInverse.copy(cam.matrixWorld).invert();
   let y0 = 9, y1 = -9, n = 0;
   const pk = Math.max(f.peak || 1, 1e-3);
+  // 横向采样覆盖视觉展宽后的湿区。±140 m 在 32° 高俯角下已出画导致 fill=0；
+  // ±40 m 是展宽前的口径又会低估。折中 ±90 m（展宽约 1.6×，原湿区半宽约 55 m）。
   for (let i = 0; i <= 11; i++) {
     const s = cs(s0 - i * 40), c = f.chanAt(s), t = rigTangent(s, f, L);
-    for (const lat of [-40, 40]) {
+    for (const lat of [-90, 90]) {
       const x = c.x - t.z * lat, z = c.z + t.x * lat;
       const w = f.waterY(x, z, f.tField);
       if (w.h / pk <= 0.005) continue;
