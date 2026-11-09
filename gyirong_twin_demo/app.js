@@ -1071,7 +1071,7 @@ function groundAt(x, z) {
    用户自由视角只做最小防穿地约束，所以手动拉近看建筑不会被强行抬高。 */
 function enforceCameraClearance() {
   const p = camera.position, t = controls.target;
-  const auto = cineCam || !!flight || autoFly || state.rotating;
+  const auto = cineCam || !!flight || autoFly || state.rotating || rigStatic;
   let need = groundAt(p.x, p.z) + CAM_GROUND_CLEAR;
   if (auto) {
     need = groundAt(p.x, p.z) + CAM_AUTO_CLEAR;
@@ -1192,49 +1192,162 @@ function resetView() {
 let followSnap = false;
 // 「沉浸式跟拍」= 洪水航拍 或 播放跟拍：两种模式都让镜头贴近灾害，
 // 此时必须收起彩色态势符号，否则近景下巨大的前锋球/圆环会盖住真实水面与地形。
-const immersiveCam = () => cineCam || autoFly;
-/* 播放跟拍的锚点必须是「洪水层自己的水头」（flood.frontHint），
-   而不是论文时间线的 chanAt(path)：后者由 frontPath(ratio) 给出，
-   前者由 tField=ratio*470 经 arrival.bin 反解，两者在 t≈220 时可差 0.2 个
-   path（约 4 km）。镜头跟错前锋就会对着下游山坡，水还在上游 →「看不到灾害」。
-   取景参数沿用已验证能看到谷底洪水的航拍跟拍，保证两套镜头观感一致。 */
-function updateDisasterFollow(dt) {
-  const h = flood && flood.frontHint ? flood.frontHint() : null;
-  if (!h || !Number.isFinite(h.x)) return;
-  if (!cineVecA) { cineVecA = new THREE.Vector3(); cineVecB = new THREE.Vector3(); }
-  const back = 1650, side = 780;
-  const px = h.x - h.tx * back - h.tz * side;
-  const pz = h.z - h.tz * back + h.tx * side;
-  const py = Math.max(h.y + 620, groundAt(px, pz) + 330);
-  const k = followSnap ? 1 : 1 - Math.exp(-dt * 2.4);
-  followSnap = false;
-  camera.position.lerp(cineVecA.set(px, py, pz), k);
-  controls.target.lerp(
-    cineVecB.set(h.x + h.tx * 900, h.y + 30, h.z + h.tz * 900), k);
+// ?rig= 定点构图验收：图层按沉浸模式收起，但不触发自动跟拍抢相机。
+// 这样截图里看到的是跟拍模式的真实画面，不会混进全景的橙色态势带与节点标签。
+let rigStatic = false, rigPending = null, rigPlaceInfo = null;
+const immersiveCam = () => cineCam || autoFly || rigStatic;
+
+/* 沿沟道弧长把机位放到「可见水头」后方 back 米、横向偏 lat、离水面 H、
+   瞄准点再向下游前移 ahead 米。这是 follow / cine 两种跟拍共用的几何核心。
+   两个关键口径（都是实测踩坑换来的）：
+   ① 机位必须沿沟道走，不能沿切线直线后退 —— 弯道处直线会切出侧壁，
+      az=0 时离地实测 −182 m（相机在地下）；
+   ② 锚点是「画面里真有水的水头」，不是 frontS。frontS 是到达时间等值线，
+      那里水深恰好 0，瞄它等于对着水前面的干坡。 */
+function placeRigAt(back, lat, H, ahead) {
+  const f = flood;
+  if (!f || !f.chanAt) return null;
+  const L = f.channel.lengthM;
+  const cs = s => Math.max(0, Math.min(L, s));
+  // ±300 m 基线求切线：沟道顶点间距中位数 63 m，±45 m 差分每个顶点跳一次方向
+  const tangent = s => {
+    const a = f.chanAt(cs(s - 300)), b = f.chanAt(cs(s + 300));
+    const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz) || 1;
+    return { x: dx / d, z: dz / d };
+  };
+  let s0 = cs(f.frontS || 0);
+  for (let d = 0; d <= 1500; d += 50) {
+    const s = cs(s0 - d), c = f.chanAt(s);
+    if (f.waterY(c.x, c.z, f.tField).h > 2) { s0 = s; break; }
+  }
+  const sc = cs(s0 - back), c = f.chanAt(sc), t = tangent(sc);
+  const px = c.x - t.z * lat, pz = c.z + t.x * lat;
+  const base = Math.max(f.waterY(px, pz, f.tField).y, groundAt(px, pz));
+  const py = base + H;
+  const aS = cs(s0 + ahead), ac = f.chanAt(aS), aw = f.waterY(ac.x, ac.z, f.tField);
+  camera.position.set(px, py, pz);
+  controls.target.set(ac.x, aw.y + 20, ac.z);
+  camera.lookAt(controls.target);
+  camera.updateMatrixWorld(true);
+  enforceCameraClearance();
+  return { s0: Math.round(s0), pos: camera.position.toArray().map(v => +v.toFixed(1)),
+           aim: controls.target.toArray().map(v => +v.toFixed(1)),
+           clearance: +(py - groundAt(px, pz)).toFixed(1) };
 }
 
-/* -------------------- 洪水航拍跟拍（无人机视角） -------------------- */
-// 镜头跟随的是「水面自己的前锋」（由 model.json 到达时间反解弧长），
-// 而不是态势层的示意小球，保证飞溅 / 碎冰 / 泡沫与镜头朝向始终一致。
+/* -------------------- 全链条推演 / 洪水航拍：沿沟道 camera rig --------------------
+   旧实现把机位写死成「水头后 1650 m、侧移 780 m、抬高 620 m」，实测俯角只有
+   24~31°、水体仅占画高 18~28%，水带横向可到 NDC −2.73（大半条在框外）。
+   新做法把景别交给几何解算而不是手填常数：
+   · 机位沿沟道弧长布置 —— 沿切线直线后退在弯道会切出侧壁（实测离地 −182 m）；
+   · 锚点取「画面里真有水的水头」，frontS 是到达时间等值线、那里水深恰好 0；
+   · 切线用 ±300 m 基线 —— 沟道顶点间距中位数 63 m，±45 m 差分每个顶点跳一次；
+   · 俯角由目标角度反解高度 —— 固定离水面高度在源区陡坡会变成仰视（实测 −4.6°）；
+   · 机位远近由「湿点实测占画高」反馈 —— 固定 back 在口岸段会占满 99% 画面。 */
+const RIG = {
+  // backMin 不要低于搜索验证过的 600 m：再靠近时湿区反而跑到相机背后出框，
+  // 实测 t=300 把 back 压到 380 后 fill 从 0.44 掉到 0.28。
+  follow: { back: 600, lat: -220, pitch: 25, fill: 0.42, backMin: 600, backMax: 2200,
+            sRate: 2.4, posRate: 2.6, tgtRate: 2.8, intro: 1.5, ahead: 200 },
+  cine:   { back: 430, lat: -150, pitch: 22, fill: 0.55, backMin: 430, backMax: 1500,
+            sRate: 2.8, posRate: 3.0, tgtRate: 3.2, intro: 1.1, ahead: 140 },
+};
+const rig = { mode: null, s: 0, back: 600, fill: 0, snap: true, introT: 1,
+              cam0: new THREE.Vector3(), tgt0: new THREE.Vector3(),
+              pos: new THREE.Vector3(), aim: new THREE.Vector3(), dbg: null };
+const rigTmp = new THREE.Vector3();
+
+function rigTangent(s, f, L) {
+  const cs = v => Math.max(0, Math.min(L, v));
+  const a = f.chanAt(cs(s - 300)), b = f.chanAt(cs(s + 300));
+  const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz) || 1;
+  return { x: dx / d, z: dz / d };
+}
+// 可见水头：从 frontS 向上游找第一个真正有水的位置。
+// 阈值用 h/peak 的相对值而不是绝对米数 —— 绝对阈值会随 setViewDistance 调
+// depthVisual 而漂移（实测 t=300 机位因此向上游退了 500 m）；
+// h/peak = pot×riseFn，与视觉放大系数无关。
+function rigHead(f, L) {
+  const cs = v => Math.max(0, Math.min(L, v));
+  const pk = Math.max(f.peak || 1, 1e-3);
+  const s0 = cs(f.frontS || 0);
+  for (let d = 0; d <= 1500; d += 50) {
+    const s = cs(s0 - d), c = f.chanAt(s);
+    if (f.waterY(c.x, c.z, f.tField).h / pk > 0.01) return s;
+  }
+  return s0;
+}
+// 湿点在画面里的纵向占比（0~1）。只算真正会渲染的水面（h>1），
+// 干沟道／山坡混进来会算出 70% 的假象，截图却是八成山坡。
+function rigFill(cam, f, s0, L) {
+  const cs = v => Math.max(0, Math.min(L, v));
+  cam.updateMatrixWorld(true);
+  cam.matrixWorldInverse.copy(cam.matrixWorld).invert();
+  let y0 = 9, y1 = -9, n = 0;
+  const pk = Math.max(f.peak || 1, 1e-3);
+  for (let i = 0; i <= 11; i++) {
+    const s = cs(s0 - i * 40), c = f.chanAt(s), t = rigTangent(s, f, L);
+    for (const lat of [-40, 40]) {
+      const x = c.x - t.z * lat, z = c.z + t.x * lat;
+      const w = f.waterY(x, z, f.tField);
+      if (w.h / pk <= 0.005) continue;
+      rigTmp.set(x, w.y, z).project(cam);
+      if (rigTmp.z > 1 || Math.abs(rigTmp.x) > 1 || Math.abs(rigTmp.y) > 1) continue;
+      n++; y0 = Math.min(y0, rigTmp.y); y1 = Math.max(y1, rigTmp.y);
+    }
+  }
+  return n >= 2 ? Math.max(0, Math.min(y1, 1) - Math.max(y0, -1)) / 2 : 0;
+}
+function updateRig(dt, mode) {
+  const f = flood; if (!f || !f.chanAt) return;
+  const cfg = RIG[mode], L = f.channel.lengthM;
+  const cs = v => Math.max(0, Math.min(L, v));
+  const snap = rig.mode !== mode || rig.snap;
+  if (snap) {
+    rig.mode = mode; rig.s = rigHead(f, L); rig.back = cfg.back; rig.snap = false;
+    rig.cam0.copy(camera.position); rig.tgt0.copy(controls.target);
+    rig.introT = 0; rig.intro0 = performance.now();
+  } else {
+    rig.s += (rigHead(f, L) - rig.s) * (1 - Math.exp(-dt * cfg.sRate));
+    // 有界反馈：水占画太大就沿沟后退，太小就靠近；0.85~1.18 防低帧率振荡。
+    if (rig.fill > 0) rig.back = clamp(rig.back * clamp(rig.fill / cfg.fill, 0.85, 1.18),
+                                        cfg.backMin, cfg.backMax);
+  }
+  const sc = cs(rig.s - rig.back), c = f.chanAt(sc), t = rigTangent(sc, f, L);
+  const px = c.x - t.z * cfg.lat, pz = c.z + t.x * cfg.lat;
+  const aS = cs(rig.s + cfg.ahead), ac = f.chanAt(aS), aw = f.waterY(ac.x, ac.z, f.tField);
+  const horiz = Math.hypot(px - ac.x, pz - ac.z);
+  // 俯角反解高度：固定「抬高 620 m」在源区会变成仰视、口岸又俯得太狠。
+  let py = aw.y + 20 + horiz * Math.tan(cfg.pitch * Math.PI / 180);
+  py = Math.max(py, groundAt(px, pz) + CAM_AUTO_CLEAR);
+  rig.pos.set(px, py, pz); rig.aim.set(ac.x, aw.y + 20, ac.z);
+  const k = snap ? 1 : 1 - Math.exp(-dt * cfg.posRate);
+  const kt = snap ? 1 : 1 - Math.exp(-dt * cfg.tgtRate);
+  camera.position.lerp(rig.pos, k);
+  controls.target.lerp(rig.aim, kt);
+  // 摇臂式切入：按墙钟计时而不是钳制后的 dt —— 无头 SwiftShader 只有 0.25 fps，
+  // 用 dt(≤0.1) 累加会让 1.5 s 的过渡拖到十几帧、几十秒都走不完。
+  // 真机 60 fps 时两条路径观感一致，仍是平滑推入。
+  if (rig.introT < 1) {
+    rig.introT = Math.min(1, (performance.now() - rig.intro0) / (cfg.intro * 1000));
+    const e = smooth(rig.introT);
+    camera.position.lerpVectors(rig.cam0, rig.pos, e);
+    controls.target.lerpVectors(rig.tgt0, rig.aim, e);
+  }
+  camera.lookAt(controls.target);
+  // 过渡帧里相机还在半路，测出来的占画高是假值，会误导 back 反馈；等落位再测。
+  rig.fill = rig.introT >= 1 ? rigFill(camera, f, rig.s, L) : 0;
+  rig.dbg = { mode, back: Math.round(rig.back), pitch: cfg.pitch, s: Math.round(rig.s),
+              fill: +rig.fill.toFixed(2), intro: +rig.introT.toFixed(2),
+              clear: +(camera.position.y - groundAt(camera.position.x, camera.position.z)).toFixed(1) };
+}
+function updateDisasterFollow(dt) {
+  if (followSnap) { rig.snap = true; followSnap = false; }
+  updateRig(dt, 'follow');
+}
 function updateCineCamera(dt) {
-  if (!flood) return;
-  const h = flood.frontHint();
-  if (!Number.isFinite(h.x) || !Number.isFinite(h.z)) return;
-  if (!cineVecA) { cineVecA = new THREE.Vector3(); cineVecB = new THREE.Vector3(); }
-  const back = 1650, side = 780;
-  const px = h.x - h.tx * back - h.tz * side;
-  const pz = h.z - h.tz * back + h.tx * side;
-  // 峡谷两侧山脊比谷底高数百米：镜头必须抬到当地地形之上，
-  // 否则无人机会「插进山体」，画面只剩一块深色崖壁（第一轮实测踩过这个坑）。
-  // 沿用原来 330 的取景余量（只把 displayY 换成更准的 groundAt），
-  // 避免防穿模钳制反过来改变航拍构图。
-  const py = Math.max(h.y + 620, groundAt(px, pz) + 330);
-  // 首帧直接就位（否则低帧率环境下要十几秒才飞到水头），之后才用阻尼跟随
-  const k = cineSnap ? 1 : 1 - Math.exp(-dt * 1.9);
-  cineSnap = false;
-  camera.position.lerp(cineVecA.set(px, py, pz), k);
-  controls.target.lerp(
-    cineVecB.set(h.x + h.tx * 900, h.y + 30, h.z + h.tz * 900), k);
+  if (cineSnap) { rig.snap = true; cineSnap = false; }
+  updateRig(dt, 'cine');
 }
 function enableCine(on) {
   cineCam = on;
@@ -1757,6 +1870,9 @@ function loop(now) {
   if (flood && flood.enabled) {
     const dist = camera.position.distanceTo(controls.target);
     flood.setViewDistance(dist);
+    // ?rig= 定点：视距参数已按当前相机更新，此刻再定位一次，
+    // 保证「可见水头」用的是正确的水深放大系数（boot 里 peak 还是初始 1.0）
+    if (rigPending) { rigPlaceInfo = placeRigAt(...rigPending); rigPending = null; }
     flood.update(dt, now);
   }
 
@@ -1904,6 +2020,17 @@ async function boot() {
   // ?engine=cesium 直接用三维地球视图打开（截图验收 / 分享指定帧）
   if (qs.get('engine') === 'cesium') setEngine('cesium');
   if (qs.get('cine') === '1' && qs.get('engine') !== 'cesium') enableCine(true);
+  // ?follow=1 静态进入全链条跟拍（不自动播放时间），供多时刻构图验收
+  if (qs.get('follow') === '1' && qs.get('engine') !== 'cesium') {
+    state.playing = false; autoFly = true; followSnap = true;
+  }
+  // ?rig=后退弧长,横向偏移,离水面高度,瞄准前移 —— 构图验收定点入口（不影响默认播放）
+  const qRig = (qs.get('rig') || '').split(',').map(Number);
+  if (qRig.length === 4 && qRig.every(Number.isFinite) && qs.get('engine') !== 'cesium') {
+    rigStatic = true; rigPending = qRig;   // 延后一帧，等 flood 视距参数随相机稳定
+  }
+  window.__rigPlace = placeRigAt;
+  window.__rigPlaceInfo = () => rigPlaceInfo;
   window.__flood = flood;   // 诊断出口：供无头浏览器做分层性能与水文复算
   // 镜头诊断：验证「用户拖动后不再被抢回」与「相机离地余量恒为正」
   window.__cam = () => {
@@ -1945,7 +2072,126 @@ async function boot() {
       camToWaterHead: +camera.position.distanceTo(whv).toFixed(1),
       // 两套前锋口径的水平差距（诚实暴露数据口径不一致）
       frontGap: wh ? +Math.hypot(c.x - wh.x, c.z - wh.z).toFixed(1) : null,
+      rig: rig.dbg || null,
     };
+  };
+  /* ---------------- 镜头构图搜索（仅验收用，不参与正常播放） ----------------
+     沿沟道弧长布置机位，扫描「后退弧长 / 横向偏移 / 离地高度 / 瞄准前移」，
+     把真实水面点投影到画面里量出主体占画高、横向跨度与遮挡。
+     上一轮实测的两条教训：机位沿直线后拉会在弯道切进侧壁（离地 −182 m），
+     所以必须沿沟道走；俯角是几何的**结果**，不能手填常数再摆位置。 */
+  window.__rigSearch = (opts = {}) => {
+    const f = flood;
+    if (!f || !f.chanAt) return { rows: [], err: 'no flood' };
+    const L = f.channel.lengthM;
+    const clampS = s => Math.max(0, Math.min(L, s));
+    // 切线用 ±300 m 基线：沟道折线顶点间距中位数 63 m，±45 m 差分会让
+    // 机位每经过一个顶点就跳一次方向，这是上一轮镜头晃动的物理来源。
+    const smoothT = s => {
+      const a = f.chanAt(clampS(s - 300)), b = f.chanAt(clampS(s + 300));
+      const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz) || 1;
+      return { x: dx / d, z: dz / d };
+    };
+    // frontS 是「到达时间 = 当前时刻」等值线，那里水深恰好 0；
+    // 画面里真正能看见的水面在上游，按 50 m 步找第一个 h>2 的位置。
+    let s0 = clampS(f.frontS || 0);
+    const sFront = s0;
+    for (let d = 0; d <= 1500; d += 50) {
+      const s = clampS(s0 - d), c = f.chanAt(s);
+      if (f.waterY(c.x, c.z, f.tField).h > 2) { s0 = s; break; }
+    }
+    const body = opts.body || 500, lead = opts.lead || 250, halfW = opts.halfW || 90;
+    const pts = [], wetS = [];
+    for (let i = 0; i <= 32; i++) {
+      const s = clampS(s0 - body + (body + lead) * i / 32);
+      const c = f.chanAt(s), t = smoothT(s);
+      let hasWet = false;
+      for (const lat of [-halfW, 0, halfW]) {
+        const x = c.x - t.z * lat, z = c.z + t.x * lat;
+        const w = f.waterY(x, z, f.tField);
+        if (w.h > 1) hasWet = true;
+        pts.push([x, w.y, z, w.h]);
+      }
+      if (hasWet) wetS.push(s);
+    }
+    const savePos = camera.position.clone(), saveTgt = controls.target.clone();
+    const saveQ = camera.quaternion.clone();
+    const backs = opts.backs || [600, 900, 1200, 1500];
+    const lats = opts.lats || [-220, 0, 220];
+    const hs = opts.hs || [160, 280, 420, 560];
+    const aheads = opts.aheads || [0, 200, 400];
+    const v = new THREE.Vector3(), dst = new THREE.Vector3();
+    const headC = f.chanAt(s0), headW = f.waterY(headC.x, headC.z, f.tField);
+    const wetPts = pts.filter(p => p[3] > 1).length;
+    const rows = [];
+    for (const back of backs) for (const lat of lats) for (const H of hs) for (const ahead of aheads) {
+      const sc = clampS(s0 - back), c = f.chanAt(sc), t = smoothT(sc);
+      const px = c.x - t.z * lat, pz = c.z + t.x * lat;
+      const base = Math.max(f.waterY(px, pz, f.tField).y, groundAt(px, pz));
+      const py = base + H;
+      const aS = clampS(s0 + ahead), ac = f.chanAt(aS), aw = f.waterY(ac.x, ac.z, f.tField);
+      const ax = ac.x, ay = aw.y + 20, az = ac.z;
+      camera.position.set(px, py, pz);
+      camera.lookAt(ax, ay, az);
+      camera.updateMatrixWorld(true);
+      camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+      let x0 = 9, x1 = -9, y0 = 9, y1 = -9, inN = 0;
+      // 湿点单独统计：主体点云里大部分是干沟道，把它们算进「水体占画高」
+      // 会得到 70% 的假象，截图却是八成山坡 —— 上一轮就栽在这里。
+      let wx0 = 9, wx1 = -9, wy0 = 9, wy1 = -9, wetIn = 0, wetVis = 0, wetVisT = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const wet = pts[i][3] > 1;
+        v.set(pts[i][0], pts[i][1], pts[i][2]).project(camera);
+        const inView = !(v.z > 1 || Math.abs(v.x) > 1 || Math.abs(v.y) > 1);
+        if (inView) {
+          inN++;
+          x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x);
+          y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y);
+          if (wet) {
+            wetIn++;
+            wx0 = Math.min(wx0, v.x); wx1 = Math.max(wx1, v.x);
+            wy0 = Math.min(wy0, v.y); wy1 = Math.max(wy1, v.y);
+          }
+        }
+        if (i % 10 || !wet) continue;
+        wetVisT++;
+        let blocked = false;
+        for (let k = 1; k <= 7; k++) {
+          const u = k / 8;
+          if (groundAt(px + (pts[i][0] - px) * u, pz + (pts[i][2] - pz) * u) >
+              py + (pts[i][1] - py) * u + 8) { blocked = true; break; }
+        }
+        if (!blocked) wetVis++;
+      }
+      v.set(headC.x, headW.y + 20, headC.z).project(camera);
+      let headBlk = 0;
+      for (let k = 1; k <= 12; k++) {
+        const u = k / 13;
+        if (groundAt(px + (headC.x - px) * u, pz + (headC.z - pz) * u) >
+            py + (headW.y + 20 - py) * u) headBlk++;
+      }
+      const horiz = Math.hypot(px - ax, pz - az);
+      rows.push({
+        back, lat, H, ahead,
+        dist: Math.round(camera.position.distanceTo(dst.set(ax, ay, az))),
+        pitch: +(Math.atan2(py - ay, horiz) * 180 / Math.PI).toFixed(1),
+        clear: Math.round(py - groundAt(px, pz)),
+        // wH / wSpan 只算湿点；chanH 是整段沟道（含干坡），两者别混用
+        wH: wetIn ? +((Math.min(wy1, 1) - Math.max(wy0, -1)) / 2 * 100).toFixed(1) : 0,
+        wSpan: wetIn ? +(Math.min(wx1, 1) - Math.max(wx0, -1)).toFixed(2) : 0,
+        wetInPct: wetPts ? Math.round(wetIn / wetPts * 100) : 0,
+        chanH: inN ? +((Math.min(y1, 1) - Math.max(y0, -1)) / 2 * 100).toFixed(1) : 0,
+        inPct: Math.round(inN / pts.length * 100),
+        visPct: wetVisT ? Math.round(wetVis / wetVisT * 100) : null,
+        headX: +v.x.toFixed(2), headY: +v.y.toFixed(2), headBlk,
+      });
+    }
+    camera.position.copy(savePos); controls.target.copy(saveTgt); camera.quaternion.copy(saveQ);
+    camera.updateMatrixWorld(true);
+    return { sFront: Math.round(sFront), s0: Math.round(s0),
+             sWet0: wetS.length ? Math.round(wetS[0]) : null,
+             sWet1: wetS.length ? Math.round(wetS[wetS.length - 1]) : null,
+             frontGap: Math.round(sFront - s0), pts: pts.length, wetPts, rows };
   };
   window.__ready = true;
   window.__dbg = () => ({
