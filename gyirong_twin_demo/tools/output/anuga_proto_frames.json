@@ -1,0 +1,51 @@
+{
+ "solver": "anuga 4.1.0 / rectangular_cross_domain / shallow water",
+ "status": "PROTOTYPE - NOT CALIBRATED, DO NOT USE FOR DISPLAY",
+ "caveat": "清水浅水方程，非泥石流两相流；一次性溃决水体，非论文流量过程线；网格过粗且四壁封闭，结果不可用作淹没范围或工程判断",
+ "params": {
+  "NX": 60,
+  "NY": 34,
+  "finalTime": 60.0,
+  "yieldStep": 10.0,
+  "manningN": 0.035,
+  "lakeRadius": 620.0,
+  "lakeDepth": 14.0
+ },
+ "frames": [
+  {
+   "t": 0.0,
+   "wet": 427,
+   "maxH": 13.85
+  },
+  {
+   "t": 10.0,
+   "wet": 425,
+   "maxH": 49.62
+  },
+  {
+   "t": 20.0,
+   "wet": 432,
+   "maxH": 67.56
+  },
+  {
+   "t": 30.0,
+   "wet": 444,
+   "maxH": 47.39
+  },
+  {
+   "t": 40.0,
+   "wet": 478,
+   "maxH": 30.42
+  },
+  {
+   "t": 50.0,
+   "wet": 490,
+   "maxH": 103.5
+  },
+  {
+   "t": 60.0,
+   "wet": 494,
+   "maxH": 118.46
+  }
+ ]
+}
