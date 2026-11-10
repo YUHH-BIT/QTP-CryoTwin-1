@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>吉隆口岸“8·26”冰岩崩-泥石流灾害链数字孪生推演</title>
+<link rel="stylesheet" href="/cesium_lib/Widgets/widgets.css">
+<style>
+  :root { --ink:#e8eef6; --dim:#93a6bd; --line:rgba(125,211,252,.16); }
+  html, body { margin:0; height:100%; overflow:hidden; background:#050c16; color:var(--ink);
+    font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif; }
+  #cesiumContainer { position:fixed; inset:0; will-change:transform; }
+  .hud { position:fixed; z-index:10; }
+  .panel { background:rgba(10,18,30,.86); border:1px solid var(--line); border-radius:12px;
+    backdrop-filter:blur(10px); box-shadow:0 10px 30px rgba(0,0,0,.45); }
+  #hdr { left:18px; top:14px; pointer-events:none; background:rgba(8,15,24,.62);
+    padding:10px 14px; border-radius:12px; border:1px solid var(--line);
+    backdrop-filter:blur(8px); box-shadow:0 8px 24px rgba(0,0,0,.4); }
+  #hdr h1 { margin:0; font-size:17px; font-weight:600; letter-spacing:.4px; color:#f1f6fb; }
+  #hdr h1 .em { color:#ffb26b; }
+  #hdr .sub { margin-top:4px; font-size:11.5px; color:var(--dim); }
+  #hdr .tag { display:inline-block; margin-top:7px; padding:2px 8px; font-size:11px; border-radius:999px;
+    color:#ffd9a8; background:rgba(255,178,107,.12); border:1px solid rgba(255,178,107,.35); }
+  #side { right:16px; top:14px; width:292px; padding:12px 13px; }
+  #side .stage-name { font-size:13px; font-weight:600; color:#ffcf9b; }
+  #side .stage-idx { float:right; font-size:11px; color:var(--dim); }
+  #side .stage-desc { margin-top:6px; font-size:11.5px; line-height:1.62; color:#c6d3e2; }
+  .kv { display:flex; justify-content:space-between; align-items:baseline; padding:5px 0;
+    border-bottom:1px dashed rgba(125,211,252,.10); font-size:12px; }
+  .kv:last-child { border-bottom:none; }
+  .kv .k { color:var(--dim); }
+  .kv .v { color:#eaf2fa; font-variant-numeric:tabular-nums; font-weight:600; }
+  .kv .v small { font-weight:400; color:var(--dim); font-size:10.5px; margin-left:3px; }
+  #side .sec { margin-top:11px; padding-top:9px; border-top:1px solid var(--line);
+    font-size:11px; color:#8fa3ba; letter-spacing:.4px; }
+  #legend { right:16px; bottom:112px; width:250px; padding:10px 13px 11px; }
+  #legend .t { font-size:11.5px; color:#b9c8d9; margin-bottom:7px; }
+  .lg { display:flex; align-items:center; gap:8px; font-size:11.5px; color:#cbd8e6; padding:2.5px 0; }
+  .lg i { width:14px; height:9px; border-radius:2px; flex:0 0 auto; }
+  .lg i.dot { width:8px; height:8px; border-radius:50%; }
+  #legend .note { margin-top:8px; padding-top:7px; border-top:1px solid var(--line);
+    font-size:10.5px; line-height:1.6; color:#8296ac; }
+  #prof { left:16px; bottom:112px; width:430px; padding:9px 11px 7px; }
+  #prof .t { font-size:11.5px; color:#b9c8d9; margin-bottom:5px; display:flex; justify-content:space-between; }
+  #prof .t span:last-child { color:#7f93a9; font-size:10.5px; }
+  #pcv { width:100%; height:126px; display:block; }
+  #tl { left:16px; right:282px; bottom:16px; height:78px; padding:9px 14px 8px; }
+  #tl .row { display:flex; align-items:center; gap:10px; }
+  #btn-play { width:28px; height:28px; border-radius:50%; border:none; cursor:pointer;
+    background:#ff9f45; color:#22160a; font-size:12px; display:grid; place-items:center; flex:0 0 auto; }
+  #clock { font-variant-numeric:tabular-nums; font-size:13.5px; font-weight:600; width:76px; }
+  #tl .prog { position:relative; flex:1; height:8px; border-radius:4px; background:rgba(255,255,255,.09); cursor:pointer; }
+  #tl .bar { position:absolute; left:0; top:0; bottom:0; border-radius:4px;
+    background:linear-gradient(90deg,#ffb26b,#ff7a3d); width:0%; }
+  #tl .ph { position:absolute; top:-3px; width:1px; height:14px; background:rgba(255,255,255,.28); }
+  #tl .marks { position:relative; height:20px; margin-top:6px; font-size:10px; color:#7f93a9; }
+  #tl .marks span { position:absolute; transform:translateX(-50%); white-space:nowrap; }
+  #tl .speed { font-size:11px; color:var(--dim); }
+  #tl select { background:rgba(255,255,255,.06); color:#c6d3e2; border:1px solid var(--line);
+    border-radius:6px; font-size:11px; padding:2px 4px; }
+  #tl label.cam { font-size:11px; color:var(--dim); display:flex; align-items:center; gap:4px; cursor:pointer; }
+  #tl label.cam input { accent-color:#ff9f45; }
+  #slow { display:none; position:fixed; left:50%; top:74px; transform:translateX(-50%); z-index:11;
+    font-size:11.5px; letter-spacing:.6px; color:#ffd9a8; background:rgba(60,26,10,.7);
+    border:1px solid rgba(255,178,107,.4); padding:3px 12px; border-radius:999px; }
+  #slow.on { display:block; }
+  #loading { position:fixed; inset:0; z-index:99; background:#050c16; display:grid; place-items:center;
+    color:#c6d3e2; font-size:13px; transition:opacity .4s; }
+  #loading.hide { opacity:0; pointer-events:none; }
+  #loading .sp { width:34px; height:34px; border-radius:50%; border:2px solid rgba(125,211,252,.2);
+    border-top-color:#7dd3fc; animation:sp 1s linear infinite; margin:0 auto 14px; }
+  @keyframes sp { to { transform:rotate(360deg); } }
+  @media (max-width:1360px) { #prof { width:360px; } #tl { right:16px; } #legend { width:236px; } }
+</style>
+</head>
+<body>
+<div id="cesiumContainer"></div>
+
+<header class="hud" id="hdr">
+  <h1>吉隆口岸 <span class="em">“8·26”</span> 冰岩崩—泥石流灾害链</h1>
+  <div class="sub">2026-08-26 10:52 错坚河上游 5150 m 冰岩体失稳 → 普热普强藏布 → 东林藏布 → 吉隆口岸</div>
+  <div class="tag">Cesium 三维地球 · 22 km 全段 · 参数据《水利学报》刘昌军等（2026）</div>
+</header>
+
+<div id="slow">慢放 ×4 · 冲击口岸</div>
+
+<aside class="hud panel" id="side">
+  <div class="stage-name" id="st-name">冰岩体失稳</div>
+  <div class="stage-idx" id="st-idx">阶段 1 / 5</div>
+  <div class="stage-desc" id="st-desc">10:52 错坚河上游约 5150 m 高位冰岩体整体失稳。</div>
+  <div class="sec">过程指标（模型）</div>
+  <div class="kv"><span class="k">演进距离</span><span class="v" id="v-s">0.0<small>km / 22.0</small></span></div>
+  <div class="kv"><span class="k">前锋流速</span><span class="v" id="v-vel">0<small>m/s</small></span></div>
+  <div class="kv"><span class="k">洪峰流量</span><span class="v" id="v-q">0<small>万 m³/s</small></span></div>
+  <div class="kv"><span class="k">平均流深</span><span class="v" id="v-dep">0<small>m</small></span></div>
+  <div class="kv"><span class="k">前缘高程</span><span class="v" id="v-h">5150<small>m</small></span></div>
+  <div class="kv"><span class="k">受损建筑</span><span class="v" id="v-bld">0<small>/ 27 处</small></span></div>
+  <div class="sec">关键结果（论文）</div>
+  <div class="kv"><span class="k">物源规模</span><span class="v">1.8<small>亿 m³</small></span></div>
+  <div class="kv"><span class="k">口岸洪峰</span><span class="v">18.83<small>万 m³/s</small></span></div>
+  <div class="kv"><span class="k">口岸平均流深</span><span class="v">47.5<small>m</small></span></div>
+  <div class="kv"><span class="k">传播历时</span><span class="v">8<small>min 20 s</small></span></div>
+</aside>
+
+<section class="hud panel" id="prof">
+  <div class="t"><span>沿程纵剖面（5150 m → 1800 m，22 km）</span><span id="prof-fps">—</span></div>
+  <canvas id="pcv"></canvas>
+</section>
+
+<section class="hud panel" id="legend">
+  <div class="t">图例</div>
+  <div class="lg"><i style="background:#8d5a2b"></i>泥石流 / 洪水（沿沟推进）</div>
+  <div class="lg"><i style="background:#e8f4ff"></i>冰崩碎屑与粉尘</div>
+  <div class="lg"><i style="background:#7dd3fc"></i>演进沟道</div>
+  <div class="lg"><i style="background:#c9d2da"></i>口岸建筑（glTF 示意重建）</div>
+  <div class="lg"><i style="background:#e05b4b"></i>受损建筑（官方 27 处，示意布设 19 栋）</div>
+  <div class="lg"><i style="border:2px solid #ff5a4a;background:transparent;height:9px"></i>受灾范围（0.7 km²）</div>
+  <div class="lg"><i style="background:rgba(86,168,255,.55)"></i>普热普强藏布堰塞湖</div>
+  <div class="note">地形 1.5 m DEM 派生 · 影像 Esri World Imagery · 建筑为按口岸功能类型程序化重建的示意模型（非实测三维实景）· 到达时间与流深由一维沿程模型（标定至论文口岸断面值）铺成。</div>
+</section>
+
+<section class="hud panel" id="tl">
+  <div class="row">
+    <button id="btn-play">▶</button>
+    <div id="clock">10:52:00</div>
+    <div class="prog" id="prog"><div class="bar" id="bar"></div>
+      <div class="ph" style="left:0%"></div><div class="ph" style="left:20%"></div>
+      <div class="ph" style="left:33.3%"></div><div class="ph" style="left:41.3%"></div>
+      <div class="ph" style="left:100%"></div>
+    </div>
+    <label class="cam"><input type="checkbox" id="autocam" checked>自动运镜</label>
+    <span class="speed">倍速</span>
+    <select id="speed">
+      <option value="16">16×</option>
+      <option value="32" selected>32×</option>
+      <option value="64">64×</option>
+      <option value="128">128×</option>
+    </select>
+  </div>
+  <div class="marks">
+    <span style="left:0%">10:52 冰岩崩</span>
+    <span style="left:20%">10:56 色琼以下</span>
+    <span style="left:33.3%">11:00:20 冲击口岸</span>
+    <span style="left:41.3%">11:01 成湖</span>
+    <span style="left:100%">11:17 堰塞湖壅高</span>
+  </div>
+</section>
+
+<div id="loading"><div><div class="sp"></div><div id="loadtxt">系统正在加载，请稍后...</div></div></div>
+
+<script>window.CESIUM_BASE_URL = '/cesium_lib/';</script>
+<script src="/cesium_lib/Cesium.js"></script>
+<script type="module">
+// ============================================================ 常量
+const CORR = '/terrain3d/gyirong_corridor/';
+const GY = '/terrain3d/gyirong/';
+const BBOX = [85.340, 28.200, 85.560, 28.310];
+const SRC = [85.4987, 28.2454, 5197];          // 源区（论文：约 5150 m）
+const PORT = [85.3777, 28.27954, 1800];
+const T_ARRIVE = 500;      // 论文：10:52 → 11:00:20 = 8 min 20 s
+const T_TOTAL = 1500;
+const MESH = 1000;
+const RAD = Math.PI / 180;
+const KX = 111320 * Math.cos(PORT[1] * RAD), KY = 110574;
+
+// 建筑模型集：own = 本项目程序化生成的 glTF；toy = @toytown/models（CC0，130 个 GLB）
+// 两者都是 Y-up、米制、原点在底面中心，可以直接互换，用 ?models=toy 切换对比
+const MODEL_SETS = {
+  own: {
+    office: { uri: '/models/bld_office.glb', h: 15.6, w: 42, d: 17 },
+    shop: { uri: '/models/bld_shop.glb', h: 11.0, w: 13, d: 10 },
+    warehouse: { uri: '/models/bld_warehouse.glb', h: 12.2, w: 32, d: 16 },
+    shed: { uri: '/models/bld_shed.glb', h: 5.2, w: 9, d: 7 },
+  },
+  toy: {
+    office: { uri: '/models/toy/office.glb', h: 24.8, w: 14.6, d: 12.6 },
+    shop: { uri: '/models/toy/shop.glb', h: 7.5, w: 8.4, d: 9.8 },
+    warehouse: { uri: '/models/toy/warehouse.glb', h: 9.0, w: 30, d: 20 },
+    shed: { uri: '/models/toy/house.glb', h: 8.7, w: 8.6, d: 7.8 },
+  },
+};
+const MODEL_SET = new URLSearchParams(location.search).get('models') === 'toy' ? 'toy' : 'own';
+const MODELS = MODEL_SETS[MODEL_SET];
+
+// ============================================================ 状态
+let viewer, heights, model, channel;
+let evtT = 0, playing = false, speed = 32, autoCam = true, lastTs = 0;
+let flowFrames = 0, lastFrame = -1, FLOW_DT = 8, FLOW_BB = null, flowLayer = null;
+let buildings = [], frags = [], fragPtr = 0, hitCount = 0;
+let iceBlocks = [], iceDust = null, iceClouds = [], icePuffs = [];
+let portPuffs = [], spray = [], fogSprites = [], shakeAmt = 0;
+let lakeEnt, lakeDam, damageEnt;
+let lastStage = -1;
+
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+
+// ============================================================ 数据
+async function loadAll() {
+  const [hBuf, md, ch] = await Promise.all([
+    fetch(CORR + 'height.bin', { cache: 'no-store' }).then(r => r.arrayBuffer()),
+    fetch(GY + 'model.json', { cache: 'no-store' }).then(r => r.json()),
+    fetch(GY + 'channel.json', { cache: 'no-store' }).then(r => r.json()),
+  ]);
+  heights = new Int16Array(hBuf);
+  model = md; channel = ch;
+}
+
+function sampleH(lon, lat) {
+  const n = MESH, N = n + 1;
+  const fx = (lon - BBOX[0]) / (BBOX[2] - BBOX[0]) * n;
+  const fy = (BBOX[3] - lat) / (BBOX[3] - BBOX[1]) * n;
+  if (fx < 0 || fy < 0 || fx >= n || fy >= n) return 0;
+  const c = Math.floor(fx), r = Math.floor(fy);
+  const tx = fx - c, ty = fy - r;
+  const h00 = heights[r * N + c], h10 = heights[r * N + c + 1];
+  const h01 = heights[(r + 1) * N + c], h11 = heights[(r + 1) * N + c + 1];
+  const h = (h00 * (1 - tx) + h10 * tx) * (1 - ty) + (h01 * (1 - tx) + h11 * tx) * ty;
+  return 1530 + h;
+}
+
+// ============================================================ 地形
+// 性能要点：Cesium 会把视野内（含 bbox 外）大量瓦片都丢给这个回调。
+// 之前每个瓦片都跑 65×65 次插值，主线程被拖住 → 地形永远 tilesLoaded=false，
+// 地形 LOD 上不去，影像也跟着只能用 z11/z12（近景一片模糊）。
+// 现在把完全在走廊外的瓦片直接返回平坦数组，并缩小采样到 33。
+const HM_W = 33;
+function makeTerrain() {
+  const scheme = new Cesium.WebMercatorTilingScheme();
+  return new Cesium.CustomHeightmapTerrainProvider({
+    width: HM_W, height: HM_W, tilingScheme: scheme,
+    callback: function (x, y, level) {
+      const rect = scheme.tileXYToRectangle(x, y, level);
+      const west = Cesium.Math.toDegrees(rect.west), east = Cesium.Math.toDegrees(rect.east);
+      const south = Cesium.Math.toDegrees(rect.south), north = Cesium.Math.toDegrees(rect.north);
+      const flat = new Float32Array(HM_W * HM_W);
+      // 完全在走廊外：直接给平坦地形，跳过插值
+      if (east < BBOX[0] - 0.30 || west > BBOX[2] + 0.30 ||
+          north < BBOX[1] - 0.30 || south > BBOX[3] + 0.30) {
+        flat.fill(1500);
+        return flat;
+      }
+      const n = HM_W - 1;
+      for (let j = 0; j < HM_W; j++) {
+        const lat = north - (north - south) * j / n;
+        const clat = clamp(lat, BBOX[1], BBOX[3]);
+        for (let i = 0; i < HM_W; i++) {
+          const lon = west + (east - west) * i / n;
+          let h = sampleH(clamp(lon, BBOX[0], BBOX[2]), clat);
+          const d = Math.max(0, BBOX[0] - lon, lon - BBOX[2], BBOX[1] - lat, lat - BBOX[3]);
+          if (d > 0) h = 1500 + (h - 1500) * Math.exp(-d / 0.055);
+          flat[j * HM_W + i] = h;
+        }
+      }
+      return flat;
+    },
+    credit: 'DEM: Terrarium / SRTM',
+  });
+}
+
+// ============================================================ 场景
+function initViewer() {
+  viewer = new Cesium.Viewer('cesiumContainer', {
+    baseLayer: new Cesium.ImageryLayer(new Cesium.UrlTemplateImageryProvider({
+      url: '/tiles/imagery/{z}/{x}/{y}.jpg',
+      rectangle: Cesium.Rectangle.fromDegrees(BBOX[0], BBOX[1], BBOX[2], BBOX[3]),
+      // 离线金字塔切了 z11–z16（源影像 2.6 m/px）；低于 11 级没有瓦片
+      minimumLevel: 11, maximumLevel: 16,
+    })),
+    terrainProvider: makeTerrain(),
+    baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false,
+    navigationHelpButton: false, animation: false, timeline: false, fullscreenButton: false,
+    infoBox: false, selectionIndicator: false, requestRenderMode: false,
+    creditContainer: document.createElement('div'),
+  });
+  const s = viewer.scene;
+  s.globe.enableLighting = false;
+  // 天空大气是逐像素散射计算，软件渲染下吃掉大部分帧率；
+  // 本演示机位全是俯视地表，关掉视觉损失很小
+  s.skyAtmosphere.show = false;
+  s.fog.enabled = true;
+  s.fog.density = 0.00012;
+  s.globe.showGroundAtmosphere = false;
+  s.globe.baseColor = Cesium.Color.fromCssColorString('#25313d');
+  s.globe.maximumScreenSpaceError = 1.5;
+  // 关闭地形深度测试：swiftshader 下它要额外的深度纹理通道，且会把
+  // 采样高度与地形瓦片高度不一致的建筑"埋"进山体里
+  s.globe.depthTestAgainstTerrain = false;
+  // 软件渲染下 FXAA 会糊化画面
+  s.postProcessStages.fxaa.enabled = false;
+  s.globe.tileCacheSize = 512;
+  s.screenSpaceCameraController.minimumZoomDistance = 260;
+  s.screenSpaceCameraController.maximumZoomDistance = 60000;
+
+  viewer.camera.setView({
+    destination: Cesium.Cartesian3.fromDegrees(85.44, 28.245, 30000),
+    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-58), roll: 0 },
+  });
+}
+
+// ============================================================ 泥石流帧层
+async function buildFlow() {
+  const linePos = [];
+  for (const p of channel.points) linePos.push(p[0], p[1], sampleH(p[0], p[1]) + 12);
+  viewer.entities.add({
+    polyline: {
+      positions: Cesium.Cartesian3.fromDegreesArrayHeights(linePos),
+      width: 2, material: Cesium.Color.fromCssColorString('#7dd3fc').withAlpha(0.42),
+    },
+  });
+
+  const meta = await fetch('/tiles/flow/sim_meta.json', { cache: 'no-store' }).then(r => r.json());
+  flowFrames = meta.frames;
+  FLOW_DT = meta.frameDt || 8;
+  FLOW_BB = meta.bbox;
+
+  // 逐帧滚动预加载（一次拉 63 张约 37 MB，太重；只提前取 8 帧）
+  preloadFrom(0);
+}
+
+const preloaded = new Set();
+function preloadFrom(k) {
+  const end = Math.min(flowFrames - 1, k + 8);
+  for (let i = k; i <= end; i++) {
+    if (preloaded.has(i)) continue;
+    preloaded.add(i);
+    const im = new Image();
+    im.src = '/tiles/flow/frame_' + String(i).padStart(3, '0') + '.png';
+  }
+}
+
+function updateFlow(t) {
+  if (!flowFrames || !FLOW_BB) return;
+  const k = Math.min(flowFrames - 1, Math.max(0, Math.floor(t / FLOW_DT)));
+  if (k === lastFrame) return;
+  lastFrame = k;
+  preloadFrom(k);
+  const url = '/tiles/flow/frame_' + String(k).padStart(3, '0') + '.png';
+  if (flowLayer) viewer.imageryLayers.remove(flowLayer, true);
+  flowLayer = viewer.imageryLayers.addImageryProvider(new Cesium.SingleTileImageryProvider({
+    url: url,
+    rectangle: Cesium.Rectangle.fromDegrees(FLOW_BB[0], FLOW_BB[1], FLOW_BB[2], FLOW_BB[3]),
+    tileWidth: 1024, tileHeight: 512,
+  }));
+}
+
+// ============================================================ 沟道插值
+const chanPts = [];
+function chanAt(s) {
+  if (!chanPts.length) for (const p of channel.points) chanPts.push(p);
+  const a0 = chanPts;
+  if (s <= a0[0][3]) return [a0[0][0], a0[0][1], a0[0][2]];
+  const last = a0[a0.length - 1];
+  if (s >= last[3]) return [last[0], last[1], last[2]];
+  for (let i = 1; i < a0.length; i++) {
+    if (a0[i][3] >= s) {
+      const a = a0[i - 1], b = a0[i];
+      const k = (s - a[3]) / Math.max(b[3] - a[3], 1e-6);
+      return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
+    }
+  }
+  return [last[0], last[1], last[2]];
+}
+
+function sOfFrac(t) {
+  // 演示时间 → 沿沟距离（近似，按各段流速累进）
+  const pr = model.profile;
+  const tm = clamp(t * (390 / 500), 0, 390);
+  for (let i = 1; i < pr.length; i++) {
+    if (pr[i][4] >= tm) {
+      const a = pr[i - 1], b = pr[i], k = (tm - a[4]) / Math.max(b[4] - a[4], 1e-6);
+      return a[0] + (b[0] - a[0]) * k;
+    }
+  }
+  return pr[pr.length - 1][0];
+}
+
+// ============================================================ 贴图工具
+function radialTexture(inner, outer, size) {
+  const c = document.createElement('canvas');
+  c.width = c.height = size || 64;
+  const g = c.getContext('2d');
+  const grd = g.createRadialGradient(c.width / 2, c.height / 2, 1, c.width / 2, c.height / 2, c.width / 2);
+  grd.addColorStop(0, inner);
+  grd.addColorStop(0.55, outer);
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd;
+  g.fillRect(0, 0, c.width, c.height);
+  return c;
+}
+const TEX_DUST = radialTexture('rgba(255,255,255,1)', 'rgba(255,255,255,0.45)');
+const TEX_SPRAY = radialTexture('rgba(255,255,255,0.95)', 'rgba(235,230,220,0.35)');
+
+// ============================================================ 冰崩
+function buildIce() {
+  const hSrc = sampleH(SRC[0], SRC[1]);
+
+  // 源区冰崖：一组不规则冰体，贴着源区陡壁
+  const iceMat = Cesium.Color.fromCssColorString('#e6f2fb');
+  for (let i = 0; i < 14; i++) {
+    const ang = (i / 14) * Math.PI * 2 + 0.3;
+    const rr = 60 + (i % 4) * 55;
+    const lon = SRC[0] + Math.cos(ang) * rr / KX;
+    const lat = SRC[1] + Math.sin(ang) * rr / KY;
+    const h = sampleH(lon, lat);
+    viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(lon, lat, h + 16 + (i % 3) * 10),
+      ellipsoid: {
+        radii: new Cesium.Cartesian3(38 + (i % 5) * 9, 30 + (i % 3) * 11, 16 + (i % 4) * 7),
+        material: iceMat.withAlpha(0.93),
+      },
+    });
+  }
+
+  // 源区崩落粉尘：用 ellipsoid 云团（ParticleSystem 在软件渲染下会触发
+  // texImage2D 尺寸越界，整个 WebGL 上下文报错、画面变灰，改实体云团规避）
+  for (let i = 0; i < 12; i++) {
+    const ang = Math.random() * Math.PI * 2;
+    const rr = Math.random() * 190;
+    const lon = SRC[0] + Math.cos(ang) * rr / KX;
+    const lat = SRC[1] + Math.sin(ang) * rr / KY;
+    const h = sampleH(lon, lat);
+    const ph = Math.random() * 10;
+    const e = viewer.entities.add({
+      show: false,
+      position: new Cesium.CallbackProperty(() => {
+        const k = clamp((evtT - ph) / 26, 0, 1);
+        return Cesium.Cartesian3.fromDegrees(lon, lat, h + 40 + k * 240);
+      }, false),
+      ellipsoid: {
+        radii: new Cesium.CallbackProperty(() => {
+          const k = clamp((evtT - ph) / 26, 0, 1);
+          const r = 65 + k * 330;
+          return new Cesium.Cartesian3(r, r, r * 0.40);
+        }, false),
+        material: new Cesium.ColorMaterialProperty(
+          new Cesium.CallbackProperty(() => {
+            const k = clamp((evtT - ph) / 30, 0, 1);
+            const a = k < 0.14 ? k / 0.14 * 0.22 : 0.22 * Math.max(0, 1 - (k - 0.14) / 0.86);
+            return Cesium.Color.fromCssColorString('#f2f7fd').withAlpha(a);
+          }, false)),
+      },
+    });
+    icePuffs.push(e);
+  }
+
+  // 崩落冰块：沿沟前 4.2 km 下滑（0~46 s）
+  for (let i = 0; i < 12; i++) {
+    const t0 = i * 1.8 + Math.random() * 1.5;
+    const sz = 14 + Math.random() * 26;
+    const lon0 = SRC[0] + (Math.random() - 0.5) * 0.004;
+    const lat0 = SRC[1] + (Math.random() - 0.5) * 0.004;
+    const e = viewer.entities.add({
+      show: false,
+      position: new Cesium.CallbackProperty(() => {
+        const k = clamp((evtT - t0) / 34, 0, 1);
+        const s = k * 4200;
+        const p = chanAt(s);
+        const drop = (1 - k) * 260;
+        const hh = sampleH(p[0], p[1]) + 22 + drop;
+        return Cesium.Cartesian3.fromDegrees(p[0], p[1], hh);
+      }, false),
+      ellipsoid: {
+        radii: new Cesium.Cartesian3(sz, sz * 0.8, sz * 0.65),
+        material: Cesium.Color.fromCssColorString('#eaf4fc').withAlpha(0.95),
+      },
+    });
+    iceBlocks.push({ ent: e, t0 });
+    void lon0; void lat0;
+  }
+
+  // 沿沟下泄的粉尘前锋（billboard 云团，随演进距离推进）
+  for (let i = 0; i < 10; i++) {
+    const e = viewer.entities.add({
+      show: false,
+      position: new Cesium.CallbackProperty(() => {
+        const s = Math.max(0, sOfFrac(evtT) - 900 - i * 130);
+        const p = chanAt(s);
+        return Cesium.Cartesian3.fromDegrees(p[0], p[1], sampleH(p[0], p[1]) + 70 + (i % 3) * 40);
+      }, false),
+      billboard: {
+        image: TEX_DUST,
+        sizeInMeters: true,
+        scale: 380 + i * 22,
+        color: new Cesium.CallbackProperty(() => {
+          const s = sOfFrac(evtT);
+          const on = evtT > 8 && s > 500;
+          const fade = evtT < 300 ? 1 : Math.max(0, 1 - (evtT - 300) / 260);
+          return Cesium.Color.fromCssColorString('#e9eef4').withAlpha(on ? 0.16 * fade : 0);
+        }, false),
+        disableDepthTestDistance: 0,
+      },
+    });
+    iceClouds.push(e);
+  }
+}
+
+function updateIce(t) {
+  for (const c of iceBlocks) {
+    const k = (t - c.t0) / 34;
+    c.ent.show = k > 0 && k < 1.08;
+  }
+  for (const p of icePuffs) {
+    p.show = t > 0 && t < 140;
+  }
+  for (let i = 0; i < iceClouds.length; i++) {
+    iceClouds[i].show = t > 8 && t < 560;
+  }
+}
+
+// ============================================================ 口岸建筑
+function groundSlope(lon, lat) {
+  const d = 60;
+  const h0 = sampleH(lon, lat);
+  const hx = sampleH(lon + d / KX, lat), hy = sampleH(lon, lat + d / KY);
+  return Math.max(Math.abs(hx - h0), Math.abs(hy - h0)) / d;
+}
+
+function buildPort() {
+  let seed = 20260826;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+
+  // --- 选点：离沟 55~230 m、地面较平（集中在口岸核心区，否则近景看不见） ---
+  const cand = [];
+  let guard = 0;
+  while (cand.length < 27 && guard++ < 12000) {
+    const dx = (rnd() - 0.5) * 780, dz = (rnd() - 0.5) * 620;
+    const lon = PORT[0] + dx / KX, lat = PORT[1] - dz / KY;
+    let dMin = 1e9;
+    for (const p of channel.points) {
+      dMin = Math.min(dMin, Math.hypot((p[0] - lon) * KX, (p[1] - lat) * KY));
+    }
+    if (dMin < 55 || dMin > 235) continue;
+    if (groundSlope(lon, lat) > 0.55) continue;
+    if (cand.some(c => Math.hypot((c.lon - lon) * KX, (c.lat - lat) * KY) < 42)) continue;
+    cand.push({ lon, lat, near: dMin });
+  }
+  cand.sort((a, b) => a.near - b.near);
+
+  // --- 类型：近沟小体量、远处大体量 ---
+  const order = [];
+  for (let i = 0; i < cand.length; i++) {
+    const r = rnd();
+    let kind;
+    if (i < 3) kind = r < 0.55 ? 'shed' : 'shop';
+    else if (i < 7) kind = r < 0.4 ? 'office' : (r < 0.75 ? 'warehouse' : 'shop');
+    else if (i < 14) kind = r < 0.35 ? 'shop' : (r < 0.7 ? 'warehouse' : 'shed');
+    else kind = r < 0.6 ? 'shop' : (r < 0.85 ? 'shed' : 'warehouse');
+    order.push(kind);
+  }
+
+  cand.forEach((b, i) => {
+    const kind = order[i];
+    const spec = MODELS[kind];
+    const h0 = sampleH(b.lon, b.lat);
+    const sc = 1.05 + rnd() * 0.45;
+    const hh = spec.h * sc;
+
+    // 正面朝向沟道（就近的沟道点）
+    let best = channel.points[0], bd = 1e18;
+    for (const p of channel.points) {
+      const dd = Math.hypot((p[0] - b.lon) * KX, (p[1] - b.lat) * KY);
+      if (dd < bd) { bd = dd; best = p; }
+    }
+    const heading = Math.atan2((best[0] - b.lon) * KX, (best[1] - b.lat) * KY);
+    const spin = (rnd() < 0.5 ? -1 : 1) * (0.25 + rnd() * 0.5);
+
+    const st = { tip: 0, sink: 0, t0: -1, h0, hh, kind };
+
+    // 地面高度：globe 的地形瓦片高度比 22 m 格网采样的 sampleH 更贴，
+    // 否则建筑会被埋在峡谷坡里（之前 19 栋一个都看不见就是这个原因）
+    const carto = Cesium.Cartographic.fromDegrees(b.lon, b.lat);
+    const groundAt = () => {
+      const gh = viewer.scene.globe.getHeight(carto);
+      return (gh === undefined || gh === null || !isFinite(gh)) ? h0 : gh;
+    };
+    st.groundAt = groundAt;
+
+    const ent = viewer.entities.add({
+      position: new Cesium.CallbackProperty(() => {
+        const g = groundAt();
+        return Cesium.Cartesian3.fromDegrees(b.lon, b.lat, g - 0.6 - st.sink * hh * 0.9);
+      }, false),
+      orientation: new Cesium.CallbackProperty(() => {
+        const k = st.tip;
+        const g = groundAt();
+        const hpr = new Cesium.HeadingPitchRoll(
+          heading + k * spin,
+          -k * 1.15,
+          k * spin * 0.55);
+        return Cesium.Transforms.headingPitchRollQuaternion(
+          Cesium.Cartesian3.fromDegrees(b.lon, b.lat, g), hpr);
+      }, false),
+      model: {
+        uri: spec.uri,
+        scale: sc,
+        // HIGHLIGHT = 与原色相乘：tip=0 时白色（原色不变），冲毁后乘深褐变暗
+        color: new Cesium.CallbackProperty(() => Cesium.Color.lerp(
+          Cesium.Color.WHITE,
+          Cesium.Color.fromCssColorString('#5d4230'),
+          st.tip * 0.95, new Cesium.Color()), false),
+        colorBlendMode: Cesium.ColorBlendMode.HIGHLIGHT,
+        shadows: Cesium.ShadowMode.DISABLED,
+        // 软件渲染（swiftshader）下 IBL 的 BRDF LUT 会触发纹理上传错误
+        imageBasedLightingFactor: new Cesium.Cartesian2(0.0, 0.0),
+      },
+    });
+
+    // 贴地阴影（增强立体感，软件渲染下没有实时阴影）
+    viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(b.lon + 0.00006, b.lat - 0.00005, h0 + 0.5),
+      ellipse: {
+        semiMajorAxis: spec.w * sc * 0.62, semiMinorAxis: spec.d * sc * 0.72,
+        height: new Cesium.CallbackProperty(() => groundAt() + 1.2, false),
+        material: Cesium.Color.fromCssColorString('#000000').withAlpha(0.22),
+        outline: false,
+      },
+    });
+
+    const delay = T_ARRIVE + 6 + (i / 27) * 74 + rnd() * 5;
+    buildings.push({ ent, st, delay, lon: b.lon, lat: b.lat, h0, hh, kind });
+  });
+
+  buildFrags();
+
+  // 受灾范围 0.7 km²
+  const rEq = Math.sqrt(0.7e6 / Math.PI);
+  damageEnt = viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(PORT[0], PORT[1], 0),
+    ellipse: {
+      semiMajorAxis: rEq * 1.15, semiMinorAxis: rEq * 0.88,
+      height: sampleH(PORT[0], PORT[1]) + 8,
+      material: new Cesium.ColorMaterialProperty(
+        new Cesium.CallbackProperty(() => Cesium.Color.fromCssColorString('#ff5a4a')
+          .withAlpha(0.10 + 0.10 * smooth(T_ARRIVE - 20, T_ARRIVE + 40, evtT)), false)),
+      outline: true,
+      outlineColor: Cesium.Color.fromCssColorString('#ff5a4a').withAlpha(0.85),
+      outlineWidth: 2,
+    },
+  });
+
+  // 堰塞湖（普热普强藏布，坝高约 60 m、库容 2.2e6 m³）
+  const lp = chanAt(19900);
+  const lp2 = chanAt(20800);
+  const rot = Math.atan2((lp2[0] - lp[0]) * KX, (lp2[1] - lp[1]) * KY);
+  lakeEnt = viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(lp[0], lp[1], 0),
+    ellipse: {
+      semiMajorAxis: 780, semiMinorAxis: 265,
+      rotation: rot,
+      height: new Cesium.CallbackProperty(() => {
+        const k = smooth(T_ARRIVE, T_ARRIVE + 320, evtT);
+        return sampleH(lp[0], lp[1]) + 2 + k * 58;
+      }, false),
+      material: new Cesium.ColorMaterialProperty(
+        new Cesium.CallbackProperty(() => Cesium.Color.fromCssColorString('#3d7fb8')
+          .withAlpha(0.58 * smooth(T_ARRIVE + 10, T_ARRIVE + 150, evtT)), false)),
+      outline: false,
+    },
+  });
+
+  // 堰塞体
+  const dp = chanAt(19400);
+  lakeDam = viewer.entities.add({
+    show: false,
+    position: Cesium.Cartesian3.fromDegrees(dp[0], dp[1], sampleH(dp[0], dp[1]) + 12),
+    box: {
+      dimensions: new Cesium.Cartesian3(520, 56, 120),
+      material: Cesium.Color.fromCssColorString('#6f5c48').withAlpha(0.9),
+    },
+  });
+
+  buildPortDust();
+  buildSpray();
+  buildMudBody();
+  buildOsmWaterTower();
+}
+
+// ---------------- OSM 实测：唯一带灾害标签的建筑 ----------------
+// OSM way 846902681：building=water_tower、disused=yes、
+// damage:event="8·26吉隆口岸泥石流"（zh:2026年中尼边境泥石流灾害）
+// 这是口岸一带唯一有公开记录的受灾建筑，按真实坐标放置。
+function buildOsmWaterTower() {
+  const LON = 85.37794, LAT = 28.28087;
+  const carto = Cesium.Cartographic.fromDegrees(LON, LAT);
+  const gAt = () => {
+    const g = viewer.scene.globe.getHeight(carto);
+    return (g === undefined || g === null || !isFinite(g)) ? sampleH(LON, LAT) : g;
+  };
+  // 支腿
+  for (const [dx, dy] of [[-3.2, -3.2], [3.2, -3.2], [-3.2, 3.2], [3.2, 3.2]]) {
+    viewer.entities.add({
+      position: new Cesium.CallbackProperty(() =>
+        Cesium.Cartesian3.fromDegrees(LON + dx / KX, LAT + dy / KY, gAt() + 5.5), false),
+      cylinder: {
+        length: 11, topRadius: 0.35, bottomRadius: 0.45,
+        material: Cesium.Color.fromCssColorString('#8c8a84').withAlpha(0.95),
+      },
+    });
+  }
+  // 水箱
+  viewer.entities.add({
+    position: new Cesium.CallbackProperty(() =>
+      Cesium.Cartesian3.fromDegrees(LON, LAT, gAt() + 14), false),
+    cylinder: {
+      length: 6.5, topRadius: 4.8, bottomRadius: 4.8,
+      material: Cesium.Color.fromCssColorString('#b9b6ad').withAlpha(0.97),
+    },
+  });
+  viewer.entities.add({
+    position: new Cesium.CallbackProperty(() =>
+      Cesium.Cartesian3.fromDegrees(LON, LAT, gAt() + 20), false),
+    label: {
+      text: '受损水塔（OSM 846902681）',
+      font: '11px sans-serif',
+      fillColor: Cesium.Color.fromCssColorString('#ffd9a8'),
+      showBackground: true,
+      backgroundColor: Cesium.Color.fromCssColorString('#0a1220').withAlpha(0.72),
+      backgroundPadding: new Cesium.Cartesian2(6, 4),
+      verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+      pixelOffset: new Cesium.Cartesian2(0, -26),
+      heightReference: Cesium.HeightReference.NONE,
+    },
+  });
+}
+
+// ---------------- 口岸泥流堆积体 ----------------
+// 泥流场是一张 1024×512 的贴图覆盖 22 km，口岸处只有 30 来个像素，
+// 拉近必然糊成一片。这里在口岸叠一个真正抬升的三维泥浆体，
+// 让近景能看出"泥浆淹没街区"，宏观仍由贴图层负责。
+let mudBody = null;
+function buildMudBody() {
+  const c = chanAt(21300);
+  const h0 = sampleH(c[0], c[1]);
+  mudBody = viewer.entities.add({
+    show: false,
+    position: Cesium.Cartesian3.fromDegrees(c[0], c[1], 0),
+    ellipse: {
+      semiMajorAxis: new Cesium.CallbackProperty(() => {
+        const k = clamp((evtT - T_ARRIVE + 18) / 110, 0, 1);
+        return 40 + k * 175;
+      }, false),
+      semiMinorAxis: new Cesium.CallbackProperty(() => {
+        const k = clamp((evtT - T_ARRIVE + 18) / 110, 0, 1);
+        return 30 + k * 125;
+      }, false),
+      height: new Cesium.CallbackProperty(() => {
+        const k = clamp((evtT - T_ARRIVE + 10) / 160, 0, 1);
+        return h0 + 2 + k * 22;
+      }, false),
+      material: new Cesium.ColorMaterialProperty(
+        new Cesium.CallbackProperty(() => {
+          const k = clamp((evtT - T_ARRIVE + 10) / 50, 0, 1);
+          return Cesium.Color.fromCssColorString('#4e3218').withAlpha(0.97 * k);
+        }, false)),
+      outline: false,
+    },
+  });
+}
+
+// ---------------- 冲毁碎块池 ----------------
+function buildFrags() {
+  // 用 Entity 小盒做碎块（数量可控、便于逐帧更新）
+  for (let i = 0; i < 42; i++) {
+    const e = viewer.entities.add({
+      show: false,
+      position: Cesium.Cartesian3.fromDegrees(PORT[0], PORT[1], 0),
+      box: {
+        dimensions: new Cesium.Cartesian3(3.2, 2.4, 2.6),
+        material: Cesium.Color.fromCssColorString('#8d7a64').withAlpha(0.95),
+      },
+      orientation: new Cesium.CallbackProperty(() => {
+        const f = frags[i];
+        if (!f || !f.on) return Cesium.Quaternion.IDENTITY;
+        return Cesium.Transforms.headingPitchRollQuaternion(
+          Cesium.Cartesian3.fromDegrees(f.lon, f.lat, f.h),
+          new Cesium.HeadingPitchRoll(f.yaw, f.pitch, f.roll));
+      }, false),
+    });
+    frags.push({ ent: e, on: false, vx: 0, vy: 0, vz: 0, lon: PORT[0], lat: PORT[1], h: 0,
+      yaw: 0, pitch: 0, roll: 0, life: 0, ground: 0 });
+  }
+}
+
+function spawnFrags(lon, lat, h, flowDir, n) {
+  for (let i = 0; i < n; i++) {
+    const f = frags[fragPtr++ % frags.length];
+    f.on = true;
+    f.lon = lon + (Math.random() - 0.5) * 0.00035;
+    f.lat = lat + (Math.random() - 0.5) * 0.00035;
+    f.h = h + Math.random() * 8;
+    f.ground = sampleH(f.lon, f.lat) + 1.2;
+    f.vx = flowDir.x * (10 + Math.random() * 26) + (Math.random() - 0.5) * 14;
+    f.vz = flowDir.z * (10 + Math.random() * 26) + (Math.random() - 0.5) * 14;
+    f.vy = 14 + Math.random() * 30;
+    f.yaw = Math.random() * 6.28;
+    f.pitch = (Math.random() - 0.5) * 3;
+    f.roll = (Math.random() - 0.5) * 3;
+    f.life = 4 + Math.random() * 3;
+    f.ent.show = true;
+  }
+}
+
+function updateFrags(dt) {
+  for (const f of frags) {
+    if (!f.on) continue;
+    f.life -= dt;
+    if (f.life <= 0) { f.on = false; f.ent.show = false; continue; }
+    f.vy -= 24 * dt;
+    f.lon += f.vx * dt / KX;
+    f.lat += f.vz * dt / KY;
+    f.h += f.vy * dt;
+    if (f.h < f.ground) {
+      f.h = f.ground;
+      f.vy = -f.vy * 0.28;
+      f.vx *= 0.5; f.vz *= 0.5;
+      f.pitch *= 0.4; f.roll *= 0.4;
+      if (Math.abs(f.vy) < 3) f.vy = 0;
+    }
+    f.yaw += dt * 1.1;
+    f.ent.position = Cesium.Cartesian3.fromDegrees(f.lon, f.lat, f.h);
+  }
+}
+
+// ---------------- 口岸尘土 / 水花 ----------------
+function buildPortDust() {
+  // 口岸尘土：同样用 ellipsoid 云团（循环"冒烟"），不用 ParticleSystem
+  let seed = 20260901;
+  const rnd = () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296;
+  for (let i = 0; i < 7; i++) {
+    const lon = PORT[0] + (rnd() - 0.5) * 0.0085;
+    const lat = PORT[1] - (rnd() - 0.5) * 0.0068;
+    const h = sampleH(lon, lat);
+    const thr = 1 + i * 0.7;             // 损毁建筑累计到这个数才开始冒烟
+    const period = 5.5 + rnd() * 3.0;
+    const phase = rnd() * period;
+    const e = viewer.entities.add({
+      show: false,
+      position: new Cesium.CallbackProperty(() => {
+        const age = ((evtT + phase) % period + period) % period;
+        return Cesium.Cartesian3.fromDegrees(lon, lat, h + 8 + age * 7);
+      }, false),
+      ellipsoid: {
+        radii: new Cesium.CallbackProperty(() => {
+          const age = ((evtT + phase) % period + period) % period;
+          const r = 55 + age * 40;
+          return new Cesium.Cartesian3(r, r, r * 0.5);
+        }, false),
+        material: new Cesium.ColorMaterialProperty(
+          new Cesium.CallbackProperty(() => {
+            if (hitCount < thr) return Cesium.Color.fromCssColorString('#c9b49a').withAlpha(0);
+            const age = ((evtT + phase) % period + period) % period;
+            const k = age / period;
+            return Cesium.Color.fromCssColorString('#c9b49a').withAlpha(0.09 * Math.sin(k * Math.PI));
+          }, false)),
+      },
+    });
+    portPuffs.push(e);
+  }
+}
+
+function buildSpray() {
+  for (let i = 0; i < 3; i++) {
+    const e = viewer.entities.add({
+      show: false,
+      position: new Cesium.CallbackProperty(() => {
+        const s = Math.max(0, sOfFrac(evtT) - i * 70);
+        const p = chanAt(s);
+        return Cesium.Cartesian3.fromDegrees(p[0], p[1], sampleH(p[0], p[1]) + 26 + i * 6);
+      }, false),
+      billboard: {
+        image: TEX_SPRAY,
+        sizeInMeters: true,
+        scale: 210 + i * 40,
+        color: new Cesium.CallbackProperty(() => {
+          const s = sOfFrac(evtT);
+          const on = evtT > 30 && s > 400;
+          return Cesium.Color.fromCssColorString('#f4efe6').withAlpha(on ? 0.55 : 0);
+        }, false),
+      },
+    });
+    spray.push(e);
+  }
+}
+
+// ---------------- 谷雾 ----------------
+function buildFog() {
+  // 谷雾只用少量、低浓度 sprite：22 km 尺度上 sprite 会叠加成一层白幕，
+  // 之前 26 个 × alpha 0.10 直接把整幅影像糊白了。
+  for (let i = 0; i < 9; i++) {
+    const s = 2000 + (i / 9) * 19500;
+    const p = chanAt(s);
+    const lon = p[0] + (Math.sin(i * 2.7) * 200) / KX;
+    const lat = p[1] + (Math.cos(i * 1.9) * 200) / KY;
+    const e = viewer.entities.add({
+      position: Cesium.Cartesian3.fromDegrees(lon, lat, sampleH(lon, lat) + 70),
+      billboard: {
+        image: TEX_DUST,
+        sizeInMeters: true,
+        scale: 210 + (i % 3) * 60,
+        color: Cesium.Color.fromCssColorString('#d5e2ee').withAlpha(0.045),
+      },
+    });
+    fogSprites.push({ ent: e, s, lon, lat, ph: i * 0.7 });
+  }
+}
+
+function updateFog(t) {
+  for (const f of fogSprites) {
+    const p = chanAt(f.s);
+    const drift = Math.sin(t * 0.18 + f.ph) * 120;
+    f.ent.position = Cesium.Cartesian3.fromDegrees(
+      p[0] + drift / KX, p[1] + drift * 0.6 / KY, sampleH(p[0], p[1]) + 90);
+  }
+}
+
+// ============================================================ 建筑更新
+function updateBuildings(t, dt) {
+  let hit = 0;
+  for (const b of buildings) {
+    const st = b.st;
+    if (t > b.delay) {
+      if (st.t0 < 0) {
+        st.t0 = b.delay;
+        // 只在正常播放经过该时刻时抛碎块（时间轴跳转不触发）
+        if (Math.abs(t - b.delay) < 1.6) {
+          let best = channel.points[0], bd = 1e18;
+          for (const p of channel.points) {
+            const dd = Math.hypot((p[0] - b.lon) * KX, (p[1] - b.lat) * KY);
+            if (dd < bd) { bd = dd; best = p; }
+          }
+          const ang = Math.atan2((best[0] - b.lon) * KX, (best[1] - b.lat) * KY);
+          spawnFrags(b.lon, b.lat, b.h0 + b.hh * 0.4, { x: Math.cos(ang), z: Math.sin(ang) }, 5);
+          shakeAmt = Math.max(shakeAmt, 0.5);
+        }
+      }
+      const k = clamp((t - st.t0) / 4.2, 0, 1);
+      st.tip = k;
+      st.sink = smooth(0.15, 1.0, k);
+    }
+    if (st.tip >= 1) hit++;
+  }
+  hitCount = hit;
+  updateFrags(dt);
+
+  // 口岸尘团随损毁数量出现（在 portPuffs 的材质里按 hitCount 判断）
+  for (const p of portPuffs) {
+    p.show = t > T_ARRIVE && t < 900 && hitCount > 0;
+  }
+  if (mudBody) mudBody.show = t > T_ARRIVE - 20;
+}
+
+function resetBuildings() {
+  for (const b of buildings) { b.st.tip = 0; b.st.sink = 0; b.st.t0 = -1; }
+  for (const f of frags) { f.on = false; f.ent.show = false; }
+  hitCount = 0;
+}
+
+// ============================================================ 时间轴 / UI
+function stageOf(t) {
+  if (t < 55) return [0, '冰岩体失稳', '10:52 错坚河上游约 5150 m 高位冰岩体整体失稳，方量约 1.8 亿 m³（面积 400 万 m²、厚约 45 m）。'];
+  if (t < 300) return [1, '冰川岩屑流', '冰岩体撞击坡体与谷底，破碎消融、释放冰内冰下水，转化为高流动性冰川岩屑流，坡降达 30.6%。'];
+  if (t < T_ARRIVE) return [2, '沟道奔涌', '沿错坚河→普热普强藏布→东林藏布高速下泄，沿途冲刷裹挟冰碛物，10:55 过色琼断面。'];
+  if (t < 900) return [3, '冲击口岸', '11:00:20 冲击吉隆口岸：洪峰 18.83 万 m³/s、平均流深 47.5 m、流速 25.13 m/s，27 处建筑被夷为平地。'];
+  return [4, '回水成湖', '口岸拥堵回水，上游形成普热普强藏布堰塞湖（坝高约 60 m、长 1100 m、库容 2.2×10⁶ m³）。'];
+}
+
+function profileAt(t) {
+  const tm = clamp(t * (390 / 500), 0, 390);
+  const pr = model.profile;
+  if (tm <= 0) return pr[0];
+  for (let i = 1; i < pr.length; i++) {
+    if (pr[i][4] >= tm) {
+      const a = pr[i - 1], b = pr[i], k = (tm - a[4]) / Math.max(b[4] - a[4], 1e-6);
+      return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, b[2],
+              a[3] + (b[3] - a[3]) * k, t, a[5] + (b[5] - a[5]) * k];
+    }
+  }
+  return pr[pr.length - 1];
+}
+
+function drawProfile(t) {
+  const c = $('pcv'), g = c.getContext('2d');
+  const W = c.clientWidth, H = c.clientHeight;
+  if (c.width !== Math.round(W * 2)) { c.width = Math.round(W * 2); c.height = Math.round(H * 2); }
+  g.setTransform(2, 0, 0, 2, 0, 0);
+  g.clearRect(0, 0, W, H);
+  const pr = model.profile;
+  const L = 34, R = 8, T = 8, B = 16;
+  const X = s => L + s / 22000 * (W - R - L);
+  const Y = h => (H - B) - (h - 1600) / (5400 - 1600) * ((H - B) - T);
+  g.strokeStyle = 'rgba(125,211,252,.12)'; g.lineWidth = 1;
+  g.font = '10px sans-serif'; g.fillStyle = '#7f93a9';
+  for (const h of [2000, 3000, 4000, 5000]) {
+    g.beginPath(); g.moveTo(L, Y(h)); g.lineTo(W - R, Y(h)); g.stroke();
+    g.fillText(String(h), 4, Y(h) + 3);
+  }
+  for (const s of [0, 5000, 10000, 15000, 20000]) {
+    g.beginPath(); g.moveTo(X(s), H - B); g.lineTo(X(s), H - B + 3); g.stroke();
+    if (s) g.fillText((s / 1000) + 'km', X(s) - 9, H - 3);
+  }
+  g.beginPath(); g.moveTo(X(pr[0][0]), Y(pr[0][1]));
+  for (const p of pr) g.lineTo(X(p[0]), Y(p[1]));
+  g.lineTo(X(pr[pr.length - 1][0]), H - B); g.lineTo(X(pr[0][0]), H - B); g.closePath();
+  g.fillStyle = 'rgba(120,150,175,.20)'; g.fill();
+  g.beginPath(); g.moveTo(X(pr[0][0]), Y(pr[0][1]));
+  for (const p of pr) g.lineTo(X(p[0]), Y(p[1]));
+  g.strokeStyle = '#9fb4c9'; g.lineWidth = 1.3; g.stroke();
+
+  const row = profileAt(Math.min(t, T_ARRIVE));
+  g.beginPath(); g.moveTo(X(pr[0][0]), Y(pr[0][1]));
+  for (const p of pr) { if (p[0] > row[0]) break; g.lineTo(X(p[0]), Y(p[1])); }
+  g.lineTo(X(row[0]), Y(row[1]));
+  g.strokeStyle = '#ff9f45'; g.lineWidth = 2.6; g.stroke();
+  g.beginPath(); g.arc(X(row[0]), Y(row[1]), 4.2, 0, 6.283); g.fillStyle = '#ffb26b'; g.fill();
+  g.beginPath(); g.arc(X(22000), Y(1789), 3.4, 0, 6.283); g.fillStyle = '#ffd166'; g.fill();
+  $('prof-fps').textContent = '前锋 ' + (row[0] / 1000).toFixed(1) + ' km · ' + Math.round(row[3]) + ' m/s';
+}
+
+function updateUI(t) {
+  const [i, name, desc] = stageOf(t);
+  $('st-name').textContent = name;
+  $('st-idx').textContent = '阶段 ' + (i + 1) + ' / 5';
+  $('st-desc').textContent = desc;
+  const row = profileAt(Math.min(t, T_ARRIVE));
+  $('v-s').innerHTML = Math.min(row[0] / 1000, 22).toFixed(1) + '<small>km / 22.0</small>';
+  $('v-vel').innerHTML = Math.round(row[3]) + '<small>m/s · ' + Math.round(row[3] * 3.6) + ' km/h</small>';
+  $('v-q').innerHTML = (row[5] / 1e4).toFixed(1) + '<small>万 m³/s</small>';
+  $('v-dep').innerHTML = (t < T_ARRIVE ? row[5] / (row[3] * 80) : 47.5).toFixed(1) + '<small>m</small>';
+  $('v-h').innerHTML = Math.round(row[1]) + '<small>m</small>';
+  $('v-bld').innerHTML = hitCount + '<small>/ ' + buildings.length + ' 栋</small>';
+  const tot = 10 * 3600 + 52 * 60 + Math.floor(t);
+  $('clock').textContent = [Math.floor(tot / 3600) % 24, Math.floor(tot / 60) % 60, tot % 60]
+    .map(v => String(v).padStart(2, '0')).join(':');
+  $('bar').style.width = (t / T_TOTAL * 100).toFixed(2) + '%';
+  $('slow').classList.toggle('on', t > T_ARRIVE - 8 && t < T_ARRIVE + 110);
+  drawProfile(t);
+}
+
+// ============================================================ 运镜
+// 注意：Cesium 的 destination 高度是椭球绝对高，这里的 h 一律为「离地相对高度」，
+// 由 applyCam 用 sampleH 折算，否则近距离机位会钻进山体里（全黑）。
+function camFor(t) {
+  // 源区：从沟道上方俯瞰冰崖
+  if (t < 55) {
+    return { lon: SRC[0] - 0.0295, lat: SRC[1] - 0.0205, h: 4300, pitch: -42, heading: 44 };
+  }
+  // 上段下泄：沿沟俯瞰
+  if (t < 210) {
+    const s = Math.max(0, sOfFrac(t));
+    const p = chanAt(s + 2600);
+    return { lon: p[0] - 0.0125, lat: p[1] - 0.0105, h: 2600, pitch: -42, heading: 40 };
+  }
+  // 中段：跟随前锋侧后方
+  if (t < 430) {
+    const s = Math.max(0, sOfFrac(t));
+    const p = chanAt(Math.max(0, s - 1500));
+    return { lon: p[0] - 0.0085, lat: p[1] - 0.0072, h: 1600, pitch: -36, heading: 46 };
+  }
+  // 逼近口岸：从下游顺河谷朝上游看（沟道 SE→NW，来流从画面深处冲来）
+  if (t < T_ARRIVE - 12) {
+    return { lon: PORT[0] - 0.0260, lat: PORT[1] + 0.0066, h: 1900, pitch: -32, heading: 106 };
+  }
+  // 冲击瞬间：口岸近景，沿河谷看泥流冲进街区
+  if (t < T_ARRIVE + 130) {
+    return { lon: PORT[0] - 0.0112, lat: PORT[1] + 0.0029, h: 720, pitch: -36, heading: 106 };
+  }
+  // 淹没后：缓慢拉高
+  if (t < 1000) {
+    return { lon: PORT[0] - 0.0150, lat: PORT[1] + 0.0038, h: 980, pitch: -38, heading: 106 };
+  }
+  // 堰塞湖：相机在湖的下游（西北），朝上游（东南）看
+  const lp = chanAt(19900);
+  return { lon: lp[0] - 0.0165, lat: lp[1] + 0.0105, h: 1900, pitch: -34, heading: 132 };
+}
+
+function applyCam(t, instant) {
+  if (!autoCam) return;
+  const c = camFor(t);
+  const ground = sampleH(c.lon, c.lat);
+  const opts = {
+    destination: Cesium.Cartesian3.fromDegrees(c.lon, c.lat, ground + c.h),
+    orientation: {
+      heading: Cesium.Math.toRadians(c.heading),
+      pitch: Cesium.Math.toRadians(c.pitch),
+      roll: 0,
+    },
+  };
+  if (instant) {
+    viewer.camera.setView(opts);
+  } else {
+    viewer.camera.flyTo({ ...opts, duration: 2.4, easingFunction: Cesium.EasingFunction.QUADRATIC_IN_OUT });
+  }
+}
+
+// ============================================================ 冲击抖动（只动 DOM，不改相机）
+function updateShake(t, ts) {
+  const el = $('cesiumContainer');
+  const k = t > T_ARRIVE - 6 && t < T_ARRIVE + 130
+    ? Math.max(0.25, 1 - (t - T_ARRIVE) / 130)
+    : 0;
+  if (k <= 0.02) { el.style.transform = ''; return; }
+  const a = 2.6 * k;
+  const x = Math.sin(ts * 0.055) * a + (Math.random() - 0.5) * a * 0.7;
+  const y = Math.cos(ts * 0.071) * a + (Math.random() - 0.5) * a * 0.7;
+  el.style.transform = 'translate(' + x.toFixed(2) + 'px,' + y.toFixed(2) + 'px)';
+}
+
+// ============================================================ 主循环
+let fpsN = 0, fpsT0 = 0, fpsVal = 0, frameN = 0;
+function tick(ts) {
+  const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.1) : 0.016;
+  lastTs = ts;
+  if (!fpsT0) fpsT0 = ts;
+  frameN++;
+  fpsN++;
+  if (ts - fpsT0 > 1000) { fpsVal = fpsN * 1000 / (ts - fpsT0); fpsN = 0; fpsT0 = ts; }
+  if (playing) {
+    // 冲击口岸前后 4 倍慢放，让冲毁过程看得清
+    const slow = evtT > T_ARRIVE - 10 && evtT < T_ARRIVE + 120 ? 0.25 : 1;
+    evtT += dt * speed * slow;
+    if (evtT >= T_TOTAL) { evtT = T_TOTAL; playing = false; setIcon(); }
+  }
+  updateFlow(evtT);
+  updateIce(evtT);
+  updateBuildings(evtT, dt);
+  updateFog(evtT);
+  updateShake(evtT, ts);
+  updateUI(evtT);
+  requestAnimationFrame(tick);
+}
+
+function setIcon() { $('btn-play').textContent = playing ? '❚❚' : '▶'; }
+
+// ============================================================ 启动
+(async function main() {
+  const step = s => { const el = $('loadtxt'); if (el) el.textContent = '加载中：' + s; };
+  const Q = new URLSearchParams(location.search);
+  const BARE = Q.get('bare') === '1';   // 调试：只加载地形+影像
+  try {
+    Cesium.Ion.defaultAccessToken = undefined;
+    step('读取数据');
+    await loadAll();
+    step('初始化地球');
+    initViewer();
+    if (!BARE) {
+      if (Q.get('noflow') !== '1') { step('泥石流场'); await buildFlow(); }
+      if (Q.get('noice') !== '1') { step('冰崩'); buildIce(); }
+      if (Q.get('noport') !== '1') { step('口岸建筑'); buildPort(); }
+      if (Q.get('nofog') !== '1') { step('谷雾'); buildFog(); }
+    }
+
+    applyCam(evtT, true);
+    setInterval(() => {
+      const st = stageOf(evtT)[0];
+      if (st !== lastStage) { lastStage = st; if (autoCam) applyCam(evtT, false); }
+    }, 260);
+
+    // 支持 URL 定格：?t=秒&play=0/1&cam=0
+    const qs = new URLSearchParams(location.search);
+    if (qs.has('t')) {
+      evtT = clamp(parseFloat(qs.get('t')) || 0, 0, T_TOTAL);
+      lastFrame = -1;
+      resetBuildings();
+      updateFlow(evtT); updateIce(evtT); updateBuildings(evtT, 0); updateUI(evtT);
+      if (autoCam) applyCam(evtT, true);
+    }
+    if (qs.get('play') === '1') playing = true;
+    if (qs.get('cam') === '0') { autoCam = false; $('autocam').checked = false; }
+    setIcon();
+
+    $('loading').classList.add('hide');
+    window.__ready = true;
+    // 诊断出口（供无头浏览器读状态）
+    window.__v = viewer;
+    window.__dbg = () => {
+      const cc = viewer.camera.positionCartographic;
+      const lon = Cesium.Math.toDegrees(cc.longitude), lat = Cesium.Math.toDegrees(cc.latitude);
+      return {
+        lon: +lon.toFixed(5), lat: +lat.toFixed(5), camH: Math.round(cc.height),
+        ground: Math.round(sampleH(lon, lat)),
+        pitch: +(Cesium.Math.toDegrees(viewer.camera.pitch)).toFixed(1),
+        tiles: viewer.scene.globe.tilesLoaded,
+        ents: viewer.entities.values.length,
+        bldgs: buildings.length, evtT: Math.round(evtT),
+        models: viewer.entities.values.filter(e => e.model).length,
+        fps: +fpsVal.toFixed(1), frames: frameN,
+        sample: buildings.length ? {
+          lon: +buildings[0].lon.toFixed(5), lat: +buildings[0].lat.toFixed(5),
+          h0: Math.round(buildings[0].h0), kind: buildings[0].kind,
+          shown: buildings[0].ent.show, tip: +buildings[0].st.tip.toFixed(2),
+        } : null,
+        err: window.__err || '',
+      };
+    };
+    requestAnimationFrame(tick);
+  } catch (e) {
+    console.error(e);
+    $('loadtxt').innerHTML = '加载失败：' + (e && e.message ? e.message : e);
+    window.__err = String(e);
+  }
+})();
+
+$('btn-play').onclick = () => {
+  if (evtT >= T_TOTAL) evtT = 0;
+  playing = !playing; setIcon();
+};
+$('speed').onchange = e => { speed = +e.target.value; };
+$('prog').onclick = e => {
+  const r = e.currentTarget.getBoundingClientRect();
+  evtT = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * T_TOTAL;
+  lastFrame = -1;
+  resetBuildings();
+  updateFlow(evtT); updateIce(evtT); updateBuildings(evtT, 0); updateUI(evtT);
+  if (autoCam) applyCam(evtT, true);
+};
+$('autocam').onchange = e => { autoCam = e.target.checked; if (autoCam) applyCam(evtT, false); };
+</script>
+</body>
+</html>

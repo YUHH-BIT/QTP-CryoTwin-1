@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>吉隆口岸“8·26”冰岩崩-泥石流灾害链三维推演</title>
+<link rel="stylesheet" href="css/styles.css" />
+<link rel="stylesheet" href="css/components.css" />
+<link href="css/lib/font-awesome.min.css" rel="stylesheet">
+<style>
+  :root { --nav-height: 0px; --ink: #e8eef6; --dim: #93a6bd; --line: rgba(125,211,252,.16); }
+  html, body { margin:0; height:100%; overflow:hidden; background:#070b14; color:var(--ink);
+    font-family:-apple-system,"Microsoft YaHei","PingFang SC",sans-serif; }
+  #stage { position:fixed; inset:0; background:linear-gradient(180deg,#050c16 0%,#0e1f31 40%,#294255 70%,#5a6c74 100%); }
+  #stage canvas { display:block; }
+  .hud { position:fixed; z-index:10; }
+  .panel { background:rgba(10,18,30,.84); border:1px solid var(--line); border-radius:12px;
+    backdrop-filter:blur(10px); box-shadow:0 10px 30px rgba(0,0,0,.45); }
+
+  #hdr { left:18px; top:14px; pointer-events:none; }
+  #hdr h1 { margin:0; font-size:17px; font-weight:600; letter-spacing:.5px; color:#f1f6fb; }
+  #hdr h1 .em { color:#ffb26b; }
+  #hdr .sub { margin-top:4px; font-size:11.5px; color:var(--dim); }
+  #hdr .tag { display:inline-block; margin-top:7px; padding:2px 8px; font-size:11px;
+    border-radius:999px; color:#ffd9a8; background:rgba(255,178,107,.12);
+    border:1px solid rgba(255,178,107,.35); }
+
+  #side { right:16px; top:14px; width:286px; padding:12px 13px; }
+  #side .stage-name { font-size:13px; font-weight:600; color:#ffcf9b; }
+  #side .stage-idx { float:right; font-size:11px; color:var(--dim); }
+  #side .stage-desc { margin-top:6px; font-size:11.5px; line-height:1.62; color:#c6d3e2; }
+  .kv { display:flex; justify-content:space-between; align-items:baseline;
+    padding:5px 0; border-bottom:1px dashed rgba(125,211,252,.10); font-size:12px; }
+  .kv:last-child { border-bottom:none; }
+  .kv .k { color:var(--dim); }
+  .kv .v { color:#eaf2fa; font-variant-numeric:tabular-nums; font-weight:600; }
+  .kv .v small { font-weight:400; color:var(--dim); font-size:10.5px; margin-left:3px; }
+  #side .sec { margin-top:11px; padding-top:9px; border-top:1px solid var(--line);
+    font-size:11px; color:#8fa3ba; letter-spacing:.4px; }
+
+  #prof { left:16px; bottom:112px; width:430px; padding:9px 11px 7px; }
+  #prof .t { font-size:11.5px; color:#b9c8d9; margin-bottom:5px; display:flex; justify-content:space-between; }
+  #prof .t span:last-child { color:#7f93a9; font-size:10.5px; }
+  #pcv { width:100%; height:126px; display:block; }
+
+  #legend { right:16px; bottom:112px; width:250px; padding:10px 13px 11px; }
+  #legend .t { font-size:11.5px; color:#b9c8d9; margin-bottom:7px; }
+  .lg { display:flex; align-items:center; gap:8px; font-size:11.5px; color:#cbd8e6; padding:2.5px 0; }
+  .lg i { width:14px; height:9px; border-radius:2px; display:inline-block; flex:0 0 auto; }
+  .lg i.dot { width:8px; height:8px; border-radius:50%; }
+  #legend .note { margin-top:8px; padding-top:7px; border-top:1px solid var(--line);
+    font-size:10.5px; line-height:1.6; color:#8296ac; }
+
+  #tl { left:16px; right:282px; bottom:16px; height:78px; padding:9px 14px 8px; }
+  #tl .row { display:flex; align-items:center; gap:10px; }
+  #btn-play { width:28px; height:28px; border-radius:50%; border:none; cursor:pointer;
+    background:#ff9f45; color:#22160a; font-size:12px; display:grid; place-items:center; flex:0 0 auto; }
+  #btn-play:hover { background:#ffb26b; }
+  #clock { font-variant-numeric:tabular-nums; font-size:13.5px; font-weight:600; color:#eaf2fa; width:76px; }
+  #tl .prog { position:relative; flex:1; height:8px; border-radius:4px; background:rgba(255,255,255,.09); cursor:pointer; }
+  #tl .bar { position:absolute; left:0; top:0; bottom:0; border-radius:4px;
+    background:linear-gradient(90deg,#ffb26b,#ff7a3d); width:0%; }
+  #tl .ph { position:absolute; top:-3px; width:1px; height:14px; background:rgba(255,255,255,.28); }
+  #tl .marks { position:relative; height:20px; margin-top:6px; font-size:10px; color:#7f93a9; }
+  #tl .marks span { position:absolute; transform:translateX(-50%); white-space:nowrap; }
+  #tl .speed { margin-left:6px; font-size:11px; color:var(--dim); }
+  #tl select { background:rgba(255,255,255,.06); color:#c6d3e2; border:1px solid var(--line);
+    border-radius:6px; font-size:11px; padding:2px 4px; }
+  #tl label.cam { font-size:11px; color:var(--dim); display:flex; align-items:center; gap:4px; cursor:pointer; }
+  #tl label.cam input { accent-color:#ff9f45; }
+
+  #loading-overlay.error .loading-spinner { display:none; }
+  #loading-overlay.error .loading-text { color:#ff9c9c; }
+
+  @media (max-width:1360px) {
+    #prof { width:360px; bottom:108px; }
+    #tl { right:16px; }
+    #legend { width:236px; bottom:108px; }
+  }
+  @media (max-height:800px) { #pcv { height:96px; } #side .stage-desc { display:none; } }
+</style>
+</head>
+<body>
+<div id="stage"></div>
+
+<header class="hud" id="hdr">
+  <h1>吉隆口岸 <span class="em">“8·26”</span> 冰岩崩—泥石流灾害链</h1>
+  <div class="sub">2026-08-26 10:52 蓝塘里壤峰北坡冰岩崩 → 沿普热普藏布、东林藏布冲击 22 km → 吉隆口岸</div>
+  <div class="tag">三维推演 · 源头至口岸 22 km 全段可见</div>
+</header>
+
+<aside class="hud panel" id="side">
+  <div class="stage-name" id="st-name">冰岩崩启动</div>
+  <div class="stage-idx" id="st-idx">阶段 1 / 5</div>
+  <div class="stage-desc" id="st-desc">10:52 冰川在海拔约 5200 m 处断裂，冰岩体高位坠落。</div>
+  <div class="sec">过程指标（推演）</div>
+  <div class="kv"><span class="k">演进距离</span><span class="v" id="v-s">0.0<small>km / 22.0</small></span></div>
+  <div class="kv"><span class="k">前锋流速</span><span class="v" id="v-vel">0<small>m/s</small></span></div>
+  <div class="kv"><span class="k">峰值流量</span><span class="v" id="v-q">0<small>万 m³/s</small></span></div>
+  <div class="kv"><span class="k">前缘高程</span><span class="v" id="v-h">5197<small>m</small></span></div>
+  <div class="kv"><span class="k">口岸淹没水深</span><span class="v" id="v-dep">0.0<small>m</small></span></div>
+  <div class="sec">灾损（官方通报）</div>
+  <div class="kv"><span class="k">受损范围</span><span class="v">0.7<small>km²</small></span></div>
+  <div class="kv"><span class="k">夷平建筑</span><span class="v">27<small>处</small></span></div>
+  <div class="kv"><span class="k">已损毁</span><span class="v" id="v-hit">0<small>处</small></span></div>
+</aside>
+
+<section class="hud panel" id="prof">
+  <div class="t"><span>沿程纵剖面（5200 m → 1800 m，22 km）</span><span id="prof-fps">—</span></div>
+  <canvas id="pcv"></canvas>
+</section>
+
+<section class="hud panel" id="legend">
+  <div class="t">图例</div>
+  <div class="lg"><i style="background:#8d5a2b"></i>泥石流 / 洪水（按流深着色）</div>
+  <div class="lg"><i style="background:#e8f4ff"></i>冰崩碎屑与粉尘</div>
+  <div class="lg"><i style="background:#7dd3fc"></i>演进沟道（东林藏布 / 普热普藏布）</div>
+  <div class="lg"><i style="background:#e05b4b"></i>受损建筑（27 处示意布设）</div>
+  <div class="lg"><i style="border:2px solid #ff5a4a;background:transparent;height:9px"></i>受灾范围（0.7 km²）</div>
+  <div class="lg"><i style="background:rgba(86,168,255,.55)"></i>堰塞湖水面</div>
+  <div class="note">冰崩位置取官方源头（蓝塘里壤峰北坡 5200 m）；流深场由一维沿程模型按横向衰减铺成，非二维数值解。建筑坐标为示意布设。</div>
+</section>
+
+<section class="hud panel" id="tl">
+  <div class="row">
+    <button id="btn-play" title="播放 / 暂停"><i class="fa fa-play"></i></button>
+    <div id="clock">10:52:00</div>
+    <div class="prog" id="prog"><div class="bar" id="bar"></div>
+      <div class="ph" style="left:0%"></div><div class="ph" style="left:16.9%"></div>
+      <div class="ph" style="left:26%"></div><div class="ph" style="left:100%"></div>
+    </div>
+    <label class="cam"><input type="checkbox" id="autocam" checked>自动运镜</label>
+    <span class="speed">倍速</span>
+    <select id="speed">
+      <option value="20">20×</option>
+      <option value="40" selected>40×</option>
+      <option value="80">80×</option>
+      <option value="160">160×</option>
+    </select>
+  </div>
+  <div class="marks">
+    <span style="left:0%">10:52 冰岩崩</span>
+    <span style="left:16.9%">10:56 冲刷成灾</span>
+    <span style="left:26%">10:59 抵达口岸</span>
+    <span style="left:100%">11:17 堰塞湖壅高</span>
+  </div>
+</section>
+
+<div class="loading-overlay active" id="loading-overlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">系统正在加载，请稍后...</div>
+</div>
+
+<script type="module">
+import * as THREE from './js/lib/three.module.js';
+import { OrbitControls } from './js/lib/OrbitControls.js';
+
+const CORR = 'terrain3d/gyirong_corridor/';
+const GY = 'terrain3d/gyirong/';
+// 错误浮层：着色器编译失败等 console.error 也一并显示出来（便于无头截图定位）
+const __errs = [];
+(function () {
+  const ce = console.error.bind(console);
+  console.error = function (...a) {
+    try { __errs.push(a.map(x => (x && x.message) ? x.message : String(x)).join(' ')); } catch (e) { }
+    ce(...a);
+  };
+  setTimeout(() => {
+    if (!__errs.length) return;
+    const d = document.createElement('div');
+    d.id = 'errbox';
+    d.style.cssText = 'position:fixed;left:0;top:0;z-index:9999;background:#2b0d0d;color:#ffb3b3;'
+      + 'font:11px/1.45 monospace;padding:8px;max-width:100vw;max-height:70vh;overflow:auto;white-space:pre-wrap';
+    d.textContent = __errs.join('\n').slice(0, 5000);
+    document.body.appendChild(d);
+  }, 3500);
+})();
+const overlay = document.getElementById('loading-overlay');
+const loadingText = document.querySelector('#loading-overlay .loading-text');
+const fail = (t, d) => {
+  overlay.classList.add('active', 'error');
+  loadingText.innerHTML = t + (d ? `<br><span style="font-size:12px;color:#94a3b8">${d}</span>` : '');
+};
+
+const T_ARRIVE = 390, T_TOTAL = 1500, EXAG = 1.3;
+const KZ = 110574;
+
+let meta, heights, field, channel, model, texSat, texFlow;
+let renderer, scene, camera, controls, P;
+let terrainMesh, flowMesh, flowUniforms;
+let waterMesh, damMesh, damageRing;
+let buildings = [], buildingsHit = 0;
+let iceGroup, iceChunks = [], iceDust = [], debrisHaze;
+let chanPts = [], chanS = [], frontMarker;
+
+// ---------------------------------------------------------------- 贴图
+function cv(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+function makeFlowTexture() {
+  const S = 512, c = cv(S, S), g = c.getContext('2d');
+  g.fillStyle = '#8a5a2c'; g.fillRect(0, 0, S, S);
+  for (let i = 0; i < 700; i++) {
+    g.fillStyle = `rgba(${70 + Math.random() * 90},${40 + Math.random() * 55},${18 + Math.random() * 30},${0.06 + Math.random() * 0.14})`;
+    g.beginPath(); g.arc(Math.random() * S, Math.random() * S, 16 + Math.random() * 62, 0, 6.283); g.fill();
+  }
+  for (let i = 0; i < 2200; i++) {
+    const x = Math.random() * S, y = Math.random() * S, len = 20 + Math.random() * 120;
+    g.strokeStyle = Math.random() < 0.5 ? `rgba(40,24,10,${0.06 + Math.random() * 0.2})`
+                                        : `rgba(215,190,155,${0.05 + Math.random() * 0.16})`;
+    g.lineWidth = 1 + Math.random() * 4;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + (Math.random() - 0.5) * 12, y + len); g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function makeSoftTexture() {
+  const S = 128, c = cv(S, S), g = c.getContext('2d');
+  const grd = g.createRadialGradient(S / 2, S / 2, 2, S / 2, S / 2, S / 2);
+  grd.addColorStop(0, 'rgba(255,255,255,0.95)');
+  grd.addColorStop(0.45, 'rgba(255,255,255,0.4)');
+  grd.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, S, S);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.NoColorSpace; return t;
+}
+
+// ---------------------------------------------------------------- 数据
+function makeProjector() {
+  const b = meta.bbox, cx = (b[0] + b[2]) / 2, cy = (b[1] + b[3]) / 2;
+  const kx = 111320 * Math.cos(cy * Math.PI / 180);
+  return { cx, cy, kx, x: lon => (lon - cx) * kx, z: lat => -(lat - cy) * KZ };
+}
+function terrainTrueHeight(lon, lat) {
+  const n = meta.meshSize + 1;
+  const col = Math.round((lon - meta.bbox[0]) / (meta.bbox[2] - meta.bbox[0]) * meta.meshSize);
+  const row = Math.round((meta.bbox[3] - lat) / (meta.bbox[3] - meta.bbox[1]) * meta.meshSize);
+  const c = Math.min(Math.max(col, 0), n - 1), r = Math.min(Math.max(row, 0), n - 1);
+  return meta.minHeight + heights[r * n + c];
+}
+const terrainHeightAt = (lon, lat) => terrainTrueHeight(lon, lat) * EXAG;
+
+async function getJSON(base, n) {
+  const r = await fetch(base + n, { cache: 'no-store' });
+  if (!r.ok) throw new Error(`${n} 读取失败（HTTP ${r.status}）`);
+  return r.json();
+}
+async function getBuf(url) {
+  const r = await fetch(url, { cache: 'no-store' });
+  if (!r.ok) throw new Error(`${url} 读取失败（HTTP ${r.status}）`);
+  return r.arrayBuffer();
+}
+function loadTexture(url) {
+  return new Promise((res, rej) => new THREE.TextureLoader().load(url, t => {
+    t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; res(t);
+  }, undefined, () => rej(new Error('贴图加载失败：' + url))));
+}
+
+// ---------------------------------------------------------------- 场景
+function initScene() {
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  document.getElementById('stage').appendChild(renderer.domElement);
+
+  scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x16273a, 26000, 62000);
+
+  camera = new THREE.PerspectiveCamera(44, innerWidth / innerHeight, 20, 400000);
+  controls = new OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.075;
+  controls.maxPolarAngle = Math.PI * 0.492;
+  controls.minDistance = 900;
+  controls.maxDistance = 60000;
+  controls.autoRotate = false;
+
+  scene.add(new THREE.HemisphereLight(0xdcefff, 0x1e2418, 0.92));
+  const sun = new THREE.DirectionalLight(0xfff0d8, 2.0);
+  sun.position.set(-14000, 20000, -11000);
+  scene.add(sun);
+  const fill = new THREE.DirectionalLight(0x8fc4ff, 0.42);
+  fill.position.set(13000, 8000, 11000);
+  scene.add(fill);
+}
+
+function buildTerrain() {
+  const n = meta.meshSize, N = n + 1;
+  const sx = meta.sizeMeters.x, sz = meta.sizeMeters.z;
+  const pos = new Float32Array(N * N * 3), uv = new Float32Array(N * N * 2);
+  for (let r = 0; r < N; r++) for (let c = 0; c < N; c++) {
+    const i = r * N + c;
+    pos[3 * i] = -sx / 2 + sx * c / n;
+    pos[3 * i + 1] = meta.minHeight + heights[i] * EXAG;
+    pos[3 * i + 2] = -sz / 2 + sz * r / n;
+    uv[2 * i] = c / n; uv[2 * i + 1] = 1 - r / n;
+  }
+  const idx = new Uint32Array(n * n * 6);
+  let k = 0;
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
+    const a = r * N + c, b = a + 1, cc = a + N + 1, d = a + N;
+    idx[k++] = a; idx[k++] = cc; idx[k++] = b;
+    idx[k++] = a; idx[k++] = d; idx[k++] = cc;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setIndex(new THREE.BufferAttribute(idx, 1));
+  geo.computeVertexNormals();
+  geo.computeBoundingSphere();
+  terrainMesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    map: texSat, roughness: 0.97, metalness: 0, side: THREE.DoubleSide,
+  }));
+  scene.add(terrainMesh);
+}
+
+// 地形四周裙边：避免整块地形"悬空"
+function buildSkirt() {
+  const n = meta.meshSize, N = n + 1;
+  const sx = meta.sizeMeters.x, sz = meta.sizeMeters.z;
+  const depth = 9000;
+  const pos = [], idx = [];
+  let v = 0;
+  const quad = (x1, z1, y1, x2, z2, y2) => {
+    pos.push(x1, y1, z1, x1, y1 - depth, z1, x2, y2 - depth, z2, x2, y2, z2);
+    idx.push(v, v + 1, v + 2, v, v + 2, v + 3);
+    v += 4;
+  };
+  const H = i => meta.minHeight + heights[i] * EXAG;
+  for (let c = 0; c < n; c++) {           // 南边
+    quad(-sx / 2 + sx * c / n, sz / 2, H(n * N + c),
+         -sx / 2 + sx * (c + 1) / n, sz / 2, H(n * N + c + 1));
+  }
+  for (let c = 0; c < n; c++) {           // 北边
+    quad(-sx / 2 + sx * (c + 1) / n, -sz / 2, H(c + 1),
+         -sx / 2 + sx * c / n, -sz / 2, H(c));
+  }
+  for (let r = 0; r < n; r++) {           // 西边
+    quad(-sx / 2, -sz / 2 + sz * r / n, H(r * N),
+         -sx / 2, -sz / 2 + sz * (r + 1) / n, H((r + 1) * N));
+  }
+  for (let r = 0; r < n; r++) {           // 东边
+    quad(sx / 2, -sz / 2 + sz * (r + 1) / n, H((r + 1) * N + n),
+         sx / 2, -sz / 2 + sz * r / n, H(r * N + n));
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  scene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({
+    color: 0x121c26, side: THREE.DoubleSide,
+  })));
+}
+
+// ---------------------------------------------------------------- 流深场（Don Watch 式）
+async function buildFlowField() {
+  const nx = field.nx, ny = field.ny;
+  const arrBuf = await getBuf(CORR + 'arrival.bin');
+  const depBuf = await getBuf(CORR + 'depth.bin');
+  const texArr = new THREE.DataTexture(new Uint8Array(arrBuf), nx, ny,
+    THREE.RedFormat, THREE.UnsignedByteType);
+  const texDep = new THREE.DataTexture(new Uint8Array(depBuf), nx, ny,
+    THREE.RedFormat, THREE.UnsignedByteType);
+  for (const t of [texArr, texDep]) {
+    t.minFilter = t.magFilter = THREE.LinearFilter;
+    t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+    t.needsUpdate = true;
+  }
+
+  const sx = meta.sizeMeters.x, sz = meta.sizeMeters.z;
+  const pos = new Float32Array(nx * ny * 3), uv = new Float32Array(nx * ny * 2);
+  for (let r = 0; r < ny; r++) {
+    for (let c = 0; c < nx; c++) {
+      const i = r * nx + c;
+      const lon = meta.bbox[0] + (meta.bbox[2] - meta.bbox[0]) * c / (nx - 1);
+      const lat = meta.bbox[3] - (meta.bbox[3] - meta.bbox[1]) * r / (ny - 1);
+      pos[3 * i] = -sx / 2 + sx * c / (nx - 1);
+      pos[3 * i + 1] = meta.minHeight + (terrainTrueHeight(lon, lat) - meta.minHeight) * EXAG;
+      pos[3 * i + 2] = -sz / 2 + sz * r / (ny - 1);
+      uv[2 * i] = c / (nx - 1);
+      uv[2 * i + 1] = r / (ny - 1);      // 行 0 = 北，与 DataTexture 一致
+    }
+  }
+  const idx = new Uint32Array((nx - 1) * (ny - 1) * 6);
+  let k = 0;
+  for (let r = 0; r < ny - 1; r++) for (let c = 0; c < nx - 1; c++) {
+    const a = r * nx + c, b = a + 1, cc = a + nx + 1, d = a + nx;
+    idx[k++] = a; idx[k++] = cc; idx[k++] = b;
+    idx[k++] = a; idx[k++] = d; idx[k++] = cc;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setIndex(new THREE.BufferAttribute(idx, 1));
+  geo.computeBoundingSphere();
+
+  flowUniforms = {
+    uArrival: { value: texArr },
+    uDepth: { value: texDep },
+    uFlow: { value: texFlow },
+    uTime: { value: 0 },
+    uArrScale: { value: field.arrivalScale },
+    uDepScale: { value: field.depthScale },
+    uExag: { value: EXAG },
+  };
+
+  const dbg = new URLSearchParams(location.search).get('dbg') || '';
+  const mat = dbg === '1'
+    ? new THREE.MeshBasicMaterial({ color: 0xff4433, transparent: true, opacity: 0.55, side: THREE.DoubleSide })
+    : new THREE.ShaderMaterial({
+    uniforms: flowUniforms,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -6,
+    polygonOffsetUnits: -6,
+    vertexShader: `
+      uniform sampler2D uArrival, uDepth;
+      uniform float uArrScale, uDepScale, uExag, uTime;
+      varying float vD;
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        float T = texture2D(uArrival, uv).r * 255.0 * uArrScale;
+        float D = texture2D(uDepth, uv).r * 255.0 * uDepScale;
+        float dt = uTime - T;
+        float k = smoothstep(0.0, 22.0, dt);
+        vD = D * k;
+        vec3 p = position;
+        // 与地形完全重合会被深度遮挡，抬 18 m（22 km 场景下不可见）
+        p.y += vD * uExag + (vD > 0.02 ? 18.0 : 0.0);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      }`,
+    fragmentShader: `
+      uniform sampler2D uFlow;
+      uniform float uTime;
+      varying float vD;
+      varying vec2 vUv;
+      void main() {
+        if (vD < 0.02) discard;
+        vec2 quv = vec2(vUv.x * 4.0, vUv.y * 26.0);
+        quv.y -= uTime * 0.010;
+        float n = texture2D(uFlow, quv).g;
+        float t = clamp(vD / 12.0, 0.0, 1.0);
+        vec3 shallow = vec3(0.63, 0.47, 0.29);
+        vec3 deep = vec3(0.24, 0.13, 0.06);
+        vec3 mud = mix(shallow, deep, t);
+        mud = mix(mud, vec3(0.93, 0.89, 0.81), smoothstep(0.70, 0.98, n) * 0.5);
+        float a = clamp(0.42 + t * 0.50, 0.42, 0.95);
+        gl_FragColor = vec4(mud, a);
+      }`,
+    });
+
+  flowMesh = new THREE.Mesh(geo, mat);
+  flowMesh.renderOrder = 2;
+  scene.add(flowMesh);
+}
+
+// ---------------------------------------------------------------- 沟道
+function buildChannelLine() {
+  chanPts = channel.points.map(p => new THREE.Vector3(
+    P.x(p[0]),
+    Math.min(terrainHeightAt(p[0], p[1]), terrainTrueHeight(p[0], p[1]) * EXAG + 40),
+    P.z(p[1])));
+  chanS = channel.points.map(p => p[3]);
+
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(chanPts),
+    new THREE.LineBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.55 }));
+  scene.add(line);
+}
+
+function chanAt(s) {
+  const n = chanS.length;
+  if (s <= chanS[0]) return chanPts[0].clone();
+  if (s >= chanS[n - 1]) return chanPts[n - 1].clone();
+  let lo = 0, hi = n - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (chanS[m] <= s) lo = m; else hi = m; }
+  const k = (s - chanS[lo]) / Math.max(chanS[hi] - chanS[lo], 1e-6);
+  return chanPts[lo].clone().lerp(chanPts[hi], k);
+}
+
+// ---------------------------------------------------------------- 冰崩（源头真实位置）
+function buildIceCollapse() {
+  const src = channel.points[0];
+  const sx = P.x(src[0]), sz = P.z(src[1]);
+  const sy = terrainHeightAt(src[0], src[1]);
+  const iceMat = new THREE.MeshStandardMaterial({
+    color: 0xdfeef9, roughness: 0.34, metalness: 0.05, flatShading: true,
+    emissive: 0x184055, emissiveIntensity: 0.45,
+  });
+  iceGroup = new THREE.Group();
+  // 源区冰川（静态白蓝色块群）
+  for (let i = 0; i < 6; i++) {
+    const g = new THREE.Mesh(new THREE.IcosahedronGeometry(65 + Math.random() * 45, 1), iceMat);
+    const ang = Math.random() * Math.PI * 2, rad = Math.random() * 260;
+    g.position.set(sx + Math.cos(ang) * rad, sy + 30 + Math.random() * 70, sz + Math.sin(ang) * rad);
+    g.scale.set(1.3, 0.5, 1.0);
+    g.rotation.set(Math.random(), Math.random(), Math.random());
+    iceGroup.add(g);
+  }
+  scene.add(iceGroup);
+
+  // 崩落冰块（沿沟道前 5 km 下滑）
+  const N = 16;
+  for (let i = 0; i < N; i++) {
+    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(22 + Math.random() * 20, 0), iceMat.clone());
+    m.visible = false;
+    m.userData = {
+      s0: i * 45 + Math.random() * 60,       // 起步沿程距离
+      v: 60 + Math.random() * 60,            // 下滑速度 m/s（视觉）
+      delay: Math.random() * 1.4,
+      spin: new THREE.Vector3((Math.random() - .5) * 5, (Math.random() - .5) * 5, (Math.random() - .5) * 5),
+    };
+    scene.add(m);
+    iceChunks.push(m);
+  }
+
+  // 崩落粉尘（雪崩状白云，沿沟道前 6 km）
+  for (let i = 0; i < 26; i++) {
+    const s = Math.random() * 6000;
+    const p = chanAt(s);
+    const d = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: TEX_SOFT, color: 0xe6f1fa, transparent: true, opacity: 0, depthWrite: false,
+    }));
+    d.position.set(p.x + (Math.random() - .5) * 260, p.y + 60 + Math.random() * 120, p.z + (Math.random() - .5) * 260);
+    d.scale.setScalar(200 + Math.random() * 160);
+    d.userData = { sOf: s / 6000, seed: Math.random() };
+    scene.add(d);
+    iceDust.push(d);
+  }
+
+  // 泥流前缘的尘雾（流团推进时贴着走）
+  debrisHaze = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: TEX_SOFT, color: 0xc7b299, transparent: true, opacity: 0, depthWrite: false,
+  }));
+  debrisHaze.scale.setScalar(520);
+  scene.add(debrisHaze);
+
+  // 前锋标记
+  frontMarker = new THREE.Mesh(new THREE.SphereGeometry(70, 16, 12),
+    new THREE.MeshBasicMaterial({ color: 0xffc16a, transparent: true, opacity: 0.85 }));
+  frontMarker.visible = false;
+  scene.add(frontMarker);
+}
+
+let TEX_SOFT = null;
+
+// ---------------------------------------------------------------- 口岸
+const PORT = [85.3777, 28.27954];
+function buildPortStuff() {
+  const h = terrainHeightAt(PORT[0], PORT[1]);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(150, 182, 48),
+    new THREE.MeshBasicMaterial({ color: 0xffd166, transparent: true, opacity: 0.9, side: THREE.DoubleSide }));
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(P.x(PORT[0]), h + 12, P.z(PORT[1]));
+  scene.add(ring);
+
+  // 27 处建筑（示意）
+  const rnd = (() => { let s = 20260826; return () => (s = s * 1664525 + 1013904223 >>> 0) / 4294967296; })();
+  let guard = 0;
+  while (buildings.length < 27 && guard++ < 6000) {
+    const dx = (rnd() - 0.5) * 780, dz = (rnd() - 0.5) * 640;
+    const lon = PORT[0] + dx / (111320 * Math.cos(PORT[1] * Math.PI / 180));
+    const lat = PORT[1] - dz / KZ;
+    const near = Math.hypot(dx, dz);
+    let dChan = 1e9;
+    for (const p of chanPts) dChan = Math.min(dChan, Math.hypot(p.x - P.x(lon), p.z - P.z(lat)));
+    if (dChan < 26) continue;
+    const bh = terrainHeightAt(lon, lat);
+    const w = 30 + rnd() * 24, d = 24 + rnd() * 18, hh = (14 + rnd() * 18) * EXAG;
+    const grp = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d),
+      new THREE.MeshStandardMaterial({ color: 0xe2e6ec, roughness: 0.82 }));
+    body.position.y = hh / 2;
+    grp.add(body);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(w * 1.08, 3, d * 1.08),
+      new THREE.MeshStandardMaterial({ color: 0xb44a3d, roughness: 0.85 }));
+    roof.position.y = hh + 1.5;
+    grp.add(roof);
+    grp.position.set(P.x(lon), bh, P.z(lat));
+    grp.rotation.y = rnd() * Math.PI;
+    grp.userData = { baseY: bh, hh, destroyed: 0, body, roof, near, delay: 0 };
+    scene.add(grp);
+    buildings.push(grp);
+  }
+  buildings.slice().sort((a, b) => a.userData.near - b.userData.near)
+    .forEach((m, i) => { m.userData.delay = (i / Math.max(buildings.length, 1)) * 86 + 2; });
+
+  // 堰塞湖水面
+  const wp = chanAt(22000);
+  const geo = new THREE.PlaneGeometry(1500, 1500, 24, 24);
+  waterMesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+    color: 0x3d7fb8, transparent: true, opacity: 0,
+    roughness: 0.16, metalness: 0.25, side: THREE.DoubleSide, depthWrite: false,
+  }));
+  waterMesh.rotation.x = -Math.PI / 2;
+  waterMesh.position.set(wp.x, wp.y, wp.z);
+  waterMesh.renderOrder = 3;
+  waterMesh.userData.base = geo.attributes.position.array.slice();
+  scene.add(waterMesh);
+  waterMesh.userData.baseY = terrainTrueHeight(PORT[0], PORT[1]);
+
+  // 堰塞体
+  const i = Math.max(0, chanPts.length - 4), p = chanPts[i], q = chanPts[Math.max(0, i - 2)];
+  const yaw = Math.atan2(p.x - q.x, p.z - q.z);
+  damMesh = new THREE.Mesh(new THREE.BoxGeometry(300, 70, 110),
+    new THREE.MeshStandardMaterial({ color: 0x5f4d3b, roughness: 1, transparent: true, opacity: 0 }));
+  damMesh.position.set(p.x, p.y + 10, p.z);
+  damMesh.rotation.y = yaw;
+  scene.add(damMesh);
+
+  // 受灾范围圈
+  const R = 470, SEG = 64, pts = [];
+  for (let k2 = 0; k2 <= SEG; k2++) {
+    const a = k2 / SEG * Math.PI * 2;
+    const x = P.x(PORT[0]) + Math.cos(a) * R, z = P.z(PORT[1]) + Math.sin(a) * R;
+    const lon = meta.bbox[0] + (x + meta.sizeMeters.x / 2) / meta.sizeMeters.x * (meta.bbox[2] - meta.bbox[0]);
+    const lat = meta.bbox[3] - (z + meta.sizeMeters.z / 2) / meta.sizeMeters.z * (meta.bbox[3] - meta.bbox[1]);
+    pts.push(new THREE.Vector3(x, terrainHeightAt(lon, lat) + 8, z));
+  }
+  damageRing = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color: 0xff5a4a, transparent: true, opacity: 0 }));
+  scene.add(damageRing);
+}
+
+// ---------------------------------------------------------------- 时间轴
+let evtT = 0, playing = true, speed = 40, lastTs = 0, autoCam = true;
+
+function stageOf(t) {
+  if (t < 60) return [0, '冰岩崩启动', '10:52 蓝塘里壤峰北坡冰川在海拔约 5200 m 处断裂，冰岩体高位坠至 4000 m 左右。'];
+  if (t < 254) return [1, '高位下泄', '冰岩碎屑裹挟融水沿普热普藏布沟道下泄，沿途刮铲冰碛物，势能持续转化为动能。'];
+  if (t < T_ARRIVE) return [2, '沟道奔涌', '流团沿东林藏布高速推进，前锋 60~80 m/s（约 220~290 km/h），直指吉隆口岸。'];
+  if (t < 700) return [3, '冲击口岸', '10:59 冲击吉隆口岸，0.7 km²、27 处建筑及附属设施被夷为平地，道路、通信、电力中断。'];
+  return [4, '回水成湖', '口岸处形成拥堵与回水，上方普热普藏布壅水成堰塞湖，持续威胁下游与施救安全。'];
+}
+function profileAt(t) {
+  const pr = model.profile;
+  if (t <= 0) return pr[0];
+  for (let i = 1; i < pr.length; i++) {
+    if (pr[i][4] >= t) {
+      const a = pr[i - 1], b = pr[i], k = (t - a[4]) / Math.max(b[4] - a[4], 1e-6);
+      return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, b[2],
+              a[3] + (b[3] - a[3]) * k, t, a[5] + (b[5] - a[5]) * k];
+    }
+  }
+  return pr[pr.length - 1];
+}
+
+let frontPos = new THREE.Vector3();
+function updateFront(t) {
+  const row = profileAt(Math.min(t, T_ARRIVE));
+  frontPos.copy(chanAt(row[0]));
+  if (frontMarker) {
+    const vis = t < T_ARRIVE + 160;
+    frontMarker.visible = vis;
+    if (vis) {
+      frontMarker.position.set(frontPos.x, frontPos.y + 40, frontPos.z);
+      frontMarker.scale.setScalar(1 + 0.22 * Math.sin(performance.now() / 120));
+    }
+  }
+  if (debrisHaze) {
+    const k = Math.min(Math.max((t - 220) / 120, 0), 1) * (t < T_ARRIVE + 200 ? 1 : 0.4);
+    debrisHaze.material.opacity = k * 0.5;
+    debrisHaze.position.set(frontPos.x, frontPos.y + 90, frontPos.z);
+  }
+  return row;
+}
+
+function updateIce(t) {
+  // 冰块沿沟道下滑（0~30s 崩落，之后停止）
+  for (const m of iceChunks) {
+    const u = m.userData;
+    const local = t - u.delay;
+    if (local < 0.5) { m.visible = false; continue; }
+    m.visible = true;
+    const sPos = u.s0 + Math.max(0, local - 0.5) * u.v * 3.2;
+    if (sPos > 5600) { m.visible = false; continue; }
+    const p = chanAt(sPos);
+    m.position.set(p.x, p.y + 60, p.z);
+    m.rotation.x += u.spin.x * 0.016;
+    m.rotation.y += u.spin.y * 0.016;
+    m.rotation.z += u.spin.z * 0.016;
+  }
+  // 粉尘：崩落后沿沟道扩散，并向上翻涌
+  const k = Math.min(Math.max((t - 4) / 26, 0), 1);
+  const now = performance.now();
+  for (let i = 0; i < iceDust.length; i++) {
+    const d = iceDust[i];
+    const start = d.userData.sOf * 26;
+    const local = Math.min(Math.max((t - 4 - start) / 10, 0), 1);
+    d.material.opacity = local * 0.85 * (t < 100 ? 1 : Math.max(0, 1 - (t - 100) / 100));
+    d.scale.setScalar((300 + i * 18) * (0.55 + local * 1.2));
+    d.position.y += Math.sin(now / 900 + i) * 0.4 + local * 0.6;
+  }
+  // 源区冰川随泥流冲开而变暗
+  if (iceGroup) {
+    const dark = Math.min(Math.max((t - 30) / 300, 0), 1) * 0.35;
+    iceGroup.children.forEach((g, i) => {
+      if (g.material.color) {
+        g.material.color.setRGB(0.87 - dark, 0.93 - dark * 0.6, 0.97 - dark * 0.4);
+      }
+      void i;
+    });
+  }
+  return k;
+}
+
+function updateBuildings(t, dt) {
+  const dtA = t - T_ARRIVE;
+  for (const m of buildings) {
+    const u = m.userData;
+    if (!u.destroyed) {
+      if (dtA > u.delay && dtA > 0) { u.destroyed = 1; u.t = 0; buildingsHit++; }
+      continue;
+    }
+    u.t += dt;
+    const k = Math.min(u.t / 3.0, 1);
+    m.position.y = u.baseY - u.hh * 0.6 * k;
+    m.rotation.z = (Math.random() < 0.5 ? 1 : -1) * 0.55 * k;
+    u.body.material.color.setRGB(0.36 - 0.15 * k, 0.32 - 0.15 * k, 0.30 - 0.15 * k);
+    u.roof.material.color.setRGB(0.45 - 0.25 * k, 0.20 - 0.12 * k, 0.16 - 0.10 * k);
+  }
+}
+
+function updateWater(t, dt) {
+  const dtA = Math.max(0, t - T_ARRIVE);
+  const rise = Math.min(dtA / 300, 1) * 26;
+  const base = waterMesh ? waterMesh.userData.baseY : 1800;
+  const waterY = (base + rise) * EXAG;
+  if (waterMesh) {
+    waterMesh.material.opacity = Math.min(dtA / 110, 1) * 0.62;
+    waterMesh.position.y = waterY;
+    const posA = waterMesh.geometry.attributes.position, baseA = waterMesh.userData.base;
+    const amp = 2.5 + Math.min(dtA / 200, 1) * 3;
+    const ph = performance.now() / 700;
+    for (let i = 0; i < posA.count; i++) {
+      const x = baseA[i * 3], y = baseA[i * 3 + 1];
+      posA.setZ(i, Math.sin(x * 0.006 + ph) * amp + Math.cos(y * 0.007 + ph * 1.2) * amp * 0.8);
+    }
+    posA.needsUpdate = true;
+  }
+  if (damMesh) {
+    damMesh.material.opacity = Math.min(dtA / 80, 1) * 0.9;
+    damMesh.position.y = waterY - 30;
+  }
+  if (damageRing) damageRing.material.opacity = Math.min(Math.max((t - T_ARRIVE) / 80, 0), 1) * 0.9;
+  return waterY;
+}
+
+// ---------------------------------------------------------------- 运镜（跟着洪水走）
+const tmpV = new THREE.Vector3(), tmpT = new THREE.Vector3();
+function computeCam(t) {
+  const st = stageOf(t)[0];
+  const src = chanPts[0];
+  const port = chanAt(22000);
+
+  if (st === 0) {
+    // 高空俯视整条河谷：源头在上方、沟道斜穿、口岸在下缘
+    const mid = chanAt(9000);
+    tmpV.set(mid.x - 5000, mid.y + 19000, mid.z + 11000);
+    tmpT.set(mid.x + 800, mid.y - 300, mid.z);
+  } else if (st === 1) {
+    const mid = chanAt(8000);
+    tmpV.set(mid.x - 6000, mid.y + 7000, mid.z + 9000);
+    tmpT.set(frontPos.x, frontPos.y + 120, frontPos.z);
+  } else if (st === 2) {
+    const back = chanAt(Math.max(0, profileAt(t)[0] - 3200));
+    tmpV.set(back.x + 2400, back.y + 1900, back.z + 3000);
+    tmpT.set(frontPos.x, frontPos.y + 80, frontPos.z);
+  } else if (st === 3) {
+    tmpV.set(port.x - 2600, port.y + 1800, port.z + 3000);
+    tmpT.set(port.x, port.y + 80, port.z);
+  } else {
+    tmpV.set(port.x - 3600, port.y + 3400, port.z + 3800);
+    tmpT.set(port.x, port.y + 40, port.z);
+  }
+  void src;
+}
+
+function director(t, dt) {
+  if (!autoCam) return;
+  computeCam(t);
+  const ease = 1 - Math.pow(0.10, dt);
+  camera.position.lerp(tmpV, ease * 0.5);
+  controls.target.lerp(tmpT, ease * 0.55);
+}
+
+function snapCamera(t) {
+  computeCam(t);
+  camera.position.copy(tmpV);
+  controls.target.copy(tmpT);
+  controls.update();
+}
+
+// ---------------------------------------------------------------- 纵剖面
+const pcv = document.getElementById('pcv'), pctx = pcv.getContext('2d');
+function drawProfile(t) {
+  const W = pcv.clientWidth, H = pcv.clientHeight;
+  if (pcv.width !== Math.round(W * 2)) { pcv.width = Math.round(W * 2); pcv.height = Math.round(H * 2); }
+  pctx.setTransform(2, 0, 0, 2, 0, 0);
+  pctx.clearRect(0, 0, W, H);
+  const pr = model.profile;
+  const padL = 34, padR = 8, padT = 8, padB = 16;
+  const x0 = padL, x1 = W - padR, y0 = padT, y1 = H - padB;
+  const sMax = 22000, hMin = 1600, hMax = 5400;
+  const X = s => x0 + (s / sMax) * (x1 - x0);
+  const Y = h => y1 - (h - hMin) / (hMax - hMin) * (y1 - y0);
+  pctx.strokeStyle = 'rgba(125,211,252,.12)'; pctx.lineWidth = 1;
+  pctx.font = '10px -apple-system,sans-serif'; pctx.fillStyle = '#7f93a9';
+  for (const h of [2000, 3000, 4000, 5000]) {
+    pctx.beginPath(); pctx.moveTo(x0, Y(h)); pctx.lineTo(x1, Y(h)); pctx.stroke();
+    pctx.fillText(String(h), 4, Y(h) + 3);
+  }
+  for (const s of [0, 5000, 10000, 15000, 20000]) {
+    pctx.beginPath(); pctx.moveTo(X(s), y1); pctx.lineTo(X(s), y1 + 3); pctx.stroke();
+    if (s) pctx.fillText((s / 1000) + 'km', X(s) - 9, H - 3);
+  }
+  pctx.beginPath(); pctx.moveTo(X(pr[0][0]), Y(pr[0][1]));
+  for (const p of pr) pctx.lineTo(X(p[0]), Y(p[1]));
+  pctx.lineTo(X(pr[pr.length - 1][0]), y1); pctx.lineTo(X(pr[0][0]), y1); pctx.closePath();
+  pctx.fillStyle = 'rgba(120,150,175,.20)'; pctx.fill();
+  pctx.beginPath(); pctx.moveTo(X(pr[0][0]), Y(pr[0][1]));
+  for (const p of pr) pctx.lineTo(X(p[0]), Y(p[1]));
+  pctx.strokeStyle = '#9fb4c9'; pctx.lineWidth = 1.3; pctx.stroke();
+
+  const row = profileAt(Math.min(t, T_ARRIVE));
+  pctx.beginPath(); pctx.moveTo(X(pr[0][0]), Y(pr[0][1]));
+  for (const p of pr) { if (p[0] > row[0]) break; pctx.lineTo(X(p[0]), Y(p[1])); }
+  pctx.lineTo(X(row[0]), Y(row[1]));
+  pctx.strokeStyle = '#ff9f45'; pctx.lineWidth = 2.6; pctx.stroke();
+
+  const px = X(row[0]), py = Y(row[1]);
+  pctx.beginPath(); pctx.arc(px, py, 4.2, 0, Math.PI * 2); pctx.fillStyle = '#ffb26b'; pctx.fill();
+  pctx.beginPath(); pctx.arc(X(sMax), Y(1789), 3.4, 0, Math.PI * 2); pctx.fillStyle = '#ffd166'; pctx.fill();
+  document.getElementById('prof-fps').textContent =
+    `前锋 ${(row[0] / 1000).toFixed(1)} km · ${Math.round(row[3])} m/s`;
+}
+
+function updateUI(t) {
+  const [idx, name, desc] = stageOf(t);
+  document.getElementById('st-name').textContent = name;
+  document.getElementById('st-idx').textContent = `阶段 ${idx + 1} / 5`;
+  document.getElementById('st-desc').textContent = desc;
+  const row = profileAt(Math.min(t, T_ARRIVE));
+  document.getElementById('v-s').innerHTML = `${Math.min(row[0] / 1000, 22).toFixed(1)}<small>km / 22.0</small>`;
+  document.getElementById('v-vel').innerHTML = `${Math.round(row[3])}<small>m/s · ${Math.round(row[3] * 3.6)} km/h</small>`;
+  document.getElementById('v-q').innerHTML = `${(row[5] / 1e4).toFixed(1)}<small>万 m³/s</small>`;
+  document.getElementById('v-h').innerHTML = `${Math.round(row[1])}<small>m</small>`;
+  document.getElementById('v-dep').innerHTML = `${(Math.min(Math.max(0, t - T_ARRIVE) / 300, 1) * 26).toFixed(1)}<small>m</small>`;
+  document.getElementById('v-hit').innerHTML = `${buildingsHit}<small>处</small>`;
+  const total = 10 * 3600 + 52 * 60 + Math.floor(t);
+  const hh = Math.floor(total / 3600) % 24, mm = Math.floor(total / 60) % 60, ss = total % 60;
+  document.getElementById('clock').textContent =
+    `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
+  document.getElementById('bar').style.width = (t / T_TOTAL * 100).toFixed(2) + '%';
+  drawProfile(t);
+}
+
+// ---------------------------------------------------------------- 循环
+function animate(ts) {
+  requestAnimationFrame(animate);
+  const dt = lastTs ? Math.min((ts - lastTs) / 1000, 0.1) : 0.016;
+  lastTs = ts;
+  if (playing) {
+    evtT += dt * speed;
+    if (evtT >= T_TOTAL) { evtT = T_TOTAL; playing = false; setPlayIcon(); }
+  }
+  updateFront(evtT);
+  updateIce(evtT);
+  updateBuildings(evtT, dt);
+  updateWater(evtT, dt);
+  if (flowUniforms) flowUniforms.uTime.value = evtT;
+  director(evtT, dt);
+  updateUI(evtT);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+function setPlayIcon() {
+  document.getElementById('btn-play').innerHTML =
+    playing ? '<i class="fa fa-pause"></i>' : '<i class="fa fa-play"></i>';
+}
+
+// ---------------------------------------------------------------- 启动
+async function main() {
+  meta = await getJSON(CORR, 'meta.json');
+  P = makeProjector();
+  const [hBuf, ch, md, fd] = await Promise.all([
+    getBuf(CORR + meta.heights), getJSON(GY, 'channel.json'),
+    getJSON(GY, 'model.json'), getJSON(CORR, 'field.json'),
+  ]);
+  heights = new Int16Array(hBuf);
+  channel = ch; model = md; field = fd;
+  const n = meta.meshSize + 1;
+  if (heights.length !== n * n) throw new Error('高度场长度不符');
+  texSat = await loadTexture(CORR + meta.textures.satellite);
+  texFlow = makeFlowTexture();
+  TEX_SOFT = makeSoftTexture();
+
+  initScene();
+  buildTerrain();
+  buildSkirt();
+  await buildFlowField();
+  buildChannelLine();
+  buildIceCollapse();
+  buildPortStuff();
+
+  const src = chanPts[0];
+  camera.position.set(src.x - 2600, src.y + 2100, src.z + 3200);
+  controls.target.set(src.x, src.y + 120, src.z);
+  controls.update();
+
+  overlay.classList.remove('active');
+  const qs = new URLSearchParams(location.search);
+  if (qs.has('t')) { const v = parseFloat(qs.get('t')); if (isFinite(v)) evtT = Math.min(Math.max(v, 0), T_TOTAL); }
+  if (qs.get('play') === '0') playing = false;
+  if (qs.get('cam') === '0') { autoCam = false; document.getElementById('autocam').checked = false; }
+  updateFront(evtT);
+  snapCamera(evtT);
+  setPlayIcon();
+  requestAnimationFrame(animate);
+}
+
+document.getElementById('btn-play').addEventListener('click', () => {
+  if (evtT >= T_TOTAL) {
+    evtT = 0; buildingsHit = 0;
+    for (const m of buildings) {
+      m.userData.destroyed = 0; m.userData.t = 0;
+      m.position.y = m.userData.baseY; m.rotation.z = 0;
+    }
+  }
+  playing = !playing; setPlayIcon();
+});
+document.getElementById('speed').addEventListener('change', e => { speed = parseFloat(e.target.value); });
+document.getElementById('prog').addEventListener('click', e => {
+  const r = e.currentTarget.getBoundingClientRect();
+  evtT = Math.min(Math.max((e.clientX - r.left) / r.width, 0), 1) * T_TOTAL;
+  updateUI(evtT);
+});
+document.getElementById('autocam').addEventListener('change', e => { autoCam = e.target.checked; });
+document.getElementById('stage').addEventListener('pointerdown', () => {
+  if (autoCam) { autoCam = false; document.getElementById('autocam').checked = false; }
+});
+addEventListener('resize', () => {
+  if (!renderer) return;
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+main().catch(err => { console.error(err); fail('三维场景加载失败', err && err.message ? err.message : String(err)); });
+</script>
+</body>
+</html>

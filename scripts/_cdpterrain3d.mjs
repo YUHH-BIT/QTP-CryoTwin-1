@@ -89,6 +89,23 @@ try {
         embeddedBody: d && d.body ? d.body.classList.contains('embedded') : null,
         demoReady: w ? w.__ready === true : null,
         demoTitle: d ? d.title : null,
+        brandDisplay: (function(){
+          if (!d || !w) return null;
+          var b = d.querySelector('.brand');
+          return b ? w.getComputedStyle(b).display : 'NO-ELEMENT';
+        })(),
+        brandText: (function(){
+          if (!d) return null;
+          var h = d.querySelector('.brand-text h1');
+          return h ? h.textContent.trim() : null;
+        })(),
+        brandRect: (function(){
+          if (!d) return null;
+          var b = d.querySelector('.brand');
+          if (!b) return null;
+          var q = b.getBoundingClientRect();
+          return [q.x, q.y, q.width, q.height].map(function(v){return Math.round(v);});
+        })(),
         demoErr: w && w.__err ? String(w.__err) : null,
         demoCanvas: d ? !!d.getElementById('scene') : null,
         demoDbg: w && w.__dbg ? w.__dbg() : null,

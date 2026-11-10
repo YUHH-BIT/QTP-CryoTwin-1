@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Cesium 环境验证</title>
+<link rel="stylesheet" href="/cesium_lib/Widgets/widgets.css">
+<style>
+  html, body, #cesiumContainer { margin:0; padding:0; height:100%; width:100%; overflow:hidden; background:#000; }
+  #hint { position:fixed; left:12px; top:12px; color:#e8f0f8; font:12px/1.7 monospace;
+    background:rgba(0,0,0,.72); padding:8px 10px; border-radius:6px; z-index:99; }
+</style>
+</head>
+<body>
+<div id="cesiumContainer"></div>
+<div id="hint">init...</div>
+<script>window.CESIUM_BASE_URL = '/cesium_lib/';</script>
+<script src="/cesium_lib/Cesium.js"></script>
+<script>
+const hint = document.getElementById('hint');
+const log = s => { hint.innerHTML += '<br>' + s; };
+try {
+  Cesium.Ion.defaultAccessToken = undefined;
+  log('Cesium ' + (Cesium.VERSION || '?'));
+
+  // 本地单张影像：走廊范围（22×12 km），完全离线
+  const imgProvider = new Cesium.SingleTileImageryProvider({
+    url: '/terrain3d/gyirong_corridor/texture.jpg',
+    rectangle: Cesium.Rectangle.fromDegrees(85.340, 28.200, 85.560, 28.310),
+    tileWidth: 4096, tileHeight: 2048
+  });
+
+  const viewer = new Cesium.Viewer('cesiumContainer', {
+    baseLayer: new Cesium.ImageryLayer(imgProvider),
+    terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+    baseLayerPicker: false, geocoder: false, homeButton: false, sceneModePicker: false,
+    navigationHelpButton: false, animation: false, timeline: false, fullscreenButton: false,
+    infoBox: false, selectionIndicator: false, requestRenderMode: false
+  });
+  viewer.scene.globe.enableLighting = false;
+  viewer.scene.skyAtmosphere.show = false;
+  viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString('#1b2c3a');
+  viewer.camera.setView({
+    destination: Cesium.Cartesian3.fromDegrees(85.45, 28.255, 22000),
+    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-65), roll: 0 }
+  });
+  log('webgl2=' + viewer.scene.context.webgl2);
+  viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(85.3777, 28.27954, 1800),
+    point: { pixelSize: 16, color: Cesium.Color.ORANGE }
+  });
+  viewer.entities.add({
+    position: Cesium.Cartesian3.fromDegrees(85.4987, 28.2454, 5197),
+    point: { pixelSize: 16, color: Cesium.Color.CYAN }
+  });
+  let n = 0;
+  viewer.scene.postRender.addEventListener(() => {
+    n++;
+    if (n === 40) {
+      log('frames=' + n + ' tilesLoaded=' + viewer.scene.globe.tilesLoaded);
+      window.__cesiumReady = true;
+    }
+  });
+} catch (e) {
+  log('ERROR ' + (e && e.message ? e.message : e));
+  window.__cesiumError = String(e);
+}
+</script>
+</body>
+</html>

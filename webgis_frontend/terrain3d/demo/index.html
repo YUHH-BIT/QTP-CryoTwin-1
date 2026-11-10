@@ -9,13 +9,18 @@
 
 <style id="embedded-mode">
 /* 系统内嵌模式：上方已有 120px 系统导航，这里把演示页自身 56px 顶栏压成
-   一条 40px 的功能条，隐藏重复的品牌标题；引擎切换与「数据与说明」保留。 */
+   一条 40px 的功能条。品牌区（方块图标 + 主标题 + 副标题 + 演示级徽章）
+   必须保留：它是本演示的名称与数据口径标识，与系统导航的站点名不是同一层级。
+   只做等比压缩，不隐藏任何文字；引擎切换与「数据与说明」照旧在右侧。 */
 body.embedded #app { grid-template-rows: 40px minmax(0, 1fr); }
-body.embedded .topbar { padding: 0 12px; }
-body.embedded .brand { display: none; }
-body.embedded .topbar-right { width: 100%; justify-content: flex-end; }
-body.embedded .brand-text h1 { font-size: 13px; }
-body.embedded .badge { display: none; }
+body.embedded .topbar { padding: 0 12px; gap: 10px; }
+body.embedded .brand { gap: 8px; }
+body.embedded .brand-mark { width: 23px; height: 23px; border-radius: 7px; }
+body.embedded .brand-mark::before { top: 8px; }
+body.embedded .brand-mark::after  { top: 14px; }
+body.embedded .brand-text h1 { font-size: 13px; gap: 6px; letter-spacing: 0; }
+body.embedded .brand-text p  { margin-top: 1px; font-size: 10px; }
+body.embedded .badge { font-size: 9px; padding: 1px 5px; }
 </style>
 <script>
 if (new URLSearchParams(location.search).get('embedded') === '1') {

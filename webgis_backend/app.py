@@ -137,6 +137,33 @@ def create_app(config_name=None):
         return send_from_directory(
             os.path.join(app.config['FRONTEND_DIR'], 'terrain3d'), filename)
 
+    # 吉隆口岸「8·26」冰岩崩-泥石流灾害链三维推演（独立页，数据在 terrain3d/gyirong/）
+    @app.route('/gyirong.html')
+    def gyirong_page():
+        return render_template('gyirong.html')
+
+    # Cesium 环境验证页
+    @app.route('/cesium_test.html')
+    def cesium_test_page():
+        return render_template('cesium_test.html')
+
+    # 吉隆灾害链 Cesium 版三维推演
+    @app.route('/gyirong_cesium.html')
+    def gyirong_cesium_page():
+        return render_template('gyirong_cesium.html')
+
+    # 离线影像瓦片金字塔（z11-z14）
+    @app.route('/tiles/<path:filename>')
+    def serve_tiles(filename):
+        return send_from_directory(
+            os.path.join(app.config['FRONTEND_DIR'], 'tiles'), filename)
+
+    # 程序化生成的建筑模型（glTF/.glb，口岸示范用）
+    @app.route('/models/<path:filename>')
+    def serve_models(filename):
+        return send_from_directory(
+            os.path.join(app.config['FRONTEND_DIR'], 'models'), filename)
+
     @app.route('/login.html')
     def login_page():
         return render_template('login.html')
@@ -200,6 +227,12 @@ def create_app(config_name=None):
     def serve_cesium(filename):
         return send_from_directory(
             os.path.join(app.config['FRONTEND_DIR'], 'cesium'), filename)
+
+    # Cesium 官方发行包（Build/Cesium 原样抽出，用于灾害链三维场景）
+    @app.route('/cesium_lib/<path:filename>')
+    def serve_cesium_lib(filename):
+        return send_from_directory(
+            os.path.join(app.config['FRONTEND_DIR'], 'cesium_lib'), filename)
 
 
     # GeoJSON 数据文件（前端地图图层使用；仅允许 .geojson，避免暴露其他原始文件）
