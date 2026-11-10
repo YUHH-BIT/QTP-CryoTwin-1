@@ -22,6 +22,36 @@ from modules.admin import admin_bp
 from modules.scene3d import scene3d_bp, tiles3d_bp
 from modules import admin_db
 
+# ---------------------------------------------------------------- MIME 兜底
+# 背景（2026-11-11 远程部署实测）：浏览器对 <script type="module"> 做严格
+# MIME 校验，只要 Content-Type 不是 JavaScript 系就整份脚本拒绝执行——
+# gyirong_twin_demo / terrain3d 系列页面会直接白屏，控制台报
+#   "Expected a JavaScript-or-Wasm module script but the server responded
+#    with a MIME type of text/plain"
+# 根因不在文件内容，而在宿主机：精简 Linux / Docker 镜像常缺 /etc/mime.types，
+# Python 的 mimetypes 猜不出 .js/.mjs，Flask 便退化成 text/plain。
+# 这里在创建 app 之前强制注册，把结果固定下来，不依赖系统 MIME 表。
+import mimetypes as _mimetypes
+
+_FORCE_MIME_TYPES = {
+    '.js': 'text/javascript', '.mjs': 'text/javascript',
+    '.css': 'text/css', '.json': 'application/json',
+    '.wasm': 'application/wasm', '.map': 'application/json',
+    '.svg': 'image/svg+xml',
+    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png',
+    '.webp': 'image/webp', '.gif': 'image/gif', '.ico': 'image/x-icon',
+    '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json',
+    '.bin': 'application/octet-stream', '.terrain': 'application/octet-stream',
+    '.pbf': 'application/x-protobuf', '.geojson': 'application/geo+json',
+    '.topojson': 'application/json',
+    '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf',
+    '.mp4': 'video/mp4', '.webm': 'video/webm',
+}
+for _ext, _mime in _FORCE_MIME_TYPES.items():
+    # strict=True：写入 strict 映射表，覆盖系统里已有的错误映射
+    _mimetypes.add_type(_mime, _ext, strict=True)
+del _ext, _mime
+
 # 统一日志配置：模块内仅用 logging.getLogger(__name__)，不重复调用 basicConfig
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s [%(name)s] %(message)s')
 
