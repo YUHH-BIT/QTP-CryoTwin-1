@@ -4,7 +4,7 @@ import { OrbitControls } from './lib/OrbitControls.js';
 import { PALETTE, material, makeSculpt, assertAnchors, applyDamage,
          diagnose, attachFacade, attachBank, buildDistanceField } from './proc.js';
 // 洪水演进实景层：④ GPU 高度场 + 亚网格连续曲面 + 碎冰 / 飞溅粒子（④②⑤①⑥）
-import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261110c';
+import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261110d';
 
 /* ==========================================================================
    吉隆「8·26」冰岩崩—泥石流灾害链 · 实景三维数字孪生推演（演示级）
@@ -323,6 +323,8 @@ let glacierGroup, lakeMesh, impactRing, impactFill, frontMarker, nodeGroup;
 let bankField = null;
 let flood = null, fieldBuffers = null;   // 洪水演进实景层 + 供其复用的原始场缓冲
 let cineCam = false, cineSnap = false, cineVecA = null, cineVecB = null;
+// 战术俯视：独立于「洪水航拍」的第二种跟拍机位（升到谷上方看沟谷全貌）
+let tacticalCam = false;
 
 // 着色器 uniform 全部提到外层：材质 needsUpdate 重新编译后引用仍然有效。
 // 灾害带两层（本体 + 衬底）共用同一批对象，refresh 一次即可同步。
@@ -1071,7 +1073,7 @@ function groundAt(x, z) {
    用户自由视角只做最小防穿地约束，所以手动拉近看建筑不会被强行抬高。 */
 function enforceCameraClearance() {
   const p = camera.position, t = controls.target;
-  const auto = cineCam || !!flight || autoFly || state.rotating || rigStatic;
+  const auto = cineCam || tacticalCam || !!flight || autoFly || state.rotating || rigStatic;
   let need = groundAt(p.x, p.z) + CAM_GROUND_CLEAR;
   if (auto) {
     need = groundAt(p.x, p.z) + CAM_AUTO_CLEAR;
@@ -1096,6 +1098,7 @@ function onUserTakeover() {
     $('btn-rotate').classList.remove('active'); changed = true;
   }
   if (cineCam) { enableCine(false); changed = true; }
+  if (tacticalCam) { enableTactical(false); changed = true; }
   if (state.autoCam) {
     state.autoCam = false;
     $('btn-autocam').classList.remove('active');
@@ -1176,6 +1179,7 @@ function updateFlight(now) {
 function resetView() {
   if (state.engine === 'cesium') { resetCesiumView(); return; }
   if (cineCam) enableCine(false);
+  if (tacticalCam) enableTactical(false);
   autoFly = false;
   state.rotating = false;
   controls.autoRotate = false;
@@ -1195,7 +1199,7 @@ let followSnap = false;
 // ?rig= 定点构图验收：图层按沉浸模式收起，但不触发自动跟拍抢相机。
 // 这样截图里看到的是跟拍模式的真实画面，不会混进全景的橙色态势带与节点标签。
 let rigStatic = false, rigPending = null, rigPlaceInfo = null;
-const immersiveCam = () => cineCam || autoFly || rigStatic;
+const immersiveCam = () => cineCam || autoFly || tacticalCam || rigStatic;
 
 /* 沿沟道弧长把机位放到「可见水头」后方 back 米、横向偏 lat、离水面 H、
    瞄准点再向下游前移 ahead 米。这是 follow / cine 两种跟拍共用的几何核心。
@@ -1254,6 +1258,13 @@ const RIG = {
             sRate: 2.4, posRate: 2.6, tgtRate: 2.8, intro: 1.5, ahead: 200 },
   cine:   { back: 430, lat: -150, pitch: 26, fill: 0.55, backMin: 430, backMax: 1500,
             sRate: 2.8, posRate: 3.0, tgtRate: 3.2, intro: 1.1, ahead: 140 },
+  // 战术俯视：用绝对高度 alt（相对瞄准点水面）而不是俯角反解 ——
+  // 俯角反解在 back 变大时会把相机抬到 2 km 以上，反而不是「谷上方」。
+  // 仍沿沟道弧长布机位，离地由 CAM_AUTO_CLEAR 兜底；与 follow/cine 共用同一套
+  // 阻尼、可见水头口径与用户接管路径，只是景别更远、俯角更大。
+  tactical: { back: 1000, lat: -320, alt: 1050, pitch: 0, fill: 0.25,
+              backMin: 800, backMax: 2000,
+              sRate: 2.0, posRate: 2.2, tgtRate: 2.4, intro: 1.6, ahead: 600 },
 };
 const rig = { mode: null, s: 0, back: 600, fill: 0, snap: true, introT: 1,
               cam0: new THREE.Vector3(), tgt0: new THREE.Vector3(),
@@ -1280,26 +1291,35 @@ function rigHead(f, L) {
   }
   return s0;
 }
-// 湿点在画面里的纵向占比（0~1）。只算真正会渲染的水面（h>1），
-// 干沟道／山坡混进来会算出 70% 的假象，截图却是八成山坡。
+/* 湿带在画面里的纵向占比（0~1），供 back 反馈用。
+   2026-11-10 逐点诊断（__rigFillDiag）确认：湿区是沿沟道的**楔形** ——
+   可见水头处收成尖端，越往上游越宽；且到达时间场含横向漫流延迟，
+   横向 ±40 m 就 T>tField（还没漫到）。所以固定横向偏移采样必然全落干区：
+     ±90 m: wet 0/24（全干）、±40 m: wet 3/24，24/24 都在画面内 —— 不是出画。
+   改为沿**中心线**先找出湿区上游端点，再投影两端量纵向跨度：
+   一定落在湿区，且正好对应「水带占画高」这个反馈量。 */
 function rigFill(cam, f, s0, L) {
   const cs = v => Math.max(0, Math.min(L, v));
+  const pk = Math.max(f.peak || 1, 1e-3);
+  const wetAt = s => {
+    const c = f.chanAt(cs(s));
+    const w = f.waterY(c.x, c.z, f.tField);
+    return { c, w, wet: w.h / pk > 0.005 };
+  };
+  let sWet = s0;
+  for (let d = 0; d <= 900; d += 30) {
+    const s = cs(s0 - d);
+    if (wetAt(s).wet) sWet = s;
+  }
   cam.updateMatrixWorld(true);
   cam.matrixWorldInverse.copy(cam.matrixWorld).invert();
   let y0 = 9, y1 = -9, n = 0;
-  const pk = Math.max(f.peak || 1, 1e-3);
-  // 横向采样覆盖视觉展宽后的湿区。±140 m 在 32° 高俯角下已出画导致 fill=0；
-  // ±40 m 是展宽前的口径又会低估。折中 ±90 m（展宽约 1.6×，原湿区半宽约 55 m）。
-  for (let i = 0; i <= 11; i++) {
-    const s = cs(s0 - i * 40), c = f.chanAt(s), t = rigTangent(s, f, L);
-    for (const lat of [-90, 90]) {
-      const x = c.x - t.z * lat, z = c.z + t.x * lat;
-      const w = f.waterY(x, z, f.tField);
-      if (w.h / pk <= 0.005) continue;
-      rigTmp.set(x, w.y, z).project(cam);
-      if (rigTmp.z > 1 || Math.abs(rigTmp.x) > 1 || Math.abs(rigTmp.y) > 1) continue;
-      n++; y0 = Math.min(y0, rigTmp.y); y1 = Math.max(y1, rigTmp.y);
-    }
+  for (const s of [sWet, (sWet + s0) / 2, s0]) {
+    const { c, w, wet } = wetAt(s);
+    if (!wet) continue;
+    rigTmp.set(c.x, w.y, c.z).project(cam);
+    if (rigTmp.z > 1 || Math.abs(rigTmp.x) > 1 || Math.abs(rigTmp.y) > 1) continue;
+    n++; y0 = Math.min(y0, rigTmp.y); y1 = Math.max(y1, rigTmp.y);
   }
   return n >= 2 ? Math.max(0, Math.min(y1, 1) - Math.max(y0, -1)) / 2 : 0;
 }
@@ -1322,9 +1342,14 @@ function updateRig(dt, mode) {
   const px = c.x - t.z * cfg.lat, pz = c.z + t.x * cfg.lat;
   const aS = cs(rig.s + cfg.ahead), ac = f.chanAt(aS), aw = f.waterY(ac.x, ac.z, f.tField);
   const horiz = Math.hypot(px - ac.x, pz - ac.z);
-  // 俯角反解高度：固定「抬高 620 m」在源区会变成仰视、口岸又俯得太狠。
-  let py = aw.y + 20 + horiz * Math.tan(cfg.pitch * Math.PI / 180);
+  // 高度：跟随/航拍用目标俯角反解（固定「抬高 620 m」在源区会变成仰视、
+  // 口岸又俯得太狠）；战术俯视用绝对高度 alt，看整条沟谷的空间关系。
+  // 两者都由离地钳制兜底，绝不把相机塞进山体。
+  let py = cfg.alt
+    ? aw.y + cfg.alt
+    : aw.y + 20 + horiz * Math.tan(cfg.pitch * Math.PI / 180);
   py = Math.max(py, groundAt(px, pz) + CAM_AUTO_CLEAR);
+  const pitchNow = Math.atan2(py - (aw.y + 20), Math.max(horiz, 1)) * 180 / Math.PI;
   rig.pos.set(px, py, pz); rig.aim.set(ac.x, aw.y + 20, ac.z);
   const k = snap ? 1 : 1 - Math.exp(-dt * cfg.posRate);
   const kt = snap ? 1 : 1 - Math.exp(-dt * cfg.tgtRate);
@@ -1342,7 +1367,7 @@ function updateRig(dt, mode) {
   camera.lookAt(controls.target);
   // 过渡帧里相机还在半路，测出来的占画高是假值，会误导 back 反馈；等落位再测。
   rig.fill = rig.introT >= 1 ? rigFill(camera, f, rig.s, L) : 0;
-  rig.dbg = { mode, back: Math.round(rig.back), pitch: cfg.pitch, s: Math.round(rig.s),
+  rig.dbg = { mode, back: Math.round(rig.back), pitch: +pitchNow.toFixed(1), s: Math.round(rig.s),
               fill: +rig.fill.toFixed(2), intro: +rig.introT.toFixed(2),
               clear: +(camera.position.y - groundAt(camera.position.x, camera.position.z)).toFixed(1) };
 }
@@ -1357,6 +1382,7 @@ function updateCineCamera(dt) {
 function enableCine(on) {
   cineCam = on;
   cineSnap = on;
+  if (on && tacticalCam) enableTactical(false);   // 两种跟拍互斥，避免抢相机
   $('btn-flood').classList.toggle('active', on);
   if (on) {
     if (state.engine !== 'three') setEngine('three');
@@ -1378,6 +1404,34 @@ function enableCine(on) {
     pushLog('退出洪水航拍，回到自由视角。', 'info', state.t);
   }
 }
+/* 战术俯视：升到谷上方约 1050 m 俯视整条沟谷，仍沿沟道弧长跟水头。
+   与洪水航拍互斥，但共用同一套可见水头 / 阻尼 / 离地钳制；
+   用户一拖画布就由 onUserTakeover 立即退出，不留无退出路径的自动运镜。 */
+function enableTactical(on) {
+  tacticalCam = on;
+  const btn = $('btn-tactical');
+  if (btn) btn.classList.toggle('active', on);
+  if (on) {
+    if (state.engine !== 'three') setEngine('three');
+    if (cineCam) enableCine(false);
+    state.layers.flood = true;
+    state.layers.debris = true;
+    state.layers.spray = true;
+    $('layer-list').querySelectorAll('input').forEach(el => {
+      el.checked = !!state.layers[el.dataset.layer];
+    });
+    autoFly = false;
+    state.rotating = false;
+    controls.autoRotate = false;
+    $('btn-rotate').classList.remove('active');
+    flight = null;
+    rig.snap = true;
+    applyLayers();
+  } else {
+    applyLayers();
+  }
+}
+window.__setTactical = enableTactical;
 const markFloodJump = () => { if (flood) flood.markJump(); };
 
 /* ------------------------------ UI ------------------------------ */
@@ -1659,6 +1713,7 @@ function bindEvents() {
     pushLog(`聚焦口岸聚落：${bldFocus ? bldFocus.count : 0} 栋 OSM 实测轮廓 · 程序化立面与勾边`, 'info', state.t);
   });
   $('btn-flood').addEventListener('click', () => enableCine(!cineCam));
+  $('btn-tactical').addEventListener('click', () => enableTactical(!tacticalCam));
   $('btn-rotate').addEventListener('click', () => {
     state.rotating = !state.rotating;
     controls.autoRotate = state.rotating;
@@ -1867,8 +1922,9 @@ function loop(now) {
   // 三维地球视图：暂停本地 WebGL 渲染与标签投影，避免两个上下文抢 GPU
   if (state.engine === 'cesium') return;
 
-  // 航拍跟拍优先；播放时改为逐帧连续跟随灾害体（不再按阶段跳飞）
-  if (cineCam) updateCineCamera(dt);
+  // 三种跟拍互斥：战术俯视 > 洪水航拍 > 播放连续跟随（不再按阶段跳飞）
+  if (tacticalCam) updateRig(dt, 'tactical');
+  else if (cineCam) updateCineCamera(dt);
   else if (autoFly && !flight) updateDisasterFollow(dt);
   // 洪水实景层：GPU 子步长推进（ping-pong 计算 pass）必须在主场景渲染之前；
   // 视距只改水面视觉放大系数，不改 KPI 数值
@@ -2025,6 +2081,8 @@ async function boot() {
   // ?engine=cesium 直接用三维地球视图打开（截图验收 / 分享指定帧）
   if (qs.get('engine') === 'cesium') setEngine('cesium');
   if (qs.get('cine') === '1' && qs.get('engine') !== 'cesium') enableCine(true);
+  if ((qs.get('view') === 'tactical' || qs.get('tactical') === '1') &&
+      qs.get('engine') !== 'cesium') enableTactical(true);
   // ?follow=1 静态进入全链条跟拍（不自动播放时间），供多时刻构图验收
   if (qs.get('follow') === '1' && qs.get('engine') !== 'cesium') {
     state.playing = false; autoFly = true; followSnap = true;
@@ -2036,6 +2094,30 @@ async function boot() {
   }
   window.__rigPlace = placeRigAt;
   window.__rigPlaceInfo = () => rigPlaceInfo;
+  // 构图诊断：逐点输出 rigFill 的采样结果（相对水深 + 投影 NDC），
+  // 用来定位「fill 恒为 0」到底是湿点判定没过、还是投影落到画面外。
+  window.__rigFillDiag = (halfW = 90) => {
+    const f = flood; if (!f || !f.chanAt) return null;
+    const L = f.channel.lengthM, cs = v => Math.max(0, Math.min(L, v));
+    const pk = Math.max(f.peak || 1, 1e-3);
+    const pv = new THREE.Vector3();
+    camera.updateMatrixWorld(true);
+    camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+    const pts = [];
+    for (let i = 0; i <= 11; i++) {
+      const s = cs(rig.s - i * 40), c = f.chanAt(s), t = rigTangent(s, f, L);
+      for (const lat of [-halfW, halfW]) {
+        const x = c.x - t.z * lat, z = c.z + t.x * lat;
+        const w = f.waterY(x, z, f.tField);
+        pv.set(x, w.y, z).project(camera);
+        pts.push({ i, lat, hp: +(w.h / pk).toFixed(3),
+                   ndc: [+pv.x.toFixed(2), +pv.y.toFixed(2), +pv.z.toFixed(2)],
+                   inView: !(pv.z > 1 || Math.abs(pv.x) > 1 || Math.abs(pv.y) > 1) });
+      }
+    }
+    return { s: Math.round(rig.s), halfW, peak: +pk.toFixed(1), fill: rig.fill,
+             back: Math.round(rig.back), pts };
+  };
   window.__flood = flood;   // 诊断出口：供无头浏览器做分层性能与水文复算
   // 镜头诊断：验证「用户拖动后不再被抢回」与「相机离地余量恒为正」
   window.__cam = () => {
@@ -2053,7 +2135,7 @@ async function boot() {
     return {
       pos: camera.position.toArray().map(v => +v.toFixed(1)),
       target: controls.target.toArray().map(v => +v.toFixed(1)),
-      cineCam, autoFly, rotating: state.rotating, autoCam: !!state.autoCam,
+      cineCam, autoFly, tacticalCam, rotating: state.rotating, autoCam: !!state.autoCam,
       flight: !!flight,
       t: +state.t.toFixed(1),
       dist: +camera.position.distanceTo(controls.target).toFixed(1),

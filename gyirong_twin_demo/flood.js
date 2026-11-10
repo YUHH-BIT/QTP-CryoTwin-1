@@ -311,10 +311,14 @@ void main() {
   // 贴图细节为主、程序化波纹只留 25% 作大尺度基底（35% 在近景仍会织出条带）；
   // 贴图缺失时自动全量回退
   vec2 slope = slopeProc * mix(1.0, 0.25, uHasNormals) + slopeTex * uHasNormals;
-  // 近景泥浆（uMuddy→1）：高频法线坡度衰减到 22%。法线贴图内部的高频波纹
-  // 在 600 m 视距被放大成密集平行条纹，衰减后只剩 GPU 波面的大尺度起伏。
+  // 近景泥浆（uMuddy→1）：高频法线坡度衰减到 22%，泥浆以漫反射为主。
+  // 2026-11-10：曾一度压到完全归零去"修斜纹"，但洋红像素量化证实
+  // 斜纹属于山坡卫星影像（水面只占画布右下角约 3.8%），不是水面缺陷，
+  // 故恢复为温和衰减，保留一点大尺度明暗起伏。
   slope *= 1.0 - 0.78 * uMuddy;
   vec3 N = normalize(vec3(-slope.x*1.5, 1.0, -slope.y*1.5));
+  // gN 是逐三角形常数，哪怕只借 10% 也会在俯视全景里显出细密的三角形人字纹；
+  // 压到 3%，只保留极轻微的地形起伏感。
   // gN 是逐三角形常数，哪怕只借 10% 也会在俯视全景里显出细密的三角形人字纹；
   // 压到 3%，只保留极轻微的地形起伏感。
   N = normalize(mix(N, gN, 0.03));
@@ -342,12 +346,21 @@ void main() {
   vec3 shallow = vec3(0.46, 0.355, 0.235);   // 浑浊泥黄（浅水）
   vec3 deep    = vec3(0.185, 0.135, 0.095);  // 深泥褐（主槽）
   vec3 body = mix(shallow, deep, clamp(depthM/18.0, 0.0, 1.0));
-  // 卫星底图只透出少量并压暖；浅水也至少留 72% 水色，否则只是「变暗的碎石底图」
-  body = mix(ground * vec3(0.46, 0.42, 0.34), body, 0.72 + 0.28*ext);
-  // 悬浮泥沙（口径 C）：泥流的颜色来自高浓度颗粒散射，不是清水表面吸收。
-  // 低频 fbm 斑驳代替高频波光，Unity HDRP「Dirty river」/Vortex Suspension 同源做法。
+  // 卫星底图只透少量并压暖。泥浆模式进一步压到近乎不透明
+  // （Unity HDRP「Dirty river」：降低 Absorption Distance）。
+  // 注意：画面右侧那片斜纹是**山坡的卫星影像**，不是透过水面来的
+  // （洋红像素量化：水面只占画布右下角约 3.8%），改这里不会也不必消掉它。
+  float waterMix = mix(0.72 + 0.28*ext, 0.94 + 0.06*ext, uMuddy);
+  body = mix(ground * vec3(0.46, 0.42, 0.34), body, waterMix);
+  // 悬浮泥沙（口径 C）：泥流颜色来自高浓度颗粒散射，不是清水表面吸收。
+  // Unity HDRP「Dirty river」/ Vortex Suspension 同源做法。
+  // 两层**各向同性** fbm 以不同速度沿流向滚动，靠时间产生流动感。
+  // 曾用「沿流向低频 × 横向高频」的 fbm 做拉长流纹，那本质是一组平行条带，
+  // 会把条纹换个方向请回来；各向同性才不会织出方向性纹理。
   float sediment = fbm(vWorld.xz * 0.035 + f * uClock * 0.40);
-  body *= 1.0 - uMuddy * (0.22 - 0.40 * sediment);
+  float mudFlow = 0.60 * fbm(vWorld.xz * 0.012 + f * uClock * 0.85)
+                + 0.40 * fbm(vWorld.xz * 0.026 - f * uClock * 0.55 + 11.7);
+  body *= 1.0 - uMuddy * (0.20 - 0.30 * sediment - 0.18 * mudFlow);
   vec3 col = body * diff + uSky * fres * mix(0.10, 0.02, uMuddy)
              + vec3(1.0, 0.94, 0.80) * spec * 0.55;
 
@@ -371,6 +384,9 @@ void main() {
   col += vec3(0.85) * smoothstep(0.78, 0.97, fn) * foamK * 0.20;
 
   float alpha = clamp(uAlpha * (0.76 + 0.24*ext) * smoothstep(0.0, 1.0, vH), 0.0, 1.0);
+  // 近景泥浆不透明（Unity HDRP「Dirty river」降低 Absorption Distance）：
+  // 高浓度悬浮液不该透出河床。与斜纹无关 —— 斜纹属于水面之外的山坡影像。
+  alpha = mix(alpha, 1.0, uMuddy);
   gl_FragColor = vec4(col, alpha);
 }
 `;

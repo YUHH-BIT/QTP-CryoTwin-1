@@ -113,6 +113,7 @@ button { font-family: inherit; cursor: pointer; }
 .btn.primary:hover { background: #2563eb; border-color: #2563eb; }
 .btn.ghost { background: rgba(255, 255, 255, .04); }
 .btn.full { width: 100%; margin-top: 8px; }
+.btn.ghost.active { background: var(--blue); color: #fff; border-color: var(--blue); }
 
 .engine-switch {
   display: inline-flex; flex: 0 0 auto; border: 1px solid var(--line-2);
