@@ -11,7 +11,7 @@ const prefix = process.argv[3] || path.join(os.tmpdir(), 'ra_');
 const waitSec = Number(process.argv[4] || 40);
 const PORT = Number(process.argv[5] || 9371);
 const times = (process.argv[6] || '120,300,430').split(',').map(Number);
-const viewMode = process.argv[7] || 'follow';   // follow=跟拍 / static=全景 / tactical=战术俯视
+const viewMode = process.argv[7] || 'follow';   // follow=默认跟拍(即战术俯视) / static=全景 / tactical 保留为 follow 别名 / tint=洋红诊断
 const W = 1600, H = 900;
 
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'edgecdp-ra-'));
@@ -74,8 +74,8 @@ try {
 
   const rows = [];
   for (const t of times) {
-    const suffix = viewMode === 'static' ? ''
-                 : viewMode === 'tactical' ? '&view=tactical' : '&follow=1';
+    // 默认跟拍现在就是战术俯视，tactical 视图保留为别名以便复用历史命令
+    const suffix = viewMode === 'static' ? '' : '&follow=1';
     // tint 复用 follow 机位，只在截图前把水面染洋红
     await send('Page.navigate', { url: `${base}?t=${t}${suffix}` });
     let ready = false;
@@ -114,7 +114,7 @@ try {
                 camToHead: c.camToWaterHead, frontGap: c.frontGap });
     // 诊断先落控制台：SwiftShader 大区域截图会偶发 75 s 超时，
     // 不能让截图失败把已经量到的机位数据一起吞掉。
-    console.log(`t=${t} view=${viewMode} tactical=${c.tacticalCam} rig=${JSON.stringify(c.rig)} clear=${c.clearance} headInView=${c.waterHeadInView} camToHead=${c.camToWaterHead} frontGap=${c.frontGap} muddy=${c.muddy}`);
+    console.log(`t=${t} view=${viewMode} rig=${JSON.stringify(c.rig)} clear=${c.clearance} headInView=${c.waterHeadInView} camToHead=${c.camToWaterHead} frontGap=${c.frontGap} muddy=${c.muddy}`);
     let shot = null;
     for (let a = 0; a < 3 && !shot; a++) {
       try { shot = await send('Page.captureScreenshot', { format: 'png' }); }

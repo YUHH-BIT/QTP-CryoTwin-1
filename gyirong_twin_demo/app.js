@@ -4,7 +4,7 @@ import { OrbitControls } from './lib/OrbitControls.js';
 import { PALETTE, material, makeSculpt, assertAnchors, applyDamage,
          diagnose, attachFacade, attachBank, buildDistanceField } from './proc.js';
 // 洪水演进实景层：④ GPU 高度场 + 亚网格连续曲面 + 碎冰 / 飞溅粒子（④②⑤①⑥）
-import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261110d';
+import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261110e';
 
 /* ==========================================================================
    吉隆「8·26」冰岩崩—泥石流灾害链 · 实景三维数字孪生推演（演示级）
@@ -323,8 +323,6 @@ let glacierGroup, lakeMesh, impactRing, impactFill, frontMarker, nodeGroup;
 let bankField = null;
 let flood = null, fieldBuffers = null;   // 洪水演进实景层 + 供其复用的原始场缓冲
 let cineCam = false, cineSnap = false, cineVecA = null, cineVecB = null;
-// 战术俯视：独立于「洪水航拍」的第二种跟拍机位（升到谷上方看沟谷全貌）
-let tacticalCam = false;
 
 // 着色器 uniform 全部提到外层：材质 needsUpdate 重新编译后引用仍然有效。
 // 灾害带两层（本体 + 衬底）共用同一批对象，refresh 一次即可同步。
@@ -1073,7 +1071,7 @@ function groundAt(x, z) {
    用户自由视角只做最小防穿地约束，所以手动拉近看建筑不会被强行抬高。 */
 function enforceCameraClearance() {
   const p = camera.position, t = controls.target;
-  const auto = cineCam || tacticalCam || !!flight || autoFly || state.rotating || rigStatic;
+  const auto = cineCam || !!flight || autoFly || state.rotating || rigStatic;
   let need = groundAt(p.x, p.z) + CAM_GROUND_CLEAR;
   if (auto) {
     need = groundAt(p.x, p.z) + CAM_AUTO_CLEAR;
@@ -1098,7 +1096,6 @@ function onUserTakeover() {
     $('btn-rotate').classList.remove('active'); changed = true;
   }
   if (cineCam) { enableCine(false); changed = true; }
-  if (tacticalCam) { enableTactical(false); changed = true; }
   if (state.autoCam) {
     state.autoCam = false;
     $('btn-autocam').classList.remove('active');
@@ -1179,7 +1176,6 @@ function updateFlight(now) {
 function resetView() {
   if (state.engine === 'cesium') { resetCesiumView(); return; }
   if (cineCam) enableCine(false);
-  if (tacticalCam) enableTactical(false);
   autoFly = false;
   state.rotating = false;
   controls.autoRotate = false;
@@ -1199,7 +1195,7 @@ let followSnap = false;
 // ?rig= 定点构图验收：图层按沉浸模式收起，但不触发自动跟拍抢相机。
 // 这样截图里看到的是跟拍模式的真实画面，不会混进全景的橙色态势带与节点标签。
 let rigStatic = false, rigPending = null, rigPlaceInfo = null;
-const immersiveCam = () => cineCam || autoFly || tacticalCam || rigStatic;
+const immersiveCam = () => cineCam || autoFly || rigStatic;
 
 /* 沿沟道弧长把机位放到「可见水头」后方 back 米、横向偏 lat、离水面 H、
    瞄准点再向下游前移 ahead 米。这是 follow / cine 两种跟拍共用的几何核心。
@@ -1249,22 +1245,17 @@ function placeRigAt(back, lat, H, ahead) {
    · 俯角由目标角度反解高度 —— 固定离水面高度在源区陡坡会变成仰视（实测 −4.6°）；
    · 机位远近由「湿点实测占画高」反馈 —— 固定 back 在口岸段会占满 99% 画面。 */
 const RIG = {
-  // backMin 不要低于搜索验证过的 600 m：再靠近时湿区反而跑到相机背后出框，
-  // 实测 t=300 把 back 压到 380 后 fill 从 0.44 掉到 0.28。
-  // 俯角按用户反馈抬高：原 25°/22° 离谷底太近（t=300 离地仅 140 m，贴着地面）。
-  // 试过 32°，水被俯视挤到画面下沿、部分湿点出画（rig.fill 掉到 0），反而更看不见；
-  // 折中取 29°/26°，离地抬到约 200 m 又不把水挤出视野。旧版 38° 更是俯视全谷不可取。
-  follow: { back: 600, lat: -220, pitch: 29, fill: 0.42, backMin: 600, backMax: 2200,
-            sRate: 2.4, posRate: 2.6, tgtRate: 2.8, intro: 1.5, ahead: 200 },
+  // 默认全链条推演跟拍 = 战术俯视机位（用户 2026-11-10 定：不再单独设按钮/模式）。
+  // 用绝对高度 alt（相对瞄准点水面）而不是俯角反解 —— 俯角反解在 back 变大时
+  // 会把相机抬到 2 km 以上，反而不是「谷上方」。实测俯角约 43°、离地约 645 m，
+  // 沟谷走向与两侧地形关系清楚；水仍是一条窄带（真实湿区约 180 m 宽）。
+  // 仍沿沟道弧长布机位，离地由 CAM_AUTO_CLEAR 兜底，共用可见水头/阻尼/用户接管。
+  follow: { back: 1000, lat: -320, alt: 1050, pitch: 0, fill: 0.25,
+            backMin: 800, backMax: 2000,
+            sRate: 2.0, posRate: 2.2, tgtRate: 2.4, intro: 1.6, ahead: 600 },
+  // 洪水航拍保留贴近水面的近景，作为与默认俯视并存的另一种观察方式。
   cine:   { back: 430, lat: -150, pitch: 26, fill: 0.55, backMin: 430, backMax: 1500,
             sRate: 2.8, posRate: 3.0, tgtRate: 3.2, intro: 1.1, ahead: 140 },
-  // 战术俯视：用绝对高度 alt（相对瞄准点水面）而不是俯角反解 ——
-  // 俯角反解在 back 变大时会把相机抬到 2 km 以上，反而不是「谷上方」。
-  // 仍沿沟道弧长布机位，离地由 CAM_AUTO_CLEAR 兜底；与 follow/cine 共用同一套
-  // 阻尼、可见水头口径与用户接管路径，只是景别更远、俯角更大。
-  tactical: { back: 1000, lat: -320, alt: 1050, pitch: 0, fill: 0.25,
-              backMin: 800, backMax: 2000,
-              sRate: 2.0, posRate: 2.2, tgtRate: 2.4, intro: 1.6, ahead: 600 },
 };
 const rig = { mode: null, s: 0, back: 600, fill: 0, snap: true, introT: 1,
               cam0: new THREE.Vector3(), tgt0: new THREE.Vector3(),
@@ -1382,7 +1373,6 @@ function updateCineCamera(dt) {
 function enableCine(on) {
   cineCam = on;
   cineSnap = on;
-  if (on && tacticalCam) enableTactical(false);   // 两种跟拍互斥，避免抢相机
   $('btn-flood').classList.toggle('active', on);
   if (on) {
     if (state.engine !== 'three') setEngine('three');
@@ -1404,34 +1394,6 @@ function enableCine(on) {
     pushLog('退出洪水航拍，回到自由视角。', 'info', state.t);
   }
 }
-/* 战术俯视：升到谷上方约 1050 m 俯视整条沟谷，仍沿沟道弧长跟水头。
-   与洪水航拍互斥，但共用同一套可见水头 / 阻尼 / 离地钳制；
-   用户一拖画布就由 onUserTakeover 立即退出，不留无退出路径的自动运镜。 */
-function enableTactical(on) {
-  tacticalCam = on;
-  const btn = $('btn-tactical');
-  if (btn) btn.classList.toggle('active', on);
-  if (on) {
-    if (state.engine !== 'three') setEngine('three');
-    if (cineCam) enableCine(false);
-    state.layers.flood = true;
-    state.layers.debris = true;
-    state.layers.spray = true;
-    $('layer-list').querySelectorAll('input').forEach(el => {
-      el.checked = !!state.layers[el.dataset.layer];
-    });
-    autoFly = false;
-    state.rotating = false;
-    controls.autoRotate = false;
-    $('btn-rotate').classList.remove('active');
-    flight = null;
-    rig.snap = true;
-    applyLayers();
-  } else {
-    applyLayers();
-  }
-}
-window.__setTactical = enableTactical;
 const markFloodJump = () => { if (flood) flood.markJump(); };
 
 /* ------------------------------ UI ------------------------------ */
@@ -1713,7 +1675,6 @@ function bindEvents() {
     pushLog(`聚焦口岸聚落：${bldFocus ? bldFocus.count : 0} 栋 OSM 实测轮廓 · 程序化立面与勾边`, 'info', state.t);
   });
   $('btn-flood').addEventListener('click', () => enableCine(!cineCam));
-  $('btn-tactical').addEventListener('click', () => enableTactical(!tacticalCam));
   $('btn-rotate').addEventListener('click', () => {
     state.rotating = !state.rotating;
     controls.autoRotate = state.rotating;
@@ -1922,9 +1883,8 @@ function loop(now) {
   // 三维地球视图：暂停本地 WebGL 渲染与标签投影，避免两个上下文抢 GPU
   if (state.engine === 'cesium') return;
 
-  // 三种跟拍互斥：战术俯视 > 洪水航拍 > 播放连续跟随（不再按阶段跳飞）
-  if (tacticalCam) updateRig(dt, 'tactical');
-  else if (cineCam) updateCineCamera(dt);
+  // 洪水航拍优先；播放时默认走战术俯视机位（逐帧连续跟随，不再按阶段跳飞）
+  if (cineCam) updateCineCamera(dt);
   else if (autoFly && !flight) updateDisasterFollow(dt);
   // 洪水实景层：GPU 子步长推进（ping-pong 计算 pass）必须在主场景渲染之前；
   // 视距只改水面视觉放大系数，不改 KPI 数值
@@ -2081,8 +2041,6 @@ async function boot() {
   // ?engine=cesium 直接用三维地球视图打开（截图验收 / 分享指定帧）
   if (qs.get('engine') === 'cesium') setEngine('cesium');
   if (qs.get('cine') === '1' && qs.get('engine') !== 'cesium') enableCine(true);
-  if ((qs.get('view') === 'tactical' || qs.get('tactical') === '1') &&
-      qs.get('engine') !== 'cesium') enableTactical(true);
   // ?follow=1 静态进入全链条跟拍（不自动播放时间），供多时刻构图验收
   if (qs.get('follow') === '1' && qs.get('engine') !== 'cesium') {
     state.playing = false; autoFly = true; followSnap = true;
@@ -2135,7 +2093,7 @@ async function boot() {
     return {
       pos: camera.position.toArray().map(v => +v.toFixed(1)),
       target: controls.target.toArray().map(v => +v.toFixed(1)),
-      cineCam, autoFly, tacticalCam, rotating: state.rotating, autoCam: !!state.autoCam,
+      cineCam, autoFly, rotating: state.rotating, autoCam: !!state.autoCam,
       flight: !!flight,
       t: +state.t.toFixed(1),
       dist: +camera.position.distanceTo(controls.target).toFixed(1),

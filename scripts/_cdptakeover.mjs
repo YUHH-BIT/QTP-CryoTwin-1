@@ -1,5 +1,6 @@
-// 验证战术俯视的用户接管：node scripts/_cdptakeover.mjs <baseUrl> <t> <port> [waitSec]
-// 打开 ?view=tactical，等落位后向画布派发 wheel，检查 tacticalCam / autoFly / cineCam 是否全关。
+// 验证默认跟拍的用户接管：node scripts/_cdptakeover.mjs <baseUrl> <t> <port> [waitSec]
+// 打开 ?t=&follow=1（默认即战术俯视机位），等落位后向画布派发 wheel，
+// 检查 autoFly / cineCam / flight 是否全关、相机不再被拉回。
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -68,7 +69,7 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: W, height: H, deviceScaleFactor: 1, mobile: false });
   await send('Network.enable');
   await send('Network.setCacheDisabled', { cacheDisabled: true });
-  await send('Page.navigate', { url: `${base}?t=${t}&view=tactical` });
+  await send('Page.navigate', { url: `${base}?t=${t}&follow=1` });
   let ready = false;
   for (let k = 0; k < 300; k++) {
     try {
@@ -80,7 +81,7 @@ try {
   if (!ready) throw new Error('not ready; errs=' + errs.slice(-2).join('|'));
   await sleep(waitSec * 1000);
   const before = await send('Runtime.evaluate', {
-    expression: `JSON.stringify({tactical:window.__cam().tacticalCam,autoFly:window.__cam().autoFly,cine:window.__cam().cineCam,rig:window.__cam().rig})`,
+    expression: `JSON.stringify({autoFly:window.__cam().autoFly,cine:window.__cam().cineCam,rig:window.__cam().rig})`,
     returnByValue: true,
   });
   console.log('BEFORE ' + before.result.value);
@@ -90,7 +91,7 @@ try {
   });
   await sleep(1500);
   const after = await send('Runtime.evaluate', {
-    expression: `JSON.stringify({tactical:window.__cam().tacticalCam,autoFly:window.__cam().autoFly,cine:window.__cam().cineCam,flight:window.__cam().flight,rig:window.__cam().rig})`,
+    expression: `JSON.stringify({autoFly:window.__cam().autoFly,cine:window.__cam().cineCam,flight:window.__cam().flight,rig:window.__cam().rig})`,
     returnByValue: true,
   });
   console.log('AFTER  ' + after.result.value);
