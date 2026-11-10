@@ -15,12 +15,12 @@
    不加载 DEM / 影像 / OSM / 流场，不改动 app.js 与 index.html 的主流程。
    ========================================================================== */
 
-import * as THREE from './lib/three.module.js';
-import { OrbitControls } from './lib/OrbitControls.js';
+import * as THREE from './lib/three.module.js?v=20261111a';
+import { OrbitControls } from './lib/OrbitControls.js?v=20261111a';
 import {
   material, makeSculpt, applyDamage, validateSpec, snapshotSpec,
   disposeSculpt, triangleCount, attachWindowGrid, SCULPT_PASSES,
-} from './proc.js';
+} from './proc.js?v=20261111a';
 
 const $ = id => document.getElementById(id);
 const PASS_CN = {

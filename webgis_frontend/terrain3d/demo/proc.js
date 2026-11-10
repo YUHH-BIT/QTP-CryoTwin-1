@@ -32,7 +32,7 @@
    全部为可选字段，旧调用（OSM 建筑、冰岩块）行为不变。
    ========================================================================== */
 
-import * as THREE from './lib/three.module.js';
+import * as THREE from './lib/three.module.js?v=20261111a';
 
 /* ---------------------- 材质色板：命名约定代替 if-else ---------------------- */
 export const PALETTE = {

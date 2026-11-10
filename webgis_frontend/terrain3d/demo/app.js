@@ -1,10 +1,10 @@
-import * as THREE from './lib/three.module.js';
-import { OrbitControls } from './lib/OrbitControls.js';
+import * as THREE from './lib/three.module.js?v=20261111a';
+import { OrbitControls } from './lib/OrbitControls.js?v=20261111a';
 // 程序化建模骨架：spec → 可编辑 THREE.Group + 材质色板 + 着色器画岸边/立面
 import { PALETTE, material, makeSculpt, assertAnchors, applyDamage,
-         diagnose, attachFacade, attachBank, buildDistanceField } from './proc.js';
+         diagnose, attachFacade, attachBank, buildDistanceField } from './proc.js?v=20261111a';
 // 洪水演进实景层：④ GPU 高度场 + 亚网格连续曲面 + 碎冰 / 飞溅粒子（④②⑤①⑥）
-import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261110e';
+import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261111a';
 
 /* ==========================================================================
    吉隆「8·26」冰岩崩—泥石流灾害链 · 实景三维数字孪生推演（演示级）
