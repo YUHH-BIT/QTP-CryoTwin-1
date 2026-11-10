@@ -100,7 +100,12 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--clay-soft); color: var(--clay);
   border: 1px solid rgba(251, 191, 36, .38);
 }
-.topbar-right { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+/* 顶栏右侧控件整体移除：引擎切换与「数据与说明」入口不再在界面占位。
+   默认视图固定为本地实景沙盘（Three.js）；Cesium 仍可用 ?engine=cesium 访问。
+   数据来源与演示级边界改由独立 Word 文档承载。
+   用 display:none 而非删 DOM——app.js 对 #engine-switch / #btn-about 直接
+   addEventListener，删节点会抛 TypeError 中断整个交互脚本。 */
+.topbar-right { display: none; }
 
 .btn {
   border: 1px solid var(--line-2); background: rgba(27, 40, 64, .88); color: var(--ink);
@@ -133,8 +138,13 @@ button { font-family: inherit; cursor: pointer; }
 }
 #scene { display: block; width: 100%; height: 100%; }
 
+/* 面板底部不再给时间轴让位：时间轴已改成居中窄胶囊，宽度按左右面板自动
+   收缩（100vw − 面板宽 − 72px），水平方向与两侧面板不重叠。原来 bottom 用
+   --tl-h+22px 是横贯全屏那条旧时间轴留下的 88px 空白，现在降到底边距，
+   与时间轴胶囊底边齐平，两侧各多出约 76px 高，表格/图表能多显示几行。
+   注意 stage-legend 在中间、与时间轴水平重叠，仍须留在时间轴上方，不动。 */
 .pane {
-  position: absolute; top: 10px; bottom: calc(var(--tl-h) + 22px);
+  position: absolute; top: 10px; bottom: var(--pane-pad);
   width: var(--pane-l); pointer-events: none; z-index: 12;
 }
 .pane.left { left: var(--pane-pad); }
@@ -185,9 +195,9 @@ body.hide-right .pane.right .pane-tab b { transform: rotate(180deg); }
   display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
   pointer-events: none;
 }
-.stage-legend { left: calc(var(--pane-pad) + var(--pane-l) + 14px); }
-body.hide-left .stage-top,
-body.hide-left .stage-legend { left: calc(var(--pane-pad) + var(--tab-w) + 8px); }
+/* 图例已改为相对时间轴胶囊居中（见 .stage-legend），不再跟随左面板，
+   故从这里的 left / 收起规则中移除；面板收起只影响 stage-top。 */
+body.hide-left .stage-top { left: calc(var(--pane-pad) + var(--tab-w) + 8px); }
 body.hide-right .stage-top { right: calc(var(--pane-pad) + var(--tab-w) + 8px); }
 
 /* ---------- 卡片 ---------- */
@@ -352,13 +362,18 @@ body.hide-right .stage-top { right: calc(var(--pane-pad) + var(--tab-w) + 8px); 
 .tool:hover { border-color: var(--ice); color: var(--ink); }
 .tool.active { background: var(--blue); color: #fff; border-color: var(--blue); }
 
+/* 图例归位到时间轴胶囊正上方、与胶囊同宽居中。原来贴左面板底 + bottom 86px，
+   是给横贯全屏的旧时间轴让位；现在胶囊居中收窄，旧位置既孤悬在左下，又会和
+   胶囊左段水平重叠。移到胶囊正上方后，底部形成「图例 + 时间轴」一组对称控件，
+   与加高到 --pane-pad 的两侧面板在水平方向互不侵占。 */
 .stage-legend {
-  position: absolute; bottom: calc(var(--tl-h) + 20px);
-  display: flex; align-items: center; gap: 11px; flex-wrap: wrap;
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: calc(var(--tl-h) + var(--pane-pad) + 10px);
+  display: flex; align-items: center; justify-content: center; gap: 11px; flex-wrap: wrap;
   background: rgba(10, 20, 36, .82); border: 1px solid rgba(47, 69, 100, .8);
   border-radius: 7px; padding: 5px 10px; font-size: 9.5px; color: var(--ink-2);
   pointer-events: auto; z-index: 3; backdrop-filter: blur(8px);
-  max-width: calc(100% - var(--pane-l) - var(--pane-r) - 60px);
+  max-width: min(680px, calc(100vw - var(--pane-l) - var(--pane-r) - 72px));
 }
 .stage-legend span { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
 .sw { width: 12px; height: 8px; border-radius: 2px; display: inline-block; }
@@ -400,18 +415,28 @@ body.cesium #btn-rotate,
 body.cesium #btn-port { display: none; }
 
 /* ---------- 时间轴 ---------- */
+/* 底部播控：改成居中的悬浮条，不再横贯整屏。原来 left/right 双向铺满，
+   一条 1576px 的实心卡片压住地图下沿；现在只占屏幕中间一段，按左右面板
+   宽度自动收缩，两侧地形露出来。 */
 .timeline {
-  position: absolute; left: var(--pane-pad); right: var(--pane-pad); bottom: var(--pane-pad);
-  height: var(--tl-h); z-index: 14; border-radius: 9px;
+  position: absolute; left: 50%; right: auto; transform: translateX(-50%);
+  bottom: var(--pane-pad);
+  width: min(680px, calc(100vw - var(--pane-l) - var(--pane-r) - 72px));
+  height: var(--tl-h); z-index: 14; border-radius: 16px;
   border: 1px solid var(--line-2); border-top: 1px solid rgba(125, 211, 252, .28);
   background: rgba(19, 31, 51, .92); backdrop-filter: blur(10px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, .42); padding: 9px 14px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .42); padding: 9px 16px;
   display: flex; flex-direction: column; justify-content: center; gap: 5px;
 }
-.tl-row { display: grid; grid-template-columns: 302px minmax(0, 1fr); gap: 16px; align-items: center; }
-.tl-controls { display: flex; align-items: center; gap: 5px; }
+.tl-row { display: flex; align-items: center; gap: 12px; }
+.tl-controls { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; }
 .tl-controls .btn { padding: 6px 9px; font-size: 11px; }
 #btn-play { min-width: 54px; }
+/* 快进/快退/倍速演示里用不上，还把播控条撑得很长。元素保留，
+   app.js 仍直接取得到并绑事件（删 DOM 会抛 TypeError 中断整个交互脚本）。 */
+.tl-controls #btn-prev,
+.tl-controls #btn-next,
+.tl-controls .speeds { display: none; }
 .speeds { display: flex; gap: 2px; margin-left: 3px; }
 .speed {
   font-size: 10px; padding: 5px 6px; border-radius: 5px;
@@ -419,7 +444,7 @@ body.cesium #btn-port { display: none; }
 }
 .speed.active { background: var(--blue); color: #fff; border-color: var(--blue); }
 
-.tl-track-wrap { min-width: 0; }
+.tl-track-wrap { min-width: 0; flex: 1 1 auto; }
 .tl-top {
   display: flex; justify-content: space-between; align-items: baseline;
   font-size: 10px; color: var(--ink-3); margin-bottom: 4px;
@@ -482,7 +507,7 @@ body.cesium #btn-port { display: none; }
 /* ---------- 窄屏 ---------- */
 @media (max-width: 1440px) {
   :root { --pane-l: 248px; --pane-r: 276px; }
-  .tl-row { grid-template-columns: 280px minmax(0, 1fr); }
+  /* tl-row 已改 flex，旧的 grid-template-columns 会失效并误导，移除。 */
 }
 @media (max-width: 1180px) {
   :root { --pane-l: 232px; --pane-r: 260px; }

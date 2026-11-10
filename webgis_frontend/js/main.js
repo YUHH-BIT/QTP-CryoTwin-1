@@ -3595,6 +3595,18 @@ function initNavHighlightByPage() {
     'terrain3d.html': '.dropdown-toggle[data-page="decision"]'
   };
   const pageName = (window.location.pathname.split('/').pop() || 'index.html');
+
+  // 下拉子项兜底高亮：某些入口是独立页面（如「决策支持 → 三维示范区」），
+  // 没有 data-category 可供 query.js / decision.js 匹配，
+  // 这里按「href 的文件名 == 当前页面」补一次 active。
+  // 带查询参数的项（query.html?cat=xxx 等）交给各页面自己的分类逻辑，跳过。
+  document.querySelectorAll('.dropdown-menu .dropdown-item').forEach(item => {
+    const href = item.getAttribute('href') || '';
+    if (!href || href.indexOf('?') !== -1) return;
+    const file = href.split('/').pop();
+    if (file && file === pageName) item.classList.add('active');
+  });
+
   const selector = pageMap[pageName];
   if (!selector) return;
   const target = document.querySelector(selector);

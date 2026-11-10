@@ -357,6 +357,13 @@ const state = {
   layers: Object.assign({ field: true }, Object.fromEntries(LAYERS.map(l => [l.id, l.on]))),
 };
 
+/* 未开始推演时，画面顶部 HUD 位显示演示介绍（标题 + 副标题 + 演示级徽章），
+   左面板阶段列表不高亮任何一项；用户一旦真正开始推演（播放 / 选阶段 / 拖时间轴
+   / ?t= 定位），翻为 false，该位置切换为阶段播报并高亮当前阶段。 */
+/* 仅内嵌模式启用「介绍态」：独立预览页顶部有自己的 56px 品牌栏，
+   若 HUD 位再放一遍介绍标题会重复，故独立模式 introMode 恒为 false。 */
+let introMode = new URLSearchParams(location.search).get('embedded') === '1';
+
 /* -------------------- 第二视图：Cesium 三维地球 -------------------- */
 // 时间映射口径：Cesium 页基准工况到达口岸为 500 s，本页表 4 基准为 505 s。
 // 用「进度比例 × 505」驱动，基准工况两视图逐秒对齐；情景变化只改变演进快慢。
@@ -531,7 +538,10 @@ function initScene() {
   controls.minDistance = 180;      // 原来 420 太远，贴不近建筑与碎冰
   controls.maxDistance = 72000;
   controls.maxPolarAngle = Math.PI * 0.492;
-  controls.autoRotateSpeed = 0.4;
+  // autoRotateSpeed 只在「update(deltaTime)」下才是真正的 秒/圈（2 → 30 s/圈）。
+  // 不传 dt 时 r160 退回「每帧固定角」，低帧率(SwiftShader)会慢到像没转。
+  // 取 1.0 ≈ 60 秒/圈，全景沙盘稳重不晃；dt 由 loop 每帧传入。
+  controls.autoRotateSpeed = 1.0;
   // 地图式交互：屏幕空间平移 + 右键 / Shift+左键平移 + 滚轮按光标位置缩放。
   // 默认 screenSpacePanning=false 时平移发生在世界 XZ 平面，斜视角下几乎拖不动。
   controls.enablePan = true;
@@ -1578,12 +1588,16 @@ function applyLayers() {
 
 function updatePanels(f) {
   const s = f.s, st = STAGES[f.stageIdx];
-  // 画面左上只报「第几阶段 + 阶段名 + 一句话机理」；
-  // 时钟交给底部时间轴（唯一读数），避免同一时刻在页面上出现三遍。
-  $('hud-idx').textContent = `${f.stageIdx + 1}/${STAGES.length}`;
-  $('hud-stage').textContent = st.name;
-  $('hud-desc').textContent = st.desc;
-  $('stage-hud').classList.toggle('crit', st.lvl === 'crit');
+  // 顶部 HUD 位双态：未开演 = 演示介绍；开演后 = 阶段播报。二者共用一个位置，
+  // 避免标题长期占着地图顶部。时钟仍只在底部时间轴出现一次。
+  $('stage-intro').classList.toggle('hidden', !introMode);
+  $('stage-hud').classList.toggle('hidden', introMode);
+  if (!introMode) {
+    $('hud-idx').textContent = `${f.stageIdx + 1}/${STAGES.length}`;
+    $('hud-stage').textContent = st.name;
+    $('hud-desc').textContent = st.desc;
+    $('stage-hud').classList.toggle('crit', st.lvl === 'crit');
+  }
   const node = NODES.find(n => n.id === st.node);
   $('focus-name').textContent = node.name;
   $('focus-sub').textContent = node.sub;
@@ -1605,7 +1619,10 @@ function updatePanels(f) {
   $('tl-total').textContent = `总历时 ${fmtDur(f.total)}`;
   $('tl-fill').style.width = `${f.ratio * 100}%`;
   $('tl-cursor').style.left = `${f.ratio * 100}%`;
-  document.querySelectorAll('.stage-item').forEach((el, i) => el.classList.toggle('active', i === f.stageIdx));
+  // 左面板高亮跟随 HUD 双态：未开演一项都不亮（此时顶部是演示介绍，不是阶段）；
+  // 开演后才高亮当前阶段，避免"还没推演就高亮第 1 阶段"的错位。
+  document.querySelectorAll('.stage-item').forEach((el, i) =>
+    el.classList.toggle('active', !introMode && i === f.stageIdx));
   const secName = f.section ? f.section.name : '';
   $('sect-body').querySelectorAll('tr').forEach(tr => {
     tr.classList.toggle('active', SECTIONS[+tr.dataset.sec].name === secName);
@@ -1622,6 +1639,7 @@ function onStageChange(idx, f) {
   // —— 阶段跳飞正是「镜头晃动 / 看不到灾害」的根因；Cesium 侧由地球自身运镜。
 }
 function jumpToStage(idx) {
+  introMode = false;
   const f = computeFrame(0, state.vol);
   state.t = STAGES[idx].r * f.total;
   autoFly = false; markFloodJump();
@@ -1631,6 +1649,7 @@ function jumpToStage(idx) {
   refresh();
 }
 function jumpToNode(idx) {
+  introMode = false;
   const f = computeFrame(0, state.vol);
   const target = NODES[idx].t;
   let best = 0, bd = Infinity;
@@ -1648,19 +1667,21 @@ function jumpToNode(idx) {
 }
 function bindEvents() {
   $('btn-play').addEventListener('click', () => {
+    if (!state.playing) introMode = false;   // 首次点「播放」＝开始推演，顶部从介绍切阶段
     state.playing = !state.playing;
     autoFly = state.playing;
     if (autoFly) { flight = null; followSnap = true; }
     $('btn-play').textContent = state.playing ? '暂停' : '播放';
     if (state.playing && state.t >= computeFrame(0, state.vol).total - 1) state.t = 0;
   });
-  $('btn-prev').addEventListener('click', () => { autoFly = false; markFloodJump(); state.t = Math.max(0, state.t - 30); refresh(); });
+  $('btn-prev').addEventListener('click', () => { introMode = false; autoFly = false; markFloodJump(); state.t = Math.max(0, state.t - 30); refresh(); });
   $('btn-next').addEventListener('click', () => {
-    autoFly = false; markFloodJump();
+    introMode = false; autoFly = false; markFloodJump();
     state.t = Math.min(computeFrame(0, state.vol).total, state.t + 30);
     refresh();
   });
   $('btn-replay').addEventListener('click', () => {
+    introMode = false;
     state.t = 0; state.playing = true; autoFly = true; lastStageIdx = -1; markFloodJump();
     $('btn-play').textContent = '暂停';
     if (state.engine === 'cesium') resetCesiumView();
@@ -1692,6 +1713,7 @@ function bindEvents() {
     refresh();
   });
   $('tl-track').addEventListener('click', e => {
+    introMode = false;
     const rect = $('tl-track').getBoundingClientRect();
     const r = clamp((e.clientX - rect.left) / rect.width, 0, 1);
     state.t = r * computeFrame(0, state.vol).total;
@@ -1938,7 +1960,9 @@ function loop(now) {
     frontMarker.children[1].scale.setScalar(1 + 0.16 * Math.sin(now / 320));
   }
   updateFlight(now);
-  controls.update();
+  // 必须把 dt 传给 update()：r160 才按真实时间算自动旋转角速度，
+  // 否则 autoRotate 走「每帧固定角」分支，低帧率下慢到几乎不动（表现为按钮没用）。
+  controls.update(dt);
   // 所有运镜算完之后再做地形安全钳制，这是防穿模的最后一道保险
   enforceCameraClearance();
 
@@ -2031,7 +2055,7 @@ async function boot() {
   }
   const initTotal = computeFrame(0, state.vol).total;
   const qT = parseFloat(qs.get('t'));
-  if (Number.isFinite(qT)) state.t = clamp(qT, 0, initTotal);
+  if (Number.isFinite(qT)) { state.t = clamp(qT, 0, initTotal); introMode = false; }
   lastStageIdx = stageIndexAt(state.t / initTotal);
   applyLayers();
   drawSpark();
@@ -2040,15 +2064,17 @@ async function boot() {
   pushLog(`实景三维就绪：真实 DEM + Esri 卫星影像 + OSM 建筑 ${buildings.length} 栋 + 洪水演进层（GPU ${FLOOD_CONSTANTS.SW}×${FLOOD_CONSTANTS.SH}），左键旋转 · 滚轮按光标位置缩放。`, 'info', state.t);
   // ?engine=cesium 直接用三维地球视图打开（截图验收 / 分享指定帧）
   if (qs.get('engine') === 'cesium') setEngine('cesium');
-  if (qs.get('cine') === '1' && qs.get('engine') !== 'cesium') enableCine(true);
+  // 航拍 / 跟拍 / 定点构图都是「已开演」的验收态，顶部直接进阶段播报，
+  // 否则分享出去的帧会出现「标题介绍 + 跟拍画面」的不一致。
+  if (qs.get('cine') === '1' && qs.get('engine') !== 'cesium') { introMode = false; enableCine(true); }
   // ?follow=1 静态进入全链条跟拍（不自动播放时间），供多时刻构图验收
   if (qs.get('follow') === '1' && qs.get('engine') !== 'cesium') {
-    state.playing = false; autoFly = true; followSnap = true;
+    introMode = false; state.playing = false; autoFly = true; followSnap = true;
   }
   // ?rig=后退弧长,横向偏移,离水面高度,瞄准前移 —— 构图验收定点入口（不影响默认播放）
   const qRig = (qs.get('rig') || '').split(',').map(Number);
   if (qRig.length === 4 && qRig.every(Number.isFinite) && qs.get('engine') !== 'cesium') {
-    rigStatic = true; rigPending = qRig;   // 延后一帧，等 flood 视距参数随相机稳定
+    introMode = false; rigStatic = true; rigPending = qRig;   // 延后一帧，等 flood 视距参数随相机稳定
   }
   window.__rigPlace = placeRigAt;
   window.__rigPlaceInfo = () => rigPlaceInfo;

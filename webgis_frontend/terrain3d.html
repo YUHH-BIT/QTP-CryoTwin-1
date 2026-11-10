@@ -6,7 +6,7 @@
   <title>青藏高原冰冻圈灾害数字孪生系统</title>
   <!-- 与其余页面保持完全一致的样式引入顺序 -->
   <link rel="stylesheet" href="css/lib/ol.css" />
-  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="stylesheet" href="css/styles.css?v=20261111nav" />
   <link rel="stylesheet" href="css/components.css" />
   <link href="css/lib/font-awesome.min.css" rel="stylesheet">
   <!-- Three.js 本地托管（js/lib/，npm 包解出，非 CDN）。不使用 importmap：
@@ -14,7 +14,7 @@
        少一层解析、也少一类"映射没生效就整页不跑"的故障。 -->
   <style>
     /* 三维示范区：系统导航区保持原样，内容区改为内嵌吉隆灾害链演示页。
-       导航占 --nav-height(120px)，iframe 铺满其余视口。 */
+       导航占 --nav-height(100px)，iframe 铺满其余视口。 */
     html, body { margin: 0; height: 100%; background: #070b14; overflow: hidden; }
     #demo-frame {
       display: block; width: 100%;
@@ -75,7 +75,7 @@
         <div class="dropdown-container">
           <a href="#" class="dropdown-toggle active" data-page="decision">决策支持</a>
           <div class="dropdown-menu" id="decision-dropdown">
-            <a href="terrain3d.html" class="dropdown-item">三维示范区</a>
+            <a href="terrain3d.html" class="dropdown-item active">三维示范区</a>
             <a href="decision.html?cat=llm" class="dropdown-item" data-category="llm">决策支持智能体</a>
             <a href="decision.html?cat=expert" class="dropdown-item" data-category="expert">专家咨询</a>
             <a href="decision.html?cat=prevention-example" class="dropdown-item" data-category="prevention-example">防灾实例</a>
@@ -156,7 +156,7 @@
 <span id="status" aria-hidden="true"></span>
 <div id="demo-error" role="alert"></div>
 <iframe id="demo-frame"
-        src="/terrain3d/demo/index.html?embedded=1&v=20261110f"
+        src="/terrain3d/demo/index.html?embedded=1&v=20261111f"
         title="吉隆 8·26 冰岩崩—泥石流灾害链三维推演"
         allow="fullscreen" loading="eager"></iframe>
 <script>

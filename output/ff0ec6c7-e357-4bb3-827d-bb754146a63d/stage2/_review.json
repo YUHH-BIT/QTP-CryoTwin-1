@@ -1,0 +1,77 @@
+﻿{
+  "passed": false,
+  "score": 71,
+  "dimensions": {
+    "design_token_compliance": {
+      "passed": false,
+      "score": 20,
+      "issues": [
+        "[DT-03] style 涓?margin-top 浣跨敤浜嗚８闂磋窛 \"4em\"锛岃鏇挎崲涓?var(--spacing-*)",
+        "[DT-03] style 涓?margin-bottom 浣跨敤浜嗚８闂磋窛 \"1.2em\"锛岃鏇挎崲涓?var(--spacing-*)",
+        "[DT-03] style 涓?margin-bottom 浣跨敤浜嗚８闂磋窛 \"0.5em\"锛岃鏇挎崲涓?var(--spacing-*)",
+        "[DT-03] style 涓?margin-bottom 浣跨敤浜嗚８闂磋窛 \"3em\"锛岃鏇挎崲涓?var(--spacing-*)",
+        "[DT-03] style 涓?margin-bottom 浣跨敤浜嗚８闂磋窛 \"0.4em\"锛岃鏇挎崲涓?var(--spacing-*)",
+        "[DT-03] style 涓?margin-top 浣跨敤浜嗚８闂磋窛 \"2.5em\"锛岃鏇挎崲涓?var(--spacing-*)",
+        "[DT-03] style 涓?margin-bottom 浣跨敤浜嗚８闂磋窛 \"1.2em\"锛岃鏇挎崲涓?var(--spacing-*)",
+        "[DT-03] style 涓?margin-bottom 浣跨敤浜嗚８闂磋窛 \"0.45em\"锛岃鏇挎崲涓?var(--spacing-*)",
+        "[DT-03] style 涓?padding-left 浣跨敤浜嗚８闂磋窛 \"2em\"锛岃鏇挎崲涓?var(--spacing-*)",
+        "[DT-03] style 涓?margin-bottom 浣跨敤浜嗚８闂磋窛 \"0.3em\"锛岃鏇挎崲涓?var(--spacing-*)",
+        "[DT-03] style 涓?padding 浣跨敤浜嗚８闂磋窛 \"0.5em 0.7em\"锛岃鏇挎崲涓?var(--spacing-*)",
+        "[DT-03] style 涓?padding 浣跨敤浜嗚８闂磋窛 \"0.6em 0.8em\"锛岃鏇挎崲涓?var(--spacing-*)",
+        "[DT-03] style 涓?padding 浣跨敤浜嗚８闂磋窛 \"0.6em 0.8em\"锛岃鏇挎崲涓?var(--spacing-*)",
+        "[DT-03] style 涓?padding 浣跨敤浜嗚８闂磋窛 \"0.8em 1em\"锛岃鏇挎崲涓?var(--spacing-*)",
+        "[DT-03] style 涓?margin-bottom 浣跨敤浜嗚８闂磋窛 \"0.4em\"锛岃鏇挎崲涓?var(--spacing-*)"
+      ]
+    },
+    "structural_integrity": {
+      "passed": true,
+      "score": 80,
+      "issues": [
+        "[SI-02] 绗?1 涓?<table> 缂哄皯 <thead>/<tbody>锛岃琛ュ叏琛ㄦ牸缁撴瀯"
+      ]
+    },
+    "typographic_quality": {
+      "passed": true,
+      "score": 80,
+      "issues": [
+        "[TQ-04] 鏂囨。鍑虹幇 9 涓?<h1>锛屾瘡涓枃妗ｅ彧搴旀湁 1 涓富鏍囬",
+        "[TQ-05] 鏂囨。鍑虹幇 11 涓?<h2>锛圵ARNING锛夛紝寤鸿妫€鏌ユ槸鍚﹁繃浜庣鐗囧寲"
+      ]
+    },
+    "genre_fit": {
+      "passed": true,
+      "score": 100,
+      "issues": []
+    },
+    "decoration_usage": {
+      "passed": true,
+      "score": 100,
+      "issues": []
+    },
+    "security": {
+      "passed": true,
+      "score": 100,
+      "issues": []
+    }
+  },
+  "actionable_feedback": [
+    "[DT-03] style 涓?margin-top 浣跨敤浜嗚８闂磋窛 \"4em\"锛岃鏇挎崲涓?var(--spacing-*)",
+    "[DT-03] style 涓?margin-bottom 浣跨敤浜嗚８闂磋窛 \"1.2em\"锛岃鏇挎崲涓?var(--spacing-*)",
+    "[DT-03] style 涓?margin-bottom 浣跨敤浜嗚８闂磋窛 \"0.5em\"锛岃鏇挎崲涓?var(--spacing-*)",
+    "[DT-03] style 涓?margin-bottom 浣跨敤浜嗚８闂磋窛 \"3em\"锛岃鏇挎崲涓?var(--spacing-*)",
+    "[DT-03] style 涓?margin-bottom 浣跨敤浜嗚８闂磋窛 \"0.4em\"锛岃鏇挎崲涓?var(--spacing-*)",
+    "[DT-03] style 涓?margin-top 浣跨敤浜嗚８闂磋窛 \"2.5em\"锛岃鏇挎崲涓?var(--spacing-*)",
+    "[DT-03] style 涓?margin-bottom 浣跨敤浜嗚８闂磋窛 \"1.2em\"锛岃鏇挎崲涓?var(--spacing-*)",
+    "[DT-03] style 涓?margin-bottom 浣跨敤浜嗚８闂磋窛 \"0.45em\"锛岃鏇挎崲涓?var(--spacing-*)",
+    "[DT-03] style 涓?padding-left 浣跨敤浜嗚８闂磋窛 \"2em\"锛岃鏇挎崲涓?var(--spacing-*)",
+    "[DT-03] style 涓?margin-bottom 浣跨敤浜嗚８闂磋窛 \"0.3em\"锛岃鏇挎崲涓?var(--spacing-*)",
+    "[DT-03] style 涓?padding 浣跨敤浜嗚８闂磋窛 \"0.5em 0.7em\"锛岃鏇挎崲涓?var(--spacing-*)",
+    "[DT-03] style 涓?padding 浣跨敤浜嗚８闂磋窛 \"0.6em 0.8em\"锛岃鏇挎崲涓?var(--spacing-*)",
+    "[DT-03] style 涓?padding 浣跨敤浜嗚８闂磋窛 \"0.6em 0.8em\"锛岃鏇挎崲涓?var(--spacing-*)",
+    "[DT-03] style 涓?padding 浣跨敤浜嗚８闂磋窛 \"0.8em 1em\"锛岃鏇挎崲涓?var(--spacing-*)",
+    "[DT-03] style 涓?margin-bottom 浣跨敤浜嗚８闂磋窛 \"0.4em\"锛岃鏇挎崲涓?var(--spacing-*)",
+    "[SI-02] 绗?1 涓?<table> 缂哄皯 <thead>/<tbody>锛岃琛ュ叏琛ㄦ牸缁撴瀯",
+    "[TQ-04] 鏂囨。鍑虹幇 9 涓?<h1>锛屾瘡涓枃妗ｅ彧搴旀湁 1 涓富鏍囬",
+    "[TQ-05] 鏂囨。鍑虹幇 11 涓?<h2>锛圵ARNING锛夛紝寤鸿妫€鏌ユ槸鍚﹁繃浜庣鐗囧寲"
+  ]
+}

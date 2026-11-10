@@ -1,0 +1,31 @@
+{
+  "genre": "general",
+  "theme_name": "modern-minimal",
+  "theme_file": "tokens/themes/modern-minimal.json",
+  "css_variables": {
+    "--typography-fontFamily-heading": "PingFang SC, 苹方-简, 微软雅黑, sans-serif",
+    "--typography-fontFamily-body": "SimSun, 宋体, serif",
+    "--typography-fontSize-title": "24pt",
+    "--typography-fontSize-h1": "18pt",
+    "--typography-fontSize-h2": "15pt",
+    "--typography-fontSize-h3": "13pt",
+    "--typography-fontSize-body": "12pt",
+    "--typography-fontSize-small": "9pt",
+    "--typography-lineHeight-body": "1.7",
+    "--typography-fontWeight-heading": "600",
+    "--color-primary": "#2563EB",
+    "--color-text": "#111827",
+    "--color-textSecondary": "#6B7280",
+    "--color-border": "#E5E7EB",
+    "--color-background": "#FFFFFF",
+    "--color-highlight": "#FEF3C7",
+    "--spacing-paragraph": "0.5em",
+    "--spacing-sectionGap": "2em",
+    "--layout-marginTop": "2.5cm",
+    "--layout-marginBottom": "2.0cm",
+    "--layout-marginLeft": "2.5cm",
+    "--layout-marginRight": "2.5cm",
+    "--layout-maxContentWidth": "165mm"
+  },
+  "typography_rules": null
+}

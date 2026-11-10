@@ -35,7 +35,7 @@
   --warning-color: #fbbf24;
 
   /* 布局 */
-  --nav-height: 120px; /* 两行导航栏高度 */
+  --nav-height: 100px; /* 两行导航栏总高（紧凑版：8+38+8+38+8 = 100） */
   --panel-width: 360px;
   --map-height: calc(100vh - var(--nav-height));
 
@@ -64,7 +64,7 @@ body {
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
   display: flex;
   flex-direction: column;
-  padding: 10px 20px;
+  padding: 8px 20px;
   position: relative;
   /* 导航栏须高于左侧图层管理面板(z:25)、右侧侧边栏(z:30)及其遮罩(z:29)，
      否则其下拉菜单会被这些面板盖住；低于全屏遮罩(z:1000+)与弹窗(z:2000+) */
@@ -90,15 +90,15 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 50px;
-  margin-bottom: 10px;
+  height: 38px;
+  margin-bottom: 8px;
 }
 
 /* 第二行导航栏 */
 .topbar-row2 {
   display: flex;
   align-items: center;
-  height: 50px;
+  height: 38px;
   justify-content: space-between;
 }
 
@@ -129,12 +129,12 @@ body {
 
 .topbar input[type="search"] {
   width: 100%;
-  height: 40px;
+  height: 34px;
   max-width: 400px;
   border: 2px solid var(--border-color);
-  border-radius: 20px;
-  padding: 0 20px;
-  font-size: 16px;
+  border-radius: 17px;
+  padding: 0 18px;
+  font-size: 15px;
   outline: none;
   background: var(--card-bg);
   color: var(--text-primary);
@@ -148,15 +148,15 @@ body {
 }
 
 .topbar .searchbar button {
-  margin-left: 12px;
+  margin-left: 10px;
   background: var(--primary);
   color: #fff;
   border: none;
-  border-radius: 20px;
-  width: 40px;
-  height: 40px;
+  border-radius: 17px;
+  width: 34px;
+  height: 34px;
   cursor: pointer;
-  font-size: 18px;
+  font-size: 15px;
   transition: all 0.2s;
   display: flex;
   align-items: center;
@@ -174,29 +174,29 @@ body {
   display: flex;
   gap: 4px;
   background: var(--card-bg);
-  border-radius: 12px;
-  padding: 4px;
+  border-radius: 10px;
+  padding: 3px;
   flex: 1;
 }
 
 .topbar .nav-links a {
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 6px 14px;
+  border-radius: 7px;
   transition: all 0.2s;
   position: relative;
   overflow: hidden;
   white-space: nowrap;
   flex: 1;
   text-align: center;
-  min-width: 120px;
+  min-width: 108px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 40px;
+  height: 32px;
 }
 
 /* 下拉菜单样式 */
@@ -670,7 +670,7 @@ body {
   display: flex;
   align-items: center;
   font-family: var(--font-display);
-  font-size: 28px;
+  font-size: 23px;
   font-weight: 700;
   letter-spacing: 2px;
   background: var(--grad-logo);
@@ -688,8 +688,8 @@ body {
 .topbar .logo::before {
   content: '';
   width: 4px;
-  height: 28px;
-  margin-right: 14px;
+  height: 22px;
+  margin-right: 12px;
   border-radius: 2px;
   background: var(--grad-accent-bar);
   box-shadow: 0 0 10px var(--ice-glow);
@@ -709,11 +709,11 @@ body {
 
 .topbar input[type="search"] {
   width: 340px;
-  height: 36px;
+  height: 34px;
   border: 1px solid var(--border-color);
-  border-radius: 24px;
+  border-radius: 17px;
   padding: 0 16px;
-  font-size: 16px;
+  font-size: 15px;
   outline: none;
   background: var(--card-bg);
   color: var(--text-primary);

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="docx-page-size" content="A4">
+  <title>吉隆8·26灾害链三维推演 · 数据来源与演示级边界说明</title>
+  <style>
+  /* 页面规则：正文页脚居中页码；封面与目录页无页脚 */
+  @page { @bottom-center { content: counter(page); } }
+  @page cover { @bottom-center { content: none; } }
+  section[role="cover"] { page: cover; }
+
+  :root {
+    --page-content-width: var(--layout-maxContentWidth, 165mm);
+    --fs-title: var(--typography-fontSize-title, 24pt);
+    --fs-h1: var(--typography-fontSize-h1, 18pt);
+    --fs-h2: var(--typography-fontSize-h2, 15pt);
+    --fs-h3: var(--typography-fontSize-h3, 13pt);
+    --fs-body: var(--typography-fontSize-body, 12pt);
+    --fs-small: var(--typography-fontSize-small, 9pt);
+    --ff-heading: var(--typography-fontFamily-heading, "微软雅黑", sans-serif);
+    --ff-body: var(--typography-fontFamily-body, "宋体", SimSun, serif);
+    --ff-mono: Consolas, "Courier New", monospace;
+    --lh-body: var(--typography-lineHeight-body, 1.7);
+    --lh-heading: 1.3;
+    --fw-bold: var(--typography-fontWeight-heading, 600);
+    --color-primary: var(--color-primary, #2563EB);
+    --color-text: var(--color-text, #111827);
+    --color-muted: var(--color-textSecondary, #6B7280);
+    --color-border: var(--color-border, #E5E7EB);
+    --color-bg: var(--color-background, #FFFFFF);
+    --color-highlight: var(--color-highlight, #FEF3C7);
+    --color-th-bg: #EEF2F8;
+    --color-warn-bg: #FDF3F2;
+    --color-warn-border: #C0392B;
+    --color-note-bg: #F4F7FB;
+    --spacing-paragraph: var(--spacing-paragraph, 0.5em);
+    --spacing-section: var(--spacing-sectionGap, 2em);
+    --spacing-block: 1em;
+    --margin-page: var(--layout-marginTop, 2.5cm);
+    --indent-body: 2em;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--ff-body); font-size: var(--fs-body); line-height: var(--lh-body);
+    color: var(--color-text); background: var(--color-bg);
+    max-width: var(--page-content-width); margin-left: auto; margin-right: auto;
+  }
+
+  /* 封面：所有块级元素各自显式居中；大标题用 p 不用 h1 */
+  section[role="cover"] { padding: var(--margin-page) 0; }
+  .cover-eyebrow { font-family: var(--ff-heading); font-size: var(--fs-h3); font-weight: var(--fw-bold); color: var(--color-primary); letter-spacing: 0.08em; text-align: center; margin-top: 4em; margin-bottom: 1.2em; }
+  .cover-title { font-family: var(--ff-heading); font-size: var(--fs-title); font-weight: var(--fw-bold); color: var(--color-text); text-align: center; line-height: var(--lh-heading); margin-bottom: 0.5em; }
+  .cover-subtitle { font-family: var(--ff-heading); font-size: var(--fs-h2); color: var(--color-primary); text-align: center; line-height: var(--lh-heading); margin-bottom: 3em; }
+  .cover-meta { font-family: var(--ff-body); font-size: var(--fs-body); color: var(--color-muted); text-align: center; margin-bottom: 0.4em; }
+  .cover-badge { font-family: var(--ff-body); font-size: var(--fs-body); font-weight: var(--fw-bold); color: var(--color-warn-border); text-align: center; margin-top: 2.5em; }
+
+  /* 目录 */
+  .doc-toc { padding: var(--spacing-block) 0; }
+  .toc-title { font-family: var(--ff-heading); font-size: var(--fs-h2); font-weight: var(--fw-bold); text-align: center; margin-bottom: 1.2em; }
+  .toc-list, .toc-list ol, .toc-list ul { list-style: none; list-style-type: none; padding-left: 0; }
+  .toc-list li { margin-bottom: 0.45em; text-indent: 0; font-family: var(--ff-body); font-size: var(--fs-body); }
+  .toc-list a { color: var(--color-primary); text-decoration: none; }
+
+  /* 正文标题 */
+  .doc-body h1 { font-family: var(--ff-heading); font-size: var(--fs-h1); font-weight: var(--fw-bold); color: var(--color-primary); line-height: var(--lh-heading); margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); }
+  .doc-body h2 { font-family: var(--ff-heading); font-size: var(--fs-h2); font-weight: var(--fw-bold); color: var(--color-text); line-height: var(--lh-heading); margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); }
+  .doc-body h3 { font-family: var(--ff-heading); font-size: var(--fs-h3); font-weight: var(--fw-bold); color: var(--color-text); line-height: var(--lh-heading); margin-top: var(--spacing-block); margin-bottom: var(--spacing-paragraph); }
+
+  /* 正文段落：宋体小四、首行缩进 2 字符 */
+  .doc-body p { font-family: var(--ff-body); font-size: var(--fs-body); line-height: var(--lh-body); text-indent: var(--indent-body); margin-bottom: var(--spacing-paragraph); }
+  .doc-body p.no-indent { text-indent: 0; }
+  .doc-body ul, .doc-body ol { padding-left: 2em; margin-bottom: var(--spacing-paragraph); }
+  .doc-body li { font-family: var(--ff-body); font-size: var(--fs-body); line-height: var(--lh-body); margin-bottom: 0.3em; }
+  strong { font-weight: var(--fw-bold); }
+  code { font-family: var(--ff-mono); font-size: var(--fs-small); background: var(--color-th-bg); }
+
+  /* 表格 */
+  table { border-collapse: collapse; width: 100%; margin-bottom: var(--spacing-block); }
+  th, td { padding: 0.5em 0.7em; border: 1px solid var(--color-border); font-family: var(--ff-body); font-size: var(--fs-small); line-height: 1.5; vertical-align: top; }
+  th { font-family: var(--ff-heading); font-weight: var(--fw-bold); background: var(--color-th-bg); text-align: left; }
+
+  /* 单段落警示 / 注释：左边框，文字加 &nbsp;&nbsp; 前导空格 */
+  .warn { border-left: 4px solid var(--color-warn-border); background: var(--color-warn-bg); padding: 0.6em 0.8em; text-indent: 0; margin-bottom: var(--spacing-block); }
+  .note { border-left: 4px solid var(--color-primary); background: var(--color-note-bg); padding: 0.6em 0.8em; text-indent: 0; margin-bottom: var(--spacing-block); }
+
+  /* 多段落底纹卡片用裸单列 table */
+  table.card { margin-bottom: var(--spacing-block); }
+  table.card td { background: var(--color-warn-bg); border-left: 4px solid var(--color-warn-border); padding: 0.8em 1em; }
+  table.card td p { text-indent: 0; margin-bottom: 0.4em; }
+
+  .doc-footer { margin-top: var(--spacing-section); color: var(--color-muted); font-size: var(--fs-small); text-align: center; }
+  </style>
+</head>
+<body>
+
+  <section role="cover">
+    <p class="cover-eyebrow">青藏高原冰冻圈灾害数字孪生系统 · 三维示范区</p>
+    <p class="cover-title">吉隆「8·26」冰岩崩—泥石流灾害链三维推演</p>
+    <p class="cover-subtitle">数据来源与演示级边界说明</p>
+    <p class="cover-meta">演示级技术文档 · 2026 年 11 月</p>
+    <p class="cover-meta">适用版本：webgis_frontend / terrain3d / demo</p>
+    <p class="cover-badge">仅供演示、方案沟通与教学展示 · 不可用于防洪决策与工程预测</p>
+  </section>
+
+  <section role="cover">
+    <nav class="doc-toc" aria-label="文档目录">
+      <p class="toc-title">目录</p>
+      <ol class="toc-list">
+        <li><a href="#section-1">一、界面信息架构</a></li>
+        <li><a href="#section-2">二、关键参数来源</a></li>
+        <li><a href="#section-3">三、实景三维底座（真实地理数据）</a></li>
+        <li><a href="#section-4">四、两种实景视图</a></li>
+        <li><a href="#section-5">五、程序化建模方法</a></li>
+        <li><a href="#section-6">六、洪水演进实景层</a></li>
+        <li><a href="#section-7">七、做了什么，没做什么</a></li>
+        <li><a href="#section-8">八、运行方式</a></li>
+        <li><a href="#section-9">九、演示级边界声明</a></li>
+      </ol>
+    </nav>
+  </section>
+
+  <section role="body" class="doc-body" data-page-restart="1">
+
+    <p class="no-indent">本文档说明「青藏高原冰冻圈灾害数字孪生系统 · 三维示范区」中吉隆「8·26」冰岩崩—泥石流灾害链推演所使用的数据来源、模型口径与技术边界。三维示范区以前端静态页面运行，不依赖后端服务、不访问外网，全部实景数据与运行库均本地托管。</p>
+
+    <table class="card">
+      <tr><td>
+        <p><strong>用途边界（请先阅读）</strong></p>
+        <p>本演示仅用于成果展示、方案沟通与教学交流，<strong>不可用于防洪决策、风险评价或任何工程预测</strong>。页面内所有流量、流速、流深、到达时间数字均引自公开发表论文表格或由其线性插值得到，<strong>不是本演示实时模拟产生的结果</strong>。</p>
+      </td></tr>
+    </table>
+
+    <h1 id="section-1">一、界面信息架构</h1>
+    <p class="no-indent">界面遵循「同一指标只出现一次」的原则组织：</p>
+    <table>
+      <thead><tr><th>区域</th><th>内容</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>左侧浮层</td><td>推演控制</td><td>8 个推演阶段（点击跳转）、图层显隐；收起后只留一条竖标签</td></tr>
+        <tr><td>右侧浮层</td><td>态势数据</td><td>当前前缘位置与行程、情景滑块与表 4 响应曲线、表 2 控制断面</td></tr>
+        <tr><td>底部</td><td>时间轴</td><td>时刻读数与进度唯一出处；相态图例在时间轴上方居中</td></tr>
+      </tbody>
+    </table>
+    <p>已合并的重复项：焦点卡的「当前时刻」与时间轴读数合并、「当前断面」与焦点标题合并、「口岸洪峰」与情景卡洪峰流量合并；原先右侧「沿程断面柱状图」与「表 2」为同一份数据，已删图留表。表 4 的两个响应量（到达时间、洪峰流量）各一张图并排、各自单轴，图上不标数值，数值置于图表上方数字卡中，避免重复。</p>
+    <p>视角操作（拖动旋转、右键或 Shift+左键平移、滚轮按光标位置缩放）在世界坐标系中完成。画布上不弹出悬停提示文字，统一在此说明。</p>
+
+    <h1 id="section-2">二、关键参数来源</h1>
+    <p class="no-indent">主要参数引自以下文献：</p>
+    <p class="note">&nbsp;&nbsp;刘昌军，张晓蕾，姚舜禹，等．西藏吉隆「8·26」冰岩崩泥石流灾害链数字孪生推演分析［J/OL］．水利学报，网络首发 2026-09-18，doi: 10.3724/j.slxb.20260653。</p>
+    <ul>
+      <li><strong>时间线</strong>：10:52 源区失稳（地震监测）、10:55 到达色琼、11:00:20 模拟到达吉隆口岸。</li>
+      <li><strong>空间与规模</strong>：源区约 5150 m、口岸约 1800 m、总高差约 3350 m、传播约 20 km、初始物源约 1.8 亿 m³、源区面积约 400 万 m²、失稳体厚约 45 m。</li>
+      <li><strong>表 2</strong>：错坚河 / 色琼 / 吉隆口岸三断面的峰值流量、平均流深、平均流速、最大流速。</li>
+      <li><strong>表 4</strong>：0.10～1.80 亿 m³ 共 8 组物源规模的到达时间、平均流深、最大流速、洪峰流量。</li>
+      <li><strong>灾害链 8 阶段</strong>：依论文 §3.2 的动力演化描述整理。</li>
+    </ul>
+    <p class="note">&nbsp;&nbsp;口径说明：正文写「8 min 20 s 到达」，表 4 写「8 min 25 s」，存在 5 s 口径差。本演示统一采用表 4 的 <strong>8 min 25 s</strong>，以保证 8 组情景系列自洽。</p>
+
+    <h1 id="section-3">三、实景三维底座（真实地理数据）</h1>
+    <table>
+      <thead><tr><th>要素</th><th>数据文件</th><th>来源与处理</th></tr></thead>
+      <tbody>
+        <tr><td>DEM</td><td><code>data/height.bin</code></td><td>1001×1001 Int16 高程增量，来自 AWS Open Data / Terrarium（SRTM 派生、全球填洞），覆盖 85.34–85.56°E、28.20–28.31°N，实测高程 1530–7221 m。显示网格双线性降采样到 321×321、垂直夸张 1.3×，计算与采样始终用原始 1001 格精度</td></tr>
+        <tr><td>影像</td><td><code>data/texture.jpg</code></td><td>8192×4617 Esri World Imagery 离线拼图，直接披在真实地形上；关闭「卫星影像」图层可切换到同区域 DEM 山体晕渲图</td></tr>
+        <tr><td>沟道</td><td><code>data/channel.json</code></td><td>由 DEM 经受限最小代价路径（严格限制爬升、沿谷底单调下降）算出的 22 km 真实谷底线，5197 m → 1789 m。灾害体、节点标记、前锋位置全部沿这条真实沟道定位</td></tr>
+        <tr><td>淹没场</td><td><code>arrival.bin</code> / <code>depth.bin</code></td><td>512×289 的到达时间与最大流深场，由项目既有一维沿程模型按横向衰减铺成，<strong>非二维数值解</strong>。沿程到达时间 0→390 s 来自一维剖面，横向按 6 m/s 漫流延迟；全幅仅约 1.57% 格点会湿（沿沟道 340 m 窄带）</td></tr>
+        <tr><td>建筑</td><td><code>osm_buildings.geojson</code></td><td>OSM 实测建筑轮廓按真实经纬度挤出体块，不是随机布点，也不是倾斜摄影模型（无立面纹理）</td></tr>
+        <tr><td>水面法线</td><td><code>lib/water/Water_1_M_Normal.jpg</code>、<code>Water_2_M_Normal.jpg</code></td><td>取自 three.js r160 官方示例素材（MIT），各 512×512，本地存放、运行时不联网；法线按 <code>NoColorSpace</code> 加载，不做 sRGB 解码</td></tr>
+      </tbody>
+    </table>
+    <p>DEM / 影像 / 沟道 / 建筑数据均从项目已有的三维底座目录只读复制一份到演示目录，源文件未改动；水面法线贴图是本次唯一外部新增素材。</p>
+
+    <h1 id="section-4">四、两种实景视图</h1>
+    <h2>本地实景沙盘（Three.js r160，默认视图）</h2>
+    <p>把 1001² DEM 直接生成网格，8192×4617 Esri 影像披在地形上；灾害带沿 22 km 实测沟道推进；建筑为 OSM 真实轮廓挤出并有程序化立面，岸边细节由着色器按沟道距离生成。适合快速俯瞰全链条与相态演进。</p>
+    <h2>三维地球 · Cesium</h2>
+    <p>复用项目已有的吉隆三维地球推演页。按真实经纬度加载 DEM 高度图地形、z11–z16 离线 Esri 影像金字塔、63 帧泥石流场次、按功能类型程序化重建的 glTF 建筑模型；含冰崩碎屑、粉尘、建筑冲毁倾倒、口岸泥流堆积体、受灾范围、堰塞湖与自动运镜。适合观察真实地理关系与口岸近景。</p>
+    <p>两个视图共用同一条时间轴、同一套论文表 2 / 表 4 数值、8 阶段剧本与情景滑块。时间映射：演示进度比例 × 505 s（Cesium 侧基准到达历时 500 s），因此基准工况 1.8 亿 m³ 下两视图时刻严格对齐；改变物源规模时，Cesium 侧按总历时等比缩放，<strong>空间场不重算</strong>。</p>
+    <p>图层开关中「卫星影像 / 演进沟道 / 灾害体推进 / 洪水淹没场 / OSM 建筑 / 冰川源区 / 堰塞水体 / 地名标签」同步作用于两视图；「等高线 / 节点标记 / 立面窗格 / 岸边细节 / 碎冰 / 飞溅」为本地沙盘专有，切到三维地球时置灰。三维地球为懒加载：首次切换才创建 WebGL 上下文，切回本地沙盘会暂停其渲染，避免两个上下文同时抢占 GPU。</p>
+
+    <h1 id="section-5">五、程序化建模方法</h1>
+    <h2>输出契约</h2>
+    <p>灾害要素由一份 <code>spec</code> 生成可编辑的 <code>THREE.Group</code>，组内挂运行时控制句柄与锚点空物体；材质按命名约定从色板取，整组损毁时切换色板，锚点缺失直接抛错。OSM 建筑与源区冰岩块两类资产共用这一工厂。此处沿用 img2threejs 的思路与方法，<strong>并未运行 img2threejs 工具本身</strong>。</p>
+    <h2>着色器画细节，而非堆贴图</h2>
+    <p>把「到 22 km 实测沟道的最短距离」烤成 768×432 距离场，地形片元着色器按距离合成常水位河面、岸线泡沫带、砾石滩、河岸植被色带与流向箭头，全部由开关控制，<strong>不新增几何体、不下载贴图</strong>。建筑窗格同理，用挤出几何侧面 UV 在片元着色器里画楼层线与窗格。灾害带在顶点着色器里按相机距离沿横向法向自适应加宽，片元里加流向箭头、两侧亮描边与脉冲前锋。</p>
+    <h2>轮廓与可读性</h2>
+    <p>屋顶与墙面靠挤出几何自带的端盖/侧壁材质分组分开，另加基座薄台与边缘勾边。点「口岸聚落」可飞到 OSM 建筑最密集的一簇观察立面。</p>
+
+    <h1 id="section-6">六、洪水演进实景层</h1>
+    <p class="no-indent">洪水实景层按资料里的方法构建，不是画示意图。每一项对应一次明确的技术取舍：</p>
+    <ul>
+      <li><strong>宏观淹没范围由真实数据给定</strong>：用既有到达时间场（已含 6 m/s 横向漫流延迟），配合真实 DEM 相对沟床的高差做地形约束——阶地、河漫滩才会被淹，高陡山坡保持干燥；沟道核心保留原始流深值。论文表 4 的「平均流深」作为淹没水位包络。既有场只给 340 m 窄带，为在实景里看见被淹的阶地、农田、道路，漫延包络按地形高差外扩到谷坡低处——这是标注清楚的<strong>视觉外推</strong>，不是二维数值解。水位放大按视距连续变化（近景约 0.5×、全景最高 3.25×），水面横向视觉展宽约 1.6×。KPI 数值与真实流深不变。</li>
+      <li><strong>GPU 并行浅水波方程</strong>：192×108 RGBA8 状态纹理乒乓推进线性化浅水波方程，每帧 3 个子步长；前锋破碎、波峰与粗糙地表持续注入波动；泡沫按流向做半拉格朗日回溯平流。干湿边界把水位与水深一起钳制，水深不会为负、速度不会发散。</li>
+      <li><strong>亚网格插值成连续曲面</strong>：水面显示网格 288×162 比状态网格更密，顶点用三次 B 样条插值淹没源，时间维用带惯性的临界阻尼二阶涨水响应加后期退水，无「一格一跳」方块与帧间阶跃。</li>
+      <li><strong>真实水法线与近景泥浆分支</strong>：水面细节主要来自两张官方水法线贴图，按双相位混合并叠加不同缩放打散重复，采样按真实流向偏移。近景按视距切到泥浆材质——高频法线坡度衰减 78%、高光衰减 85%，改用低频悬浮泥沙斑驳表现高浓度颗粒流；远景保留清水波光，中间连续过渡。贴图缺失时自动回退。浅水按法线偏移折射采样真实影像，能透出被淹的阶地、农田与道路。</li>
+      <li><strong>水头泡沫 / 浪花 / 飞溅 / 扬尘</strong>：前锋由到达时刻自动形成动态带，叠加平流泡沫与波峰破碎；粒子只在已淹没的水头湿区生成，抛物运动、落到水面或飘到干山坡即消亡。</li>
+      <li><strong>碎冰与冰碛物翻滚碰撞</strong>：由输出契约生成可编辑组，用实例化网格批量绘制；CPU 侧按到达时间梯度得到流向场平流，速度用松弛产生惯性；浅水搁浅增摩擦、前锋湍流加大角速度；空间哈希做碰撞并交换角动量。块体半沉在水面下，高度按移动后位置实时重采水面，干区或出界实例直接隐藏。</li>
+      <li><strong>语义粗糙度</strong>：由 OSM 建筑轮廓、地形坡度、距沟道距离烘焙分区阻力，驱动波浪注入、泡沫生成与湍流强度，不是全城一个系数。</li>
+    </ul>
+    <h2>镜头控制约定</h2>
+    <p>在画布上拖动或滚轮缩放会<strong>立即接管视角</strong>：取消飞行插值、停止自动推演与自动旋转、退出洪水跟拍，此后相机完全由用户控制，不会再被拉回。自动运镜期间每帧按显示网格做地形安全钳制：自由视角只保证相机不钻进地面，自动运镜保留更大离地余量。</p>
+    <p>默认全链条推演采用<strong>战术俯视机位</strong>：升到谷上方约 1050 m（实测俯角约 43°、离地约 645 m），用绝对高度而非俯角反解（后者在视距拉大时会把相机抬到 2 km 以上），看整条沟谷走向与两侧地形关系。「洪水航拍」仍是贴近水面的低角度近景（俯角 26°），两种观察方式并存。</p>
+    <h2>全链条推演跟拍</h2>
+    <p>播放后镜头逐帧连续跟随洪水层水头，不按 8 个阶段跳飞预设节点；跟拍期间自动收起前锋球、圆环、灾害色带、节点标签等态势符号。锚点取画面里真有水的水头：从到达时间等值线沿沟道向上游找第一个相对水深超过 1% 的位置（相对阈值，不随视距放大系数漂移），切线用 ±300 m 基线平滑。锚点、机位、瞄准点分别阻尼，机位远近由湿带中心线在画面里的纵向占比有界反馈。</p>
+    <p class="warn">&nbsp;&nbsp;口径差提示：水头由到达时间场反解，而 KPI 与阶段里的「累计传播」来自论文时间线，两者在演示中段实测最大相差约 4.7 km，统一两套场的映射仍需后续处理。</p>
+    <h2>局部放大逻辑</h2>
+    <p>三维场景的「中心点」是轨道控制器的 target。滚轮先用射线拾取光标下的地形点，再把相机与 target 同时相对该点按比例缩放，拾取点在屏幕上保持不动而轨道中心逐步移到光标处；右键或 Shift+左键做屏幕空间平移。</p>
+
+    <h1 id="section-7">七、做了什么，没做什么</h1>
+    <h2>已完成</h2>
+    <ul>
+      <li>真实 DEM 起伏与真实卫星影像的实景三维；等高线（每 200 m 首曲线 / 1000 m 计曲线）、22 km 沟道、灾害体沿沟推进并做「冰岩屑流 → 碎屑流 → 泥石流」相态渐变、OSM 建筑（程序化立面 / 基座 / 勾边）、岸边细节、堰塞水体与受灾范围；时间轴、图层、镜头飞行、情景滑块。</li>
+      <li>洪水演进实景层：真实水域遮挡关系、GPU 波面、泡沫、碎冰刚体、近景泥浆材质与折射影像。</li>
+    </ul>
+    <h2>未完成或明确不做</h2>
+    <ul>
+      <li><strong>不求解完整二维浅水方程 / 宾汉流体阻力，不反演物源，不计算洪峰流量与流速。</strong> 洪水层的 GPU 解的是线性化小振幅波方程，只负责表面波动与泡沫观感；宏观淹没范围与到达时间来自既有场数据，水位包络来自论文表 4。它不产出任何预测数字，也不替代工程水动力计算。</li>
+      <li>地形约束漫延包络、垂直放大系数、波幅、碎冰数量与粒子数量均为<strong>视觉合成参数</strong>；没有倾斜摄影 / 3D Tiles 实景模型。</li>
+      <li>本地沙盘建筑是 OSM 实测轮廓挤出加程序化立面着色。这批 OSM 数据没有真实高度或层数字段，楼高按示意层高估算并做 2× 视觉放大，<strong>不代表真实楼高</strong>；三维地球建筑为按口岸功能类型程序化重建的 glTF 示意模型。</li>
+      <li><strong>统一 ACES 色调映射 / SSAO / 全局距离雾本版未做</strong>：自定义着色器材质不参与 three.js 的色调映射与雾处理，直接开启会让水面与山体色调不一致；SSAO 需引入后处理链，在当前软件渲染环境下代价过高。</li>
+      <li><strong>二维数值解求解器原型已就绪但未接入页面</strong>：基于 ANUGA 4.1.0，当前网格过粗、用一次性溃决水体代替流量过程线、四壁封闭，结果未率定，<strong>不可用于演示或工程判断</strong>。</li>
+      <li>到达时间场与二维水动力的统一映射、KPI 传播与水头位置的口径差（约 4.7 km）<strong>尚未处理完成</strong>。</li>
+    </ul>
+    <h2>可视化约定</h2>
+    <ul>
+      <li>真实高山峡谷的谷底会被山脊完全挡住，因此灾害带、沟道线、前锋标记做成不参与深度测试的「态势叠加层」，宽度为全景下可辨而放大，<strong>不代表真实淹没宽度</strong>。</li>
+      <li>实景洪水水面参与真实深度测试，会被山体与建筑正确遮挡；全景下仅按视距放大水深的视觉高度，KPI 数值与真实流深不变。水面网格与地形显示网格按同一条三角形对角线分片线性采样，保证两层严格共面。</li>
+      <li><strong>水面视觉口径（演示夸张，显式标注）</strong>：真实窄谷湿区仅约 180 m 宽，为让它在近景跟拍里可辨，淹没势场在烘焙阶段做幂次抬升（γ = 0.60），横向视觉展宽约 1.6×；近景同时切到泥浆材质。这两项只改观感，不改空间场、水深剖面、到达时间与 KPI；<strong>画面里的水面宽度与泥色都不代表实测淹没边界或实测流深</strong>。</li>
+      <li>情景推演滑块改变时间轴总历时、KPI 与演进快慢，并按表 4 平均流深缩放洪水层的水位包络（因此淹没范围会随物源变化）；但<strong>到达时间场与二维水动力都不重算</strong>，这是演示级最重要的边界。</li>
+    </ul>
+
+    <h1 id="section-8">八、运行方式</h1>
+    <p>本演示为独立静态页面，不依赖 WebGIS 后端、不依赖外网。以演示目录为静态服务器根目录运行：</p>
+    <p class="note">&nbsp;&nbsp;<code>python tools/serve.py 8765</code></p>
+    <p>需使用多线程服务器，不要用单线程的 <code>python -m http.server</code>——本页会并发拉取 DEM、影像与库文件，单线程会拒绝连接，表现为贴图加载失败或图表空白。浏览器打开 <code>http://127.0.0.1:8765/</code>。</p>
+    <p>在系统中访问时，三维示范区页面保留系统统一导航，内容区以内嵌框架加载本演示页，静态资源走系统既有的三维资源路由，无需后端改动。</p>
+    <p>可用查询参数直接定位：<code>?t=300&amp;vol=0.90</code> 定位到指定时刻（秒）与物源规模（亿 m³）；<code>&amp;cine=1</code> 以洪水航拍跟拍视角打开；<code>&amp;engine=cesium</code> 直接用三维地球视图打开；<code>?diag=1</code> 输出运行时诊断。推荐验收组合：<code>?t=260&amp;cine=1&amp;diag=1</code>。</p>
+    <p>附带的单图转程序化 Three.js 模型实验室是独立开发页：按 img2threejs 2.0.1 的方法论，把一张参考图分 8 个阶段重建为可编辑的三维组。它不加载本演示任何 DEM / 影像 / OSM 数据，也不改动主沙盘，因此不在主界面占位。</p>
+
+    <h1 id="section-9">九、演示级边界声明（重申）</h1>
+    <ol>
+      <li>本演示仅用于演示、方案沟通与教学展示，<strong>不可用于防洪决策、风险评价或任何工程预测</strong>。</li>
+      <li>页面所有流量、流速、流深、到达时间数字引自论文表格或由其线性插值，非本演示模拟产生。</li>
+      <li>洪水层 GPU 波面解的是线性化小振幅波方程，宏观淹没范围与到达时间来自既有场，水位包络来自论文表 4，不产出预测数字。</li>
+      <li>水面展宽、垂直夸张、泥浆材质、碎冰与粒子数量等为视觉合成参数，画面中的水面宽度与泥色不代表实测淹没边界或实测流深。</li>
+      <li>到达时间场与 KPI 传播存在约 4.7 km 口径差，二维数值解求解器原型未接入、结果未率定，相关统一映射工作<strong>尚未完成</strong>。</li>
+    </ol>
+
+    <p class="doc-footer no-indent">—— 文档结束 · 本说明随三维示范区页面版本同步维护 ——</p>
+
+  </section>
+
+</body>
+</html>
