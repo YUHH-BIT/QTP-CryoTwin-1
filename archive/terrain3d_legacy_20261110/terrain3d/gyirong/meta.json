@@ -1,0 +1,32 @@
+{
+  "region": "gyirong",
+  "name": "吉隆口岸（热索村）",
+  "subtitle": "吉隆藏布与东林藏布交汇处 · 中尼边境",
+  "bbox": [
+    85.3522,
+    28.257,
+    85.4032,
+    28.302
+  ],
+  "zoom": 15,
+  "meshSize": 900,
+  "minHeight": 1684.9,
+  "maxHeight": 3711.4,
+  "sizeMeters": {
+    "x": 4999.7,
+    "z": 4974.3
+  },
+  "textures": {
+    "satellite": "texture.jpg",
+    "hillshade": "texture_hillshade.jpg"
+  },
+  "heights": "height.bin",
+  "mask": null,
+  "basin": null,
+  "peaks": [],
+  "sources": {
+    "dem": "AWS Open Data / Terrarium（SRTM 派生，全球已填洞）",
+    "imagery": "Esri World Imagery（在线，需按其条款署名）"
+  },
+  "generated": "2026-10-29 21:10"
+}

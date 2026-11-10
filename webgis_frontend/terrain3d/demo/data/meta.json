@@ -1,0 +1,31 @@
+{
+  "region": "custom",
+  "name": "自定义区域 85.34,28.20,85.56,28.31",
+  "bbox": [
+    85.34,
+    28.2,
+    85.56,
+    28.31
+  ],
+  "zoom": 13,
+  "meshSize": 1000,
+  "minHeight": 1530.1,
+  "maxHeight": 7221.3,
+  "sizeMeters": {
+    "x": 21572.4,
+    "z": 12159.4
+  },
+  "textures": {
+    "satellite": "texture.jpg",
+    "hillshade": "texture_hillshade.jpg"
+  },
+  "heights": "height.bin",
+  "mask": null,
+  "basin": null,
+  "peaks": [],
+  "sources": {
+    "dem": "AWS Open Data / Terrarium（SRTM 派生，全球已填洞）",
+    "imagery": "Esri World Imagery（在线，需按其条款署名）"
+  },
+  "generated": "2026-10-30 01:29"
+}

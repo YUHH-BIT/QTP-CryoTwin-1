@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:," />
+<title>单图 → 程序化 Three.js 模型 · 建模实验室</title>
+<style>
+  :root {
+    --bg: #0a1017; --panel: #111c26; --panel2: #172632; --line: #243849;
+    --text: #e7f0f6; --muted: #8ea7ba; --accent: #4ec9e0; --accent2: #ffb454;
+    --ok: #5fd39a; --bad: #ff7b72;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 13px/1.55 system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  .topbar {
+    height: 66px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 18px; border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #14222e, #0e1822);
+  }
+  .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+  .brand-mark {
+    width: 30px; height: 30px; flex: none; border-radius: 8px;
+    background: linear-gradient(135deg, var(--accent), #2c6f9a);
+    box-shadow: 0 0 18px rgba(78, 201, 224, .35);
+  }
+  .brand h1 { margin: 0; font-size: 16px; letter-spacing: .3px; }
+  .brand p { margin: 2px 0 0; color: var(--muted); font-size: 11.5px; }
+  .btn {
+    border: 1px solid var(--line); background: var(--panel2); color: var(--text);
+    padding: 7px 12px; border-radius: 7px; cursor: pointer; font-size: 12px;
+    text-decoration: none; display: inline-flex; align-items: center; justify-content: center;
+    transition: border-color .15s, background .15s;
+  }
+  .btn:hover { border-color: var(--accent); background: #1d3040; }
+  .btn.primary { background: #17566b; border-color: #2b8ba8; color: #eafcff; }
+  .btn.primary:hover { background: #1d6d86; }
+  .btn.ghost { background: transparent; }
+  .btn:disabled { opacity: .42; cursor: not-allowed; }
+  .btn:disabled:hover { border-color: var(--line); background: var(--panel2); }
+
+  .lab {
+    display: grid; grid-template-columns: 316px minmax(400px, 1fr) 306px;
+    gap: 12px; padding: 12px; height: calc(100vh - 66px);
+  }
+  .col { min-width: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+  .col::-webkit-scrollbar { width: 8px; }
+  .col::-webkit-scrollbar-thumb { background: #294051; border-radius: 8px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 12px;
+  }
+  .card h2 { margin: 0 0 10px; font-size: 13px; letter-spacing: .3px; }
+  .tag {
+    float: right; font-size: 10px; font-weight: 400; color: var(--accent);
+    border: 1px solid #27586a; border-radius: 20px; padding: 1px 8px;
+  }
+  .note { color: var(--muted); font-size: 11.5px; margin: 9px 0 0; }
+  .ref-frame {
+    border: 1px solid #33485a; border-radius: 7px; overflow: hidden;
+    background: #cdd9e0; line-height: 0;
+  }
+  .ref-frame img { width: 100%; display: block; }
+  .ref-cap { color: var(--muted); font-size: 11px; margin-top: 7px; }
+
+  .pass-list { display: flex; flex-direction: column; gap: 4px; }
+  .pass {
+    display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+    border: 1px solid transparent; border-radius: 6px; cursor: pointer;
+    color: var(--muted); font-size: 12px;
+  }
+  .pass:hover { background: #1a2a37; }
+  .pass.done { color: var(--text); background: #152c33; border-color: #23505a; }
+  .pass.active { color: #eafcff; background: #1c4a5b; border-color: var(--accent); }
+  .pass.fail { color: var(--bad); background: #351f22; border-color: #6c3535; }
+  .pass .idx {
+    width: 19px; height: 19px; flex: none; border-radius: 50%; font-size: 10px;
+    display: grid; place-items: center; border: 1px solid #3a5468;
+  }
+  .pass.done .idx { background: #1f6a63; border-color: #2f9c8e; color: #dffaf2; }
+  .pass.active .idx { background: var(--accent); color: #062430; border-color: var(--accent); }
+  .pass .cn { flex: 1; }
+  .pass .en { font-size: 10px; opacity: .62; font-family: ui-monospace, Consolas, monospace; }
+  .btn-row { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .btn-row .btn { flex: 1; min-width: 92px; }
+
+  .gate { margin-top: 10px; font-size: 11.5px; }
+  .gate-row { display: flex; gap: 6px; align-items: flex-start; padding: 2px 0; }
+  .gate-row .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; }
+  .dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }
+  .gate-row .gname { flex: 1; }
+  .gate-row .gval { color: var(--muted); font-family: ui-monospace, Consolas, monospace; font-size: 10.5px; }
+
+  .detail { display: flex; gap: 8px; align-items: flex-start; padding: 5px 0; border-bottom: 1px dashed #22333f; font-size: 11.5px; }
+  .detail:last-child { border-bottom: 0; }
+  .detail .num { flex: none; width: 18px; height: 18px; border-radius: 50%; background: #1c4c5e; color: #bfeaf5; display: grid; place-items: center; font-size: 10px; }
+  .detail .body { flex: 1; min-width: 0; }
+  .detail .body b { font-weight: 600; }
+  .detail .body span { display: block; color: var(--muted); font-size: 10.5px; }
+  .detail .cf { flex: none; font-family: ui-monospace, Consolas, monospace; font-size: 10.5px; color: var(--accent2); }
+  .detail.pending { opacity: .42; }
+
+  .viewport {
+    position: relative; height: min(54vh, 520px); min-height: 340px;
+    border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+    background: radial-gradient(ellipse at 50% 42%, #223746, #0b141d 72%);
+  }
+  #cv { display: block; width: 100%; height: 100%; }
+  .vp-hud {
+    position: absolute; left: 12px; top: 12px; pointer-events: none;
+    background: rgba(9, 20, 29, .78); border: 1px solid #2b4557; border-radius: 7px;
+    padding: 7px 10px; font-size: 11px; color: var(--muted);
+  }
+  .vp-hud b { color: var(--text); font-size: 12.5px; }
+  .vp-hud .k { color: var(--accent); }
+  .vp-side {
+    position: absolute; right: 12px; top: 12px; width: 40%; max-width: 260px;
+    border: 1px solid #3a5f74; border-radius: 7px; overflow: hidden;
+    box-shadow: 0 8px 26px rgba(0,0,0,.5); display: none; background: #cdd9e0;
+  }
+  .vp-side.on { display: block; }
+  .vp-side img { width: 100%; display: block; }
+  .vp-side .cap { background: rgba(9,20,29,.9); color: #cfe4ef; font-size: 10.5px; padding: 4px 7px; }
+  .vp-tip { position: absolute; left: 12px; bottom: 10px; color: #7893a7; font-size: 10.5px; pointer-events: none; }
+
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .metric { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .metric .v { font-size: 17px; font-weight: 600; color: var(--accent); font-family: ui-monospace, Consolas, monospace; }
+  .metric .l { color: var(--muted); font-size: 10.5px; }
+  pre {
+    margin: 0; max-height: 250px; overflow: auto; font-size: 10.5px; line-height: 1.5;
+    font-family: ui-monospace, Consolas, "Courier New", monospace; color: #a9d6e6;
+    background: #0b1620; border: 1px solid #203241; border-radius: 7px; padding: 10px;
+    white-space: pre-wrap; word-break: break-all;
+  }
+  .slider { margin: 9px 0; }
+  .slider label { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); }
+  .slider label b { color: var(--text); font-family: ui-monospace, Consolas, monospace; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .check { display: flex; align-items: center; gap: 7px; font-size: 11.5px; margin: 7px 0; color: var(--muted); }
+  .check input { accent-color: var(--accent); }
+  .reviews { max-height: 230px; overflow: auto; font-size: 11px; }
+  .rev { display: flex; gap: 7px; padding: 4px 0; border-bottom: 1px dashed #22333f; }
+  .rev .pill { flex: none; font-size: 10px; padding: 1px 7px; border-radius: 20px; font-family: ui-monospace, Consolas, monospace; }
+  .rev .pill.pass { background: #194437; color: var(--ok); }
+  .rev .pill.fail { background: #462324; color: var(--bad); }
+  .rev .txt { flex: 1; color: var(--muted); }
+  .note-card ul { margin: 0; padding-left: 17px; color: var(--muted); font-size: 11.5px; }
+  .note-card li { margin: 5px 0; }
+  .note-card b { color: #c9dde9; }
+  code { background: #1b2b38; padding: 1px 4px; border-radius: 3px; color: #b9e2f0; font-size: 10.5px; }
+  @media (max-width: 1180px) {
+    .lab { grid-template-columns: 1fr; height: auto; }
+    .col { overflow: visible; }
+    .viewport { height: 460px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark"></span>
+    <div>
+      <h1>单图 → 程序化 Three.js 模型 · 建模实验室</h1>
+      <p>img2threejs 2.0.1 方法论复刻　|　独立页面，不接入沙盘主程序，不改动既有系统</p>
+    </div>
+  </div>
+  <a class="btn ghost" href="./index.html">← 返回实景沙盘</a>
+</header>
+
+<main class="lab">
+  <!-- 左栏：参考图 / pass / detailInventory -->
+  <aside class="col left">
+    <section class="card">
+      <h2>① 参考图 <span class="tag">构图参考</span></h2>
+      <div class="ref-frame"><img id="ref-img" alt="口岸联检楼立面构图参考图" /></div>
+      <div class="ref-cap">编号 1–6 对应下方 detailInventory，每个编号都必须映射到真实组件或命名材质。</div>
+      <p class="note">这是一张<b>人工绘制的构图示意图</b>，不是实测照片、不是倾斜摄影。因此本页的重建目标是「结构与比例像」，不做像素级保真；背面、屋顶设备、真实尺度均标注为低置信推断。</p>
+    </section>
+
+    <section class="card">
+      <h2>② 分阶段构建 <span class="tag">8 passes</span></h2>
+      <div id="pass-list" class="pass-list"></div>
+      <div class="btn-row">
+        <button id="btn-next" class="btn primary">下一阶段</button>
+        <button id="btn-all" class="btn">一键全链路</button>
+        <button id="btn-reset" class="btn ghost">回到起点</button>
+      </div>
+      <div id="gate" class="gate"></div>
+      <div class="btn-row">
+        <button id="btn-gate-test" class="btn ghost">故意破坏 spec，看门控</button>
+      </div>
+      <div id="gate-test" class="note"></div>
+    </section>
+
+    <section class="card">
+      <h2>③ detailInventory <span class="tag">身份细节</span></h2>
+      <div id="detail-list"></div>
+      <p class="note">门控规则：任何一条细节没有 <code>mappedTo</code>，就不生成几何。这是防止「贴一张看起来很真的图，其实没有结构」的关键。</p>
+    </section>
+  </aside>
+
+  <!-- 中栏：3D 视口 / 指标 / spec 快照 -->
+  <section class="col center">
+    <div class="viewport" id="viewport">
+      <canvas id="cv"></canvas>
+      <div class="vp-hud">
+        <b id="vp-title">blockout</b><br />
+        当前 pass <span class="k" id="vp-pass">0 / 8</span>　|　拖拽旋转 · 滚轮缩放
+      </div>
+      <div class="vp-side" id="side-by-side">
+        <img id="side-img" alt="参考图对照" />
+        <div class="cap">参考图 / 渲染对照（同一视角为示意，非严格相机匹配）</div>
+      </div>
+      <div class="vp-tip" id="vp-tip">Three.js r160 · 全部几何由代码生成，无 mesh 文件、无贴图下载</div>
+    </div>
+
+    <div class="metrics" id="metrics"></div>
+
+    <section class="card">
+      <h2>④ 可编辑 spec 快照 <span class="tag">可 diff</span></h2>
+      <pre id="spec-json">等待构建…</pre>
+      <p class="note">输出是<b>可 diff 的 JSON + 代码</b>，不是二进制网格。改右侧任一参数都会从这份 spec 整组重建，<code>seed</code> 固定保证程序化摆放可复现。</p>
+    </section>
+  </section>
+
+  <!-- 右栏：参数 / 评审 / 边界 -->
+  <aside class="col right">
+    <section class="card">
+      <h2>⑤ 改 spec，实时重建</h2>
+      <div class="slider"><label>楼层数 <b id="v-floors">4</b></label><input id="s-floors" type="range" min="2" max="7" step="1" value="4" /></div>
+      <div class="slider"><label>开间（窗列） <b id="v-bays">8</b></label><input id="s-bays" type="range" min="4" max="12" step="1" value="8" /></div>
+      <div class="slider"><label>屋顶坡度 <b id="v-pitch">0.12</b></label><input id="s-pitch" type="range" min="0" max="0.35" step="0.01" value="0.12" /></div>
+      <div class="slider"><label>窗格密度 <b id="v-win">1.00</b></label><input id="s-win" type="range" min="0.4" max="2" step="0.05" value="1" /></div>
+      <div class="slider"><label>损毁程度 <b id="v-damage">0.00</b></label><input id="s-damage" type="range" min="0" max="1" step="0.01" value="0" /></div>
+      <div class="slider"><label>夜间亮灯 <b id="v-night">0.35</b></label><input id="s-night" type="range" min="0" max="1" step="0.01" value="0.35" /></div>
+      <div class="slider"><label>三角面预算 <b id="v-budget">12000</b></label><input id="s-budget" type="range" min="2000" max="40000" step="1000" value="12000" /></div>
+      <label class="check"><input id="c-strict" type="checkbox" checked /> strict-quality 门控（失败即不生成）</label>
+      <label class="check"><input id="c-compare" type="checkbox" /> side-by-side 参考图对照</label>
+      <label class="check"><input id="c-spin" type="checkbox" /> 自动旋转（runtime tick）</label>
+    </section>
+
+    <section class="card">
+      <h2>⑥ 阶段评审记录 <span class="tag">确定性门控</span></h2>
+      <div id="reviews" class="reviews"></div>
+      <p class="note">这里<b>没有 AI 视觉评审</b>：所有可机械判定的检查（组件数、命名材质、细节映射、三角面预算、锚点、重复系统）交给脚本；「像不像」留给人在对照图里看。这正是 img2threejs「scripts enforce, model judges」的做法。</p>
+    </section>
+
+    <section class="card note-card">
+      <h2>边界与事实核对</h2>
+      <ul>
+        <li>项目：<b>img2threejs 2.0.1</b>（Apache-2.0，2026-11-05 发版），主仓约 20.4k stars。定位是 Agent Skill，不是开箱即用的网页服务。</li>
+        <li>运行条件：Node ≥ 18、Git、Python ≥ 3.10，以及 Claude Code / Codex / OpenCode / Hermes 之一；核心 <code>forge/</code> 脚本纯标准库、不需要 pip，README 未要求单独的 LLM API Key。</li>
+        <li><b>宣称契约 ≠ 实际生成代码</b>：README 与 <code>docs/ARCHITECTURE.md</code> 写的是 <code>createObjectNameModel(spec, options)</code> + <code>ObjectSculptSpec</code> + <code>root.userData.sculptRuntime</code>；但画廊里真实落地的 <code>tropical-island/createTropicalIslandModel.ts</code> 是<b>无参工厂</b>，没有 sculptRuntime，参数以 <code>PALETTE / PROP_SLOTS</code> 常量暴露，运行时句柄挂在 <code>root.userData.tick / dispose</code> 上。本页两种暴露方式都保留。</li>
+        <li>单图看不到背面：按区域标 confidence，允许输出「只能做到示意」，不把视觉相似度当成测量真值。</li>
+        <li>本页<b>不调用任何外部服务</b>、不联网、不加载网格或贴图，Three.js r160 已在本地；与吉隆沙盘的真实 DEM / 影像 / OSM 数据完全隔离。</li>
+      </ul>
+    </section>
+  </aside>
+</main>
+
+<!-- 唯一的一张参考图：内联 SVG，运行时序列化成 data URI 供两处 img 使用 -->
+<template id="ref-template">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 300" width="480" height="300">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fb7c9"/><stop offset="1" stop-color="#e3eaec"/></linearGradient>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7f2e7"/><stop offset="1" stop-color="#d7cebc"/></linearGradient>
+  </defs>
+  <rect width="480" height="300" fill="url(#sky)"/>
+  <path d="M0 150 L60 108 L110 138 L175 82 L235 132 L295 96 L350 140 L420 104 L480 146 V300 H0Z" fill="#7d92a3" opacity=".55"/>
+  <path d="M0 176 L70 146 L140 172 L215 138 L285 170 L360 142 L440 172 L480 156 V300 H0Z" fill="#5d7487" opacity=".5"/>
+  <rect y="232" width="480" height="68" fill="#8d8b7f"/>
+  <rect y="244" width="480" height="56" fill="#716f64"/>
+  <rect x="38" y="164" width="64" height="72" fill="url(#wall)" stroke="#6d6558"/>
+  <rect x="378" y="164" width="64" height="72" fill="url(#wall)" stroke="#6d6558"/>
+  <g fill="#3e5d70" stroke="#e7ddc9" stroke-width="1.4">
+    <rect x="48" y="176" width="18" height="15"/><rect x="74" y="176" width="18" height="15"/>
+    <rect x="48" y="202" width="18" height="15"/><rect x="74" y="202" width="18" height="15"/>
+    <rect x="388" y="176" width="18" height="15"/><rect x="414" y="176" width="18" height="15"/>
+    <rect x="388" y="202" width="18" height="15"/><rect x="414" y="202" width="18" height="15"/>
+  </g>
+  <rect x="100" y="106" width="280" height="130" fill="url(#wall)" stroke="#6d6558" stroke-width="1.6"/>
+  <rect x="96" y="96" width="288" height="12" fill="#9c4638"/>
+  <rect x="96" y="92" width="288" height="4" fill="#c9825c"/>
+  <g fill="#e9dfcc" stroke="#9a8c76" stroke-width=".7">
+    <rect x="98" y="84" width="14" height="8"/><rect x="122" y="84" width="14" height="8"/>
+    <rect x="146" y="84" width="14" height="8"/><rect x="170" y="84" width="14" height="8"/>
+    <rect x="194" y="84" width="14" height="8"/><rect x="218" y="84" width="14" height="8"/>
+    <rect x="242" y="84" width="14" height="8"/><rect x="266" y="84" width="14" height="8"/>
+    <rect x="290" y="84" width="14" height="8"/><rect x="314" y="84" width="14" height="8"/>
+    <rect x="338" y="84" width="14" height="8"/><rect x="362" y="84" width="14" height="8"/>
+  </g>
+  <g fill="#3e5d70" stroke="#ded3bd" stroke-width="1.5">
+    <rect x="114" y="126" width="24" height="20"/><rect x="146" y="126" width="24" height="20"/>
+    <rect x="178" y="126" width="24" height="20"/><rect x="210" y="126" width="24" height="20"/>
+    <rect x="242" y="126" width="24" height="20"/><rect x="274" y="126" width="24" height="20"/>
+    <rect x="306" y="126" width="24" height="20"/><rect x="338" y="126" width="24" height="20"/>
+    <rect x="114" y="160" width="24" height="20"/><rect x="146" y="160" width="24" height="20"/>
+    <rect x="178" y="160" width="24" height="20"/><rect x="210" y="160" width="24" height="20"/>
+    <rect x="242" y="160" width="24" height="20"/><rect x="274" y="160" width="24" height="20"/>
+    <rect x="306" y="160" width="24" height="20"/><rect x="338" y="160" width="24" height="20"/>
+    <rect x="114" y="194" width="24" height="20"/><rect x="146" y="194" width="24" height="20"/>
+    <rect x="178" y="194" width="24" height="20"/><rect x="306" y="194" width="24" height="20"/>
+    <rect x="338" y="194" width="24" height="20"/>
+  </g>
+  <rect x="210" y="190" width="60" height="46" fill="#4a443b"/>
+  <rect x="202" y="182" width="76" height="8" fill="#b9ab94"/>
+  <rect x="222" y="198" width="36" height="38" fill="#2b3b45"/>
+  <line x1="240" y1="92" x2="240" y2="42" stroke="#4a4a48" stroke-width="2"/>
+  <path d="M240 44 L272 50 L240 58 Z" fill="#c8392f"/>
+  <rect x="88" y="236" width="304" height="8" fill="#bdb3a0"/>
+  <rect x="80" y="244" width="320" height="7" fill="#a69c89"/>
+  <g font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle">
+    <circle cx="110" cy="72" r="9" fill="#1e5f7a"/><text x="110" y="76">1</text>
+    <circle cx="330" cy="72" r="9" fill="#1e5f7a"/><text x="330" y="76">2</text>
+    <circle cx="126" cy="136" r="9" fill="#1e5f7a"/><text x="126" y="140">3</text>
+    <circle cx="240" cy="172" r="9" fill="#1e5f7a"/><text x="240" y="176">4</text>
+    <circle cx="96" cy="260" r="9" fill="#1e5f7a"/><text x="96" y="264">5</text>
+    <circle cx="286" cy="34" r="9" fill="#1e5f7a"/><text x="286" y="38">6</text>
+  </g>
+</svg>
+</template>
+
+<script type="module" src="./sculpt_lab.js"></script>
+</body>
+</html>
