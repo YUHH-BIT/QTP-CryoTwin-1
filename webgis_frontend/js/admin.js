@@ -118,6 +118,11 @@
       document.querySelectorAll('.admin-nav-item').forEach(n => {
         n.classList.toggle('active', n.getAttribute('data-cat') === cat);
       });
+      // 同步顶栏「系统管理」下拉的选中态：左栏与下拉是同一套分类，
+      // 只亮左栏会让"从下拉进来的当前页"在导航里看不出来。
+      document.querySelectorAll('#admin-dropdown .dropdown-item').forEach(i => {
+        i.classList.toggle('active', i.dataset.category === cat);
+      });
       setContent('<div class="admin-empty">加载中…</div>');
       try {
         await this['render' + cat.charAt(0).toUpperCase() + cat.slice(1)]();
