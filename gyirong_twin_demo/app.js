@@ -73,11 +73,13 @@ const STAGES = [
    `alias` 把同源的第二个状态位挂在同一个开关上：本地沙盘的实景洪水水面与
    旧「示意流深场」用的是同一份 arrival/depth 场（同时开会叠两层水），
    故合并成一项「洪水淹没场」；三维地球侧该位仍是泥流帧场开关。 */
+// 「灾害体推进」默认关：它是 22 km 全景用的橙色相态示意带（C 层视觉合成），
+// 近景下半透明盖住真实泥流与碎冰，观感干扰大；需要时由左侧图层卡手动勾选。
 const LAYERS = [
   { id: 'imagery',   label: '卫星影像',   on: true,  group: '底图与地形' },
   { id: 'contour',   label: '等高线',     on: false, group: '底图与地形' },
 
-  { id: 'hazard',    label: '灾害体推进', on: true,  group: '灾害与水体' },
+  { id: 'hazard',    label: '灾害体推进', on: false, group: '灾害与水体' },
   { id: 'channel',   label: '演进沟道',   on: true,  group: '灾害与水体' },
   { id: 'flood',     label: '洪水淹没场', on: true,  group: '灾害与水体', alias: ['field'] },
   { id: 'debris',    label: '碎冰 / 冰碛物', on: true, group: '灾害与水体' },
@@ -531,7 +533,10 @@ function initScene() {
   controls.minDistance = 180;      // 原来 420 太远，贴不近建筑与碎冰
   controls.maxDistance = 72000;
   controls.maxPolarAngle = Math.PI * 0.492;
-  controls.autoRotateSpeed = 0.4;
+  // autoRotateSpeed 只在「update(deltaTime)」下才是真正的 秒/圈（2 → 30 s/圈）。
+  // 不传 dt 时 r160 退回「每帧固定角」，低帧率(SwiftShader)会慢到像没转。
+  // 取 1.0 ≈ 60 秒/圈，全景沙盘稳重不晃；dt 由 loop 每帧传入。
+  controls.autoRotateSpeed = 1.0;
   // 地图式交互：屏幕空间平移 + 右键 / Shift+左键平移 + 滚轮按光标位置缩放。
   // 默认 screenSpacePanning=false 时平移发生在世界 XZ 平面，斜视角下几乎拖不动。
   controls.enablePan = true;
@@ -1873,7 +1878,10 @@ function loop(now) {
     const f = computeFrame(state.t, state.vol);
     state.t = Math.min(f.total, state.t + dt * SIM_SECONDS_PER_REAL_SECOND * state.speed);
     if (state.t >= f.total) {
-      state.playing = false; autoFly = false;
+      // 只停时间推进，不清 autoFly：它同时是 immersiveCam() 的判据，清掉会让
+      // 全景的橙色态势带 / 节点球在末帧突然恢复（此时 uFront 已到 1，整条带全亮）。
+      // 用户拖画布 / 滚轮 / 重置视角仍会清 autoFly，退出路径不变。
+      state.playing = false;
       $('btn-play').textContent = '播放';
       pushLog('推演结束：灾害体到达吉隆口岸', 'crit', state.t);
     }
@@ -1920,7 +1928,10 @@ function loop(now) {
   // 跟拍模式压低「态势叠加层」，让真实水面 / 泡沫 / 碎冰成为画面主体；
   // 全景模式保留叠加层以便在 22 km 尺度上辨识沟道
   const overlayFade = state.layers.flood ? (imm ? 0.16 : 0.58) : 1;
-  hazardShared.uAlpha.value = (1 - 0.68 * nearK) * overlayFade;
+  // 近景（nearK→1）真正淡出：原实现只切 depthTest，alpha 仍留约 0.19，
+  // 手动拖画布退出跟拍后几百米宽的橙色态势带会整片盖住泥流与碎冰。
+  // 全景（nearK→0）保持 0.58，22 km 尺度仍靠态势带辨识沟道。
+  hazardShared.uAlpha.value = (1 - 0.68 * nearK) * overlayFade * (1 - 0.92 * nearK);
   const wantDepth = nearK > 0.35;
   if (wantDepth !== overlayDepth) {
     overlayDepth = wantDepth;
@@ -1938,7 +1949,9 @@ function loop(now) {
     frontMarker.children[1].scale.setScalar(1 + 0.16 * Math.sin(now / 320));
   }
   updateFlight(now);
-  controls.update();
+  // 必须把 dt 传给 update()：r160 才按真实时间算自动旋转角速度，
+  // 否则 autoRotate 走「每帧固定角」分支，低帧率下慢到几乎不动（表现为按钮没用）。
+  controls.update(dt);
   // 所有运镜算完之后再做地形安全钳制，这是防穿模的最后一道保险
   enforceCameraClearance();
 
@@ -2251,6 +2264,7 @@ async function boot() {
     facadeOn: facadeUniforms.uFacadeOn.value, sculpts: diagnose(),
     bldFocus: bldFocus && { count: bldFocus.count, x: Math.round(bldFocus.x), z: Math.round(bldFocus.z) },
     widthBoost: +hazardShared.uWidthBoost.value.toFixed(1),
+    hazardAlpha: +hazardShared.uAlpha.value.toFixed(3),
     t: Math.round(state.t), path: +computeFrame(state.t, state.vol).path.toFixed(3),
     hazardFront: +hazardMat.uniforms.uFront.value.toFixed(3),
     hazardVisible: hazardMesh.visible,
