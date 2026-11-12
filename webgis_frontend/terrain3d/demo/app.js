@@ -4,7 +4,7 @@ import { OrbitControls } from './lib/OrbitControls.js?v=20261111a';
 import { PALETTE, material, makeSculpt, assertAnchors, applyDamage,
          diagnose, attachFacade, attachBank, buildDistanceField } from './proc.js?v=20261111a';
 // 洪水演进实景层：④ GPU 高度场 + 亚网格连续曲面 + 碎冰 / 飞溅粒子（④②⑤①⑥）
-import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261111a';
+import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261112ao';
 
 /* ==========================================================================
    吉隆「8·26」冰岩崩—泥石流灾害链 · 实景三维数字孪生推演（演示级）
@@ -82,6 +82,9 @@ const LAYERS = [
   { id: 'hazard',    label: '灾害体推进', on: false, group: '灾害与水体' },
   { id: 'channel',   label: '演进沟道',   on: true,  group: '灾害与水体' },
   { id: 'flood',     label: '洪水淹没场', on: true,  group: '灾害与水体', alias: ['field'] },
+  // 「图7 淹没范围」= 直接把论文图 7 勾出的包络贴在地形上（范围图层，与时间无关），
+  // 动态水面只画「此刻有水」的地方，这一层画「最终铺到哪里」，两者互补不重复。
+  { id: 'extent',    label: '文献淹没范围', on: true, group: '灾害与水体' },
   { id: 'debris',    label: '碎冰 / 冰碛物', on: true, group: '灾害与水体' },
   { id: 'spray',     label: '浪花 / 扬尘', on: true, group: '灾害与水体' },
   { id: 'lake',      label: '堰塞水体',   on: true,  group: '灾害与水体' },
@@ -376,7 +379,7 @@ const CESIUM_LAYER_KEYS = ['imagery', 'channel', 'hazard', 'field',
 // 「洪水淹没场」不在此列 —— 它已合并了三维地球侧控制泥流帧场的 field 位，
 // 两个视图都有意义，所以切换后仍可勾选。
 const THREE_ONLY_LAYERS = ['contour', 'nodes', 'facade', 'bank',
-                           'debris', 'spray'];
+                           'debris', 'spray', 'extent'];
 const DIAG = new URLSearchParams(location.search).get('diag') === '1';
 let cesiumFrame = null, cesiumRequested = false, cesiumReady = false;
 let cesiumDiag = null, cesiumErr = '', lastCesiumT = -1;
@@ -643,8 +646,12 @@ function buildSkirt() {
 
 // 到达时间 / 流深场：纹理保持 512×289 原精度，仅显示网格降采样（性能取舍）
 async function buildFlowField() {
-  const [arrBuf, depBuf] = await Promise.all([getBuf('arrival.bin'), getBuf('depth.bin')]);
-  fieldBuffers = { arrBuf, depBuf };    // 洪水层烘焙淹没源时复用同一份原始数据
+  const [arrBuf, depBuf, shapeBuf] = await Promise.all([
+    getBuf('arrival.bin'), getBuf('depth.bin'), getBuf('shape.bin').catch(() => null)]);
+  // shape.bin = 预先烘焙的淹没包络（scripts/build_gyirong_flood_shape.py 生成，
+  // 按论文图 7 的形态：源头扇形漫开 + 峡谷细长主流）。缺失时洪水层回退到运行时
+  // 由 arrival/depth + 地形现算的老口径，不影响页面可用性。
+  fieldBuffers = { arrBuf, depBuf, shapeBuf };
   const mk = buf => {
     const t = new THREE.DataTexture(new Uint8Array(buf), field.nx, field.ny,
       THREE.RedFormat, THREE.UnsignedByteType);
@@ -705,6 +712,7 @@ function buildFlood() {
     chanPts, chanS, chanAt, displayY, terrainY: terrainTriY,
     texSat, texWaterN0, texWaterN1, exag: EXAG,
     arrBuf: fieldBuffers.arrBuf, depBuf: fieldBuffers.depBuf,
+    shapeBuf: fieldBuffers.shapeBuf,
   }).build();
   const f = computeFrame(state.t, state.vol);
   flood.setLayers(state.layers);
@@ -930,28 +938,106 @@ function buildOSMBuildings() {
   }
 }
 
+/* 冰崩源位置（2026-11-12 用户指正）：不能压在沟道口上，要放在「靠近演进路线那座山的
+   另一边」。按 DEM 实测，取沟道起点（85.4981, 28.2460, 5245 m）正北 2.3 km 的
+   6911 m 冰壁北坡 (85.4985, 28.2605)：它与沟道之间隔着一道山脊（起点方向上被地形挡
+   127 m），而沿坡下行的通道 2.34 km、落差 1666 m 是单调下降的 —— 冰体失稳后顺坡崩落
+   直接跌进错坚河上游。这是 8·26 冰岩崩的形态：源区在山背后高处，不在河谷里。
+   （试过西北 3.5 km 的 5435 m 平缓冰斗：与沟道不连通，要绕 13 km 或翻 6400 m 垭口，
+     物理上不成立，已废弃。） */
+const GLACIER_LL = [85.4985, 28.2605];
+
+/* 2026-11-12 18:50 用户要求：删掉源区那五个大冰块。
+   冰体本身是示意几何（Icosahedron），在 22 km 全景里既不像真实冰体、又抢主体水面的
+   注意力，所以整体撤掉，只留下面那条贴地的冰崩崩落带表达「源区在哪、怎么下来的」。
+   保留一个空 Group 占位：图层的 visible / 消融 scale / 诊断接口都按 glacierGroup 取，
+   删变量会连锁改 setLayers 与 updateFlood，空组零风险。 */
 function buildGlacier() {
-  const src = chanPts[0];
-  // 与建筑同一套 spec 工厂：证明新增一类资产只要写一份 parts 描述。
-  // 子块仍用相对坐标，整组缩放时才不会甩离源区。
-  const seed = [[0, 0, 150], [190, -130, 110], [-170, 150, 125], [90, 210, 95], [-110, -180, 88]];
-  const parts = seed.map(([dx, dz, r], i) => {
-    const dy = displayY(src.x + dx, src.z + dz) - src.y;
-    return {
-      name: `part_ice_${i}`, role: 'body',
-      geometry: new THREE.IcosahedronGeometry(r, 0), material: material('GY_ice'),
-      position: [dx, dy + r * 0.55 + 30 + (i % 2) * 25, dz],
-      scale: [1.25, 0.55, 1.0],
-      rotation: [dx * 0.002, dz * 0.002, 0.2],
-    };
-  });
-  glacierGroup = makeSculpt({
-    id: 'glacier_source', kind: 'glacier', parts,
-    anchor: 'anchor_glacier_socket', meta: { source: 'ice-rock avalanche source' },
-  });
-  glacierGroup.name = 'anchor_glacier';   // 保留既有锚点名，镜头/诊断按它取
-  glacierGroup.position.set(src.x, src.y, src.z);
+  glacierGroup = new THREE.Group();
+  glacierGroup.name = 'anchor_glacier';
   scene.add(glacierGroup);
+}
+
+/* 冰崩崩落带：冰体失稳后顺坡崩落、跌进错坚河上游的通道。
+   用 DEM 上的「最陡下行路径」算出来（只允许每步上升 ≤8 m 的硬约束，得到唯一一条
+   从源区 6925 m 落到沟道起点 5245 m 的走廊，长 2.34 km、落差 1680 m）。
+   冰体本身藏在山脊后面，光有冰块观众看不出源区在哪；这条带子把「山那边的冰源」
+   和「山这边的沟道口」在视觉上连起来，冰崩的来路一眼可读（2026-11-12 用户指正）。
+   带宽由 95 m 渐变到 170 m（崩落扇），贴地 20 单位，跟随「冰川源区」图层开关。 */
+const ICE_TRACK = [
+  [85.4984, 28.26048],
+  [85.4984, 28.26008],
+  [85.4984, 28.25967],
+  [85.4984, 28.25926],
+  [85.4984, 28.25886],
+  [85.4984, 28.25846],
+  [85.4984, 28.25805],
+  [85.4984, 28.25765],
+  [85.4984, 28.25724],
+  [85.4984, 28.25683],
+  [85.4984, 28.25643],
+  [85.4984, 28.25603],
+  [85.4984, 28.25562],
+  [85.4984, 28.25521],
+  [85.4984, 28.25481],
+  [85.4984, 28.2544],
+  [85.4984, 28.254],
+  [85.4984, 28.2536],
+  [85.4984, 28.25319],
+  [85.4984, 28.25278],
+  [85.4984, 28.25238],
+  [85.4984, 28.25198],
+  [85.4984, 28.25157],
+  [85.4984, 28.25117],
+  [85.4984, 28.25076],
+  [85.4984, 28.25035],
+  [85.4984, 28.24995],
+  [85.4984, 28.24955],
+  [85.4984, 28.24914],
+  [85.4984, 28.24873],
+  [85.4984, 28.24833],
+  [85.4984, 28.24792],
+  [85.4984, 28.24752],
+  [85.4984, 28.24712],
+  [85.4984, 28.24671],
+  [85.4984, 28.2463],
+  [85.49818, 28.2459],
+];
+let iceTrackMesh = null;
+function buildIceTrack() {
+  const P = ICE_TRACK.map(([lon, lat]) => {
+    const x = xOf(lon), z = zOf(lat);
+    return new THREE.Vector3(x, terrainTriY(x, z) + 20, z);
+  });
+  const pos = [], idx = [], uv = [];
+  for (let i = 0; i < P.length; i++) {
+    const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)];
+    let dx = b.x - a.x, dz = b.z - a.z;
+    const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+    const t = i / (P.length - 1);
+    const w = lerp(210, 360, t) * 0.5;
+    pos.push(P[i].x - dz * w, P[i].y, P[i].z + dx * w);
+    pos.push(P[i].x + dz * w, P[i].y, P[i].z - dx * w);
+    uv.push(0, t, 1, t);
+    if (i < P.length - 1) {
+      const k = i * 2;
+      idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  const m = new THREE.MeshBasicMaterial({
+    color: 0xb8dcef, transparent: true, opacity: 0.34,
+    depthWrite: false, side: THREE.DoubleSide,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+  });
+  iceTrackMesh = new THREE.Mesh(g, m);
+  iceTrackMesh.name = 'anchor_ice_track';
+  iceTrackMesh.renderOrder = 2.6;
+  iceTrackMesh.frustumCulled = false;
+  scene.add(iceTrackMesh);
 }
 
 function buildLakeAndImpact() {
@@ -1182,7 +1268,55 @@ function updateFlight(now) {
   controls.target.lerpVectors(flight.fromTgt, flight.toTgt, e);
   if (k >= 1) flight = null;
 }
-/* 重置视角（原顶栏按钮已挪到画布右上工具条）：回到 22 km 全景。
+/* 全景取景（2026-11-12 用户拍板：退回最初那台机位，只把模型朝正面稍微转一点）。
+   上一版按沟道包围盒现算（俯角 65°、斜距 13 km），几何指标更「正确」——
+   入画 100%、无遮挡 100%、占画幅 78%×70% —— 但用户看下来觉得「不好看」：
+   俯角太陡变成了正上方拍地图，丢了沙盘模型那种斜侧透视的立体感。
+   所以退回固定机位 (−8200,15000,16500)→(0,2200,0)：俯角约 35°、斜距 22.5 km，
+   正是「站在模型斜上方看整条沟谷」的观感。
+   OV_POSE.yaw 是绕竖直轴的整体旋转（单位度，0 = 原机位）：把模型往正面掰一点，
+   让沟谷长轴不要那么「斜插出画」。正负决定转哪边，?oyaw= 可临时覆盖试角度。 */
+const OV_POSE = {
+  // 以最初那台机位为基准反推出来的极坐标：方位角 −26.4°、俯角 34.8°、斜距 22.5 km，
+  // 即 cam(−8200,15000,16500) → tgt(0,2200,0)。改成极坐标只为了能单拧方位角/俯角。
+  tgt: [0, 2200, 0],
+  baseAz: -26.4,
+  dist: 22500,
+  yaw: (() => {
+    const q = parseFloat(new URLSearchParams(location.search).get('oyaw'));
+    return Number.isFinite(q) ? q : 0;
+  })(),
+  pitch: (() => {
+    const q = parseFloat(new URLSearchParams(location.search).get('opitch'));
+    return Number.isFinite(q) ? q : 34.8;
+  })(),
+};
+function overviewCamera() {
+  if (!OV_POSE) return null;
+  const [tx, ty, tz] = OV_POSE.tgt;
+  // yaw 在基准方位角上叠加：转到与沟道长轴平行时，地形会在画面里「立」成竖向纵深；
+  // pitch 压低后两侧山脊立起来，成两侧夹一谷的立面观感。
+  const a = (OV_POSE.baseAz + OV_POSE.yaw) * Math.PI / 180;
+  const p = OV_POSE.pitch * Math.PI / 180;
+  const hd = OV_POSE.dist * Math.cos(p), vy = OV_POSE.dist * Math.sin(p);
+  const px = tx + hd * Math.sin(a), pz = tz + hd * Math.cos(a);
+  const py = Math.max(ty + vy, groundAt(px, pz) + CAM_AUTO_CLEAR);
+  return { cam: new THREE.Vector3(px, py, pz), tgt: new THREE.Vector3(tx, ty, tz) };
+}
+function applyOverviewCam(anim) {
+  const o = overviewCamera();
+  if (!o) return null;
+  if (anim) flyTo(o.tgt, o.cam, 950);
+  else {
+    camera.position.copy(o.cam);
+    controls.target.copy(o.tgt);
+    camera.lookAt(o.tgt);
+    controls.update();
+  }
+  return o;
+}
+
+/* 重置视角（原顶栏按钮已挪到画布右上工具条）：回到整条沟道的全景取景。
    必须先把跟拍 / 自动运镜 / 自动旋转停掉——否则下一帧 updateDisasterFollow
    会把相机又拉回水头，用户看到的就是「点了没反应」。 */
 function resetView() {
@@ -1195,7 +1329,7 @@ function resetView() {
   followSnap = false;
   applyLayers();
   markFloodJump();
-  flyTo(new THREE.Vector3(0, 2200, 0), new THREE.Vector3(-8200, 15000, 16500), 950);
+  applyOverviewCam(true);
 }
 
 /* -------------------- 播放跟拍：镜头始终在灾害上方 -------------------- */
@@ -1257,18 +1391,32 @@ function placeRigAt(back, lat, H, ahead) {
    · 俯角由目标角度反解高度 —— 固定离水面高度在源区陡坡会变成仰视（实测 −4.6°）；
    · 机位远近由「湿点实测占画高」反馈 —— 固定 back 在口岸段会占满 99% 画面。 */
 const RIG = {
-  // 默认全链条推演跟拍 = 战术俯视机位（用户 2026-11-10 定：不再单独设按钮/模式）。
+  // 默认全链条推演跟拍 = 无人机航拍视角（2026-11-12 用户要求「别贴太紧，要无人机航拍感」）。
+  // 参数不是估的：__rigSearch 在 t=300 扫 back×lat×H×ahead 共 144 组，取
+  // 「入画≥99%、无遮挡 100%、水头落在画面中心（headX≈0）、俯角 35~40°」那一组：
+  //   back 2000 / lat −520 / H 1200 / ahead 400 → 斜距 2.4 km、俯角 37.7°、离地 1.2 km。
+  // 上一版 alt=780/back=820 的问题不是「俯角不对」，而是**斜距只有 1.3 km**，
+  // 镜头怼在谷里，看不出洪流在整段沟谷中的位置；再上一版 alt=1700/back=5200
+  // 又飞到 4.5 km 外，谷地全在背光阴影里、还暗。2.4 km 是两者之间的可用区间。
   // 用绝对高度 alt（相对瞄准点水面）而不是俯角反解 —— 俯角反解在 back 变大时
-  // 会把相机抬到 2 km 以上，反而不是「谷上方」。实测俯角约 43°、离地约 645 m，
-  // 沟谷走向与两侧地形关系清楚；水仍是一条窄带（真实湿区约 180 m 宽）。
-  // 仍沿沟道弧长布机位，离地由 CAM_AUTO_CLEAR 兜底，共用可见水头/阻尼/用户接管。
-  follow: { back: 1000, lat: -320, alt: 1050, pitch: 0, fill: 0.25,
-            backMin: 800, backMax: 2000,
-            sRate: 2.0, posRate: 2.2, tgtRate: 2.4, intro: 1.6, ahead: 600 },
+  // 会把相机抬到 2 km 以上，反而不是「谷上方」。离地由 CAM_AUTO_CLEAR 兜底。
+  // back 区间收窄：fill 反馈只做 ±15% 微调，别让它一路顶到上下限把机位拉走。
+  follow: { back: 2100, lat: -520, alt: 1200, pitch: 0, fill: 0.26,
+            backMin: 1950, backMax: 2350,
+            sRate: 2.0, posRate: 1.9, tgtRate: 2.1, intro: 2.4, ahead: 400 },
+  // 贴水面近景（?cam=near 切换）：取 __rigSearch 在 t=300 实测的最优区
+  // （H 160~250、湿带占画高 45~50%、水头居中、零遮挡）。俯角只有约 10°，
+  // 是「贴着水面看推进」的第一视角，与上面的俯瞰是两种观察方式，不互相替代。
+  near:   { back: 1000, lat: 220, alt: 0, pitch: 10, fill: 0.48,
+            backMin: 700, backMax: 1600,
+            sRate: 2.2, posRate: 2.6, tgtRate: 2.8, intro: 1.4, ahead: 300 },
   // 洪水航拍保留贴近水面的近景，作为与默认俯视并存的另一种观察方式。
   cine:   { back: 430, lat: -150, pitch: 26, fill: 0.55, backMin: 430, backMax: 1500,
             sRate: 2.8, posRate: 3.0, tgtRate: 3.2, intro: 1.1, ahead: 140 },
 };
+// 跟拍预设：默认折中俯瞰；加 ?cam=near 换成贴水面近景，便于直接对比。
+// 不新增按钮——工具条固定五项是 11-09 定的。
+const CAM_PRESET = new URLSearchParams(location.search).get('cam') === 'near' ? 'near' : 'follow';
 const rig = { mode: null, s: 0, back: 600, fill: 0, snap: true, introT: 1,
               cam0: new THREE.Vector3(), tgt0: new THREE.Vector3(),
               pos: new THREE.Vector3(), aim: new THREE.Vector3(), dbg: null };
@@ -1288,9 +1436,13 @@ function rigHead(f, L) {
   const cs = v => Math.max(0, Math.min(L, v));
   const pk = Math.max(f.peak || 1, 1e-3);
   const s0 = cs(f.frontS || 0);
-  for (let d = 0; d <= 1500; d += 50) {
+  // 回看上限 600 m、阈值 0.005（2026-11-12 修）。原来 1500 m / 0.01 会在
+  // 「刚漫到、水深还没起来」的段落一路往上游找，锚点于是落后前锋 650 m、
+  // 甚至比上一时刻更靠上游 —— 观感就是镜头卡住、往回退。
+  // 现在宁可让锚点贴着前锋，也不回看太远。
+  for (let d = 0; d <= 600; d += 50) {
     const s = cs(s0 - d), c = f.chanAt(s);
-    if (f.waterY(c.x, c.z, f.tField).h / pk > 0.01) return s;
+    if (f.waterY(c.x, c.z, f.tField).h / pk > 0.005) return s;
   }
   return s0;
 }
@@ -1332,28 +1484,74 @@ function updateRig(dt, mode) {
   const cs = v => Math.max(0, Math.min(L, v));
   const snap = rig.mode !== mode || rig.snap;
   if (snap) {
-    rig.mode = mode; rig.s = rigHead(f, L); rig.back = cfg.back; rig.snap = false;
+    rig.mode = mode; rig.s = rigHead(f, L); rig.snap = false;
     rig.cam0.copy(camera.position); rig.tgt0.copy(controls.target);
     rig.introT = 0; rig.intro0 = performance.now();
   } else {
     rig.s += (rigHead(f, L) - rig.s) * (1 - Math.exp(-dt * cfg.sRate));
-    // 有界反馈：水占画太大就沿沟后退，太小就靠近；0.85~1.18 防低帧率振荡。
-    if (rig.fill > 0) rig.back = clamp(rig.back * clamp(rig.fill / cfg.fill, 0.85, 1.18),
-                                        cfg.backMin, cfg.backMax);
   }
-  const sc = cs(rig.s - rig.back), c = f.chanAt(sc), t = rigTangent(sc, f, L);
-  const px = c.x - t.z * cfg.lat, pz = c.z + t.x * cfg.lat;
+  /* 源区机位（2026-11-12 用户指正）：冰崩源已挪到沟道起点北偏西 3.5 km 的山背后，
+     常规 2.4 km 斜距根本框不到它，画面里只剩一片雪坡 —— 就是「一开场怼在冰川面上」。
+     s 很小时把机位沿沟道再退 2.6 km、并抬高 1.15 km（俯角约 27°），让「山背后的冰体」
+     与「山脚下待冲的沟道」同时入画；s > 2600 m 后线性归位到常规航拍参数。 */
+  const srcK = mode === 'follow' ? clamp(1 - rig.s / 2600, 0, 1) : 0;
+  const backUse = cfg.back + 2600 * srcK;
+  const altUse = cfg.alt ? cfg.alt + 1150 * srcK : 0;
+  if (snap) rig.back = backUse;
+  else if (rig.fill > 0) rig.back = clamp(rig.back * clamp(rig.fill / cfg.fill, 0.85, 1.18),
+                                          cfg.backMin + 2600 * srcK, cfg.backMax + 2600 * srcK);
+  // 机位点：常规取 s−back；源区（s < back）时沿沟道切线**反向外推**到起点之外，
+  // 而不是把里程钳到 0。钳到 0 会让相机和瞄准点几乎重合、斜距只剩侧偏量，
+  // 等于把镜头怼在冰川面上 —— 这是「一开始推演贴太近」的直接原因。
+  const scRaw = rig.s - rig.back;
+  const sc = cs(scRaw);
+  const t = rigTangent(sc, f, L);
+  let px, pz;
+  if (scRaw < 0) {
+    const c0 = f.chanAt(0), over = -scRaw;   // 切线 t 指向下游，上游要取负
+    px = c0.x - t.x * over - t.z * cfg.lat;
+    pz = c0.z - t.z * over + t.x * cfg.lat;
+  } else {
+    const c = f.chanAt(sc);
+    px = c.x - t.z * cfg.lat;
+    pz = c.z + t.x * cfg.lat;
+  }
   const aS = cs(rig.s + cfg.ahead), ac = f.chanAt(aS), aw = f.waterY(ac.x, ac.z, f.tField);
-  const horiz = Math.hypot(px - ac.x, pz - ac.z);
+  let tgtX = ac.x, tgtY = aw.y + 20, tgtZ = ac.z;
+  let horiz = Math.hypot(px - ac.x, pz - ac.z);
   // 高度：跟随/航拍用目标俯角反解（固定「抬高 620 m」在源区会变成仰视、
   // 口岸又俯得太狠）；战术俯视用绝对高度 alt，看整条沟谷的空间关系。
   // 两者都由离地钳制兜底，绝不把相机塞进山体。
   let py = cfg.alt
-    ? aw.y + cfg.alt
+    ? aw.y + altUse
     : aw.y + 20 + horiz * Math.tan(cfg.pitch * Math.PI / 180);
   py = Math.max(py, groundAt(px, pz) + CAM_AUTO_CLEAR);
+  /* 源区回望机位（2026-11-12）：冰崩源已挪到沟道起点北偏西 3.5 km 的山背后。
+     常规沿沟道后退的机位在源区会退到雪原上、背对冰体，画面只剩一屏雪坡。
+     源区（s 小）时改成「站在冰源—起点连线的起点一侧 4.3 km 处回望」：
+     画面前景是待冲的沟道口，中景是那道山脊，远景是山背后露头的冰体 ——
+     冰崩「从山的另一边起、越过山脊冲进河谷」的空间关系一眼能看懂。 */
+  if (srcK > 0.001) {
+    const c0 = f.chanAt(0);
+    const gx2 = xOf(GLACIER_LL[0]), gz2 = zOf(GLACIER_LL[1]);
+    const gy2 = displayY(gx2, gz2);
+    let dx = c0.x - gx2, dz = c0.z - gz2;
+    const dl = Math.hypot(dx, dz) || 1; dx /= dl; dz /= dl;
+    const sx2 = c0.x + dx * 7000, sz2 = c0.z + dz * 7000;
+    // 源区要「一眼看懂」：冰源在起点正北 2.3 km 的 6911 m 峰顶，比沟道口高 1666 m。
+    // 机位近到 4 km 时山脊正好卡在画面上缘、把山后的冰体裁掉（实测过 4 km / 3 km 两档），
+    // 所以退到 7 km、抬到沟道口以上 4.5 km（俯角约 24°）：整座山连同山顶冰体和
+    // 山脚的沟道口一起入画，冰崩「从山那边崩下来」的完整路径才读得出来。
+    // s>2600 m 后这一段线性归位到常规航拍参数，不影响后续跟拍。
+    const sy2 = Math.max(c0.y + 4500, groundAt(sx2, sz2) + CAM_AUTO_CLEAR);
+    px = lerp(px, sx2, srcK); pz = lerp(pz, sz2, srcK); py = lerp(py, sy2, srcK);
+    horiz = Math.hypot(px - ac.x, pz - ac.z);
+    tgtX = lerp(ac.x, (c0.x + gx2) / 2, srcK);
+    tgtZ = lerp(ac.z, (c0.z + gz2) / 2, srcK);
+    tgtY = lerp(aw.y + 20, (c0.y + gy2) / 2 + 60, srcK);
+  }
   const pitchNow = Math.atan2(py - (aw.y + 20), Math.max(horiz, 1)) * 180 / Math.PI;
-  rig.pos.set(px, py, pz); rig.aim.set(ac.x, aw.y + 20, ac.z);
+  rig.pos.set(px, py, pz); rig.aim.set(tgtX, tgtY, tgtZ);
   const k = snap ? 1 : 1 - Math.exp(-dt * cfg.posRate);
   const kt = snap ? 1 : 1 - Math.exp(-dt * cfg.tgtRate);
   camera.position.lerp(rig.pos, k);
@@ -1376,7 +1574,7 @@ function updateRig(dt, mode) {
 }
 function updateDisasterFollow(dt) {
   if (followSnap) { rig.snap = true; followSnap = false; }
-  updateRig(dt, 'follow');
+  updateRig(dt, CAM_PRESET);
 }
 function updateCineCamera(dt) {
   if (cineSnap) { rig.snap = true; cineSnap = false; }
@@ -1577,6 +1775,7 @@ function applyLayers() {
   channelLine.visible = L.channel && !immersiveCam();
   buildings.forEach(m => { m.visible = L.buildings; });
   glacierGroup.visible = L.glacier;
+  if (iceTrackMesh) iceTrackMesh.visible = L.glacier;
   // 堰塞湖蓝饼、受灾范围圈、节点小球与地名标签也都是态势标注，一并收掉
   lakeMesh.visible = L.lake && !immersiveCam();
   impactRing.visible = L.lake && !immersiveCam();
@@ -1668,11 +1867,15 @@ function jumpToNode(idx) {
   refresh();
 }
 function bindEvents() {
+  // 播放不再跟拍：全链条推演默认在「打开系统时的那台全景机位」下演绎（2026-11-12 用户
+  // 拍板，用于演示视频）。固定机位的好处是洪水沿沟道推进的整个空间过程能一屏看完，
+  // 也避免跟拍在源区/峡谷处反复调整带来的画面跳动。用户手动拖画布照旧生效，
+  // 「洪水航拍」按钮仍可单独开启贴水近景。
   $('btn-play').addEventListener('click', () => {
     if (!state.playing) introMode = false;   // 首次点「播放」＝开始推演，顶部从介绍切阶段
     state.playing = !state.playing;
-    autoFly = state.playing;
-    if (autoFly) { flight = null; followSnap = true; }
+    autoFly = false;
+    flight = null; followSnap = false;
     $('btn-play').textContent = state.playing ? '暂停' : '播放';
     if (state.playing && state.t >= computeFrame(0, state.vol).total - 1) state.t = 0;
   });
@@ -1684,10 +1887,11 @@ function bindEvents() {
   });
   $('btn-replay').addEventListener('click', () => {
     introMode = false;
-    state.t = 0; state.playing = true; autoFly = true; lastStageIdx = -1; markFloodJump();
+    state.t = 0; state.playing = true; autoFly = false; lastStageIdx = -1; markFloodJump();
     $('btn-play').textContent = '暂停';
     if (state.engine === 'cesium') resetCesiumView();
-    else { flight = null; followSnap = true; }   // 不再 setView('persp')，避免与连续跟拍打架
+    // 固定默认全景机位：与打开系统时完全一致，全程不动（演示视频用）。
+    else { flight = null; followSnap = false; applyOverviewCam(true); }
     refresh();
   });
   $('btn-reset').addEventListener('click', resetView);
@@ -1931,6 +2135,12 @@ function loop(now) {
   // 近景（<4 km）改用真实遮挡并淡出，否则几百米宽的叠加层会把口岸建筑与岸边糊住。
   const camDist = camera.position.distanceTo(controls.target);
   const nearK = clamp((9000 - camDist) / 5000, 0, 1);
+  // 文献淹没范围：近景只留描边（填充 4%），拉远到 8 km 才铺到 13%。
+  // 不这么分档，2 km 以内的跟拍会被 19% 的填充糊成一整片蓝膜。
+  if (flood && flood.extentMat) {
+    flood.extentMat.uniforms.uFillA.value =
+      0.04 + 0.09 * clamp((camDist - 2500) / 5500, 0, 1);
+  }
   hazardShared.uWidthBoost.value = clamp((camDist - 9000) / 9000, 0, 1) * 110;
   // applyLayers 只在图层切换时调用，播放开始/结束不会触发，
   // 所以每帧统一同步一次「沉浸式跟拍」的可见性。
@@ -2040,6 +2250,7 @@ async function boot() {
   buildHazardStrip();
   buildOSMBuildings();
   buildGlacier();
+  buildIceTrack();
   buildLakeAndImpact();
   buildNodes();
   buildFlood();
@@ -2271,6 +2482,119 @@ async function boot() {
              sWet0: wetS.length ? Math.round(wetS[0]) : null,
              sWet1: wetS.length ? Math.round(wetS[wetS.length - 1]) : null,
              frontGap: Math.round(sFront - s0), pts: pts.length, wetPts, rows };
+  };
+  // 首屏就用全景取景（?rig= 定点验收时不抢相机）
+  if (!rigStatic) applyOverviewCam(false);
+  // 沟道端点 / 场景尺寸：给「重置视角」取景与外部验收用（不是给页面用的）
+  window.__chan = () => {
+    const n = chanPts.length;
+    const a = chanPts[0], b = chanPts[n - 1], m = chanPts[(n / 2) | 0];
+    const R = arr => arr.map(v => Math.round(v));
+    return {
+      up: R([a.x, a.y, a.z]), port: R([b.x, b.y, b.z]), mid: R([m.x, m.y, m.z]),
+      len: Math.round(channel.lengthM),
+      size: R([meta.sizeMeters.x, meta.sizeMeters.z]),
+      fov: camera.fov, aspect: +(camera.aspect.toFixed(3)),
+      pos: R(camera.position.toArray()), tgt: R(controls.target.toArray()),
+    };
+  };
+  // 冰崩源体：位置、屏幕归一化坐标、是否在视锥内 —— 源区取景验收用
+  window.__glacier = () => {
+    if (!glacierGroup) return null;
+    const v = glacierGroup.position.clone();
+    const pr = v.clone().project(camera);
+    return { pos: [Math.round(v.x), Math.round(v.y), Math.round(v.z)],
+             ndc: [+pr.x.toFixed(2), +pr.y.toFixed(2), +pr.z.toFixed(3)],
+             inView: pr.z < 1 && Math.abs(pr.x) <= 1 && Math.abs(pr.y) <= 1,
+             scale: +glacierGroup.scale.x.toFixed(2), visible: glacierGroup.visible,
+             camDist: Math.round(camera.position.distanceTo(v)),
+             kids: glacierGroup.children.length,
+             kid0: glacierGroup.children[0] ? (() => {
+               const c0 = glacierGroup.children[0];
+               const wp = c0.getWorldPosition(new THREE.Vector3());
+               return { type: c0.type, vis: c0.visible,
+                        wp: [Math.round(wp.x), Math.round(wp.y), Math.round(wp.z)],
+                        verts: c0.geometry && c0.geometry.attributes.position
+                               ? c0.geometry.attributes.position.count : 0,
+                        col: c0.material && c0.material.color
+                             ? c0.material.color.getHexString() : null };
+             })() : null };
+  };
+  // 自由飞行：取景验收时直接摆机位，dur=0 即刻落位（不走插值，便于逐参数截图）
+  window.__fly = (px, py, pz, tx, ty, tz, dur = 0) => {
+    if (cineCam) enableCine(false);
+    autoFly = false; state.rotating = false; controls.autoRotate = false;
+    flyTo(new THREE.Vector3(tx, ty, tz), new THREE.Vector3(px, py, pz), dur);
+    if (dur <= 0) {
+      camera.position.set(px, py, pz);
+      controls.target.set(tx, ty, tz);
+      controls.update();
+    }
+    return 'ok';
+  };
+  // 全景取景评分：把整条沟道投影到候选机位里，返回「入画比例 / 未被地形挡住的比例 /
+  // 画面占用宽高」。只做投影与 8 段视线穿地形判定，不渲染 —— 一次页面加载就能扫几百个
+  // 候选机位，比逐个截图快两个数量级。occl 采样点与 __rigSearch 同一套口径。
+  window.__frameTest = (camArr, tgtArr) => {
+    const saveP = camera.position.clone(), saveT = controls.target.clone();
+    const tv = new THREE.Vector3(tgtArr[0], tgtArr[1], tgtArr[2]);
+    camera.position.set(camArr[0], camArr[1], camArr[2]);
+    controls.target.copy(tv);
+    camera.lookAt(tv);
+    camera.updateMatrixWorld(true);
+    camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+    const dist = Math.round(camera.position.distanceTo(tv));
+    const cx = camArr[0], cy = camArr[1], cz = camArr[2];
+    const v = new THREE.Vector3();
+    let x0 = 9, x1 = -9, y0 = 9, y1 = -9, inN = 0, vis = 0, tot = 0;
+    for (let i = 0; i < chanPts.length; i += 3) {
+      const p = chanPts[i]; tot++;
+      v.set(p.x, p.y + 15, p.z).project(camera);
+      if (v.z > 1 || Math.abs(v.x) > 1 || Math.abs(v.y) > 1) continue;
+      inN++;
+      x0 = Math.min(x0, v.x); x1 = Math.max(x1, v.x);
+      y0 = Math.min(y0, v.y); y1 = Math.max(y1, v.y);
+      let blocked = false;
+      for (let k = 1; k <= 8; k++) {
+        const u = k / 9;
+        if (groundAt(cx + (p.x - cx) * u, cz + (p.z - cz) * u) >
+            cy + (p.y + 15 - cy) * u + 6) { blocked = true; break; }
+      }
+      if (!blocked) vis++;
+    }
+    camera.position.copy(saveP); controls.target.copy(saveT);
+    camera.lookAt(saveT); camera.updateMatrixWorld(true);
+    return {
+      inPct: Math.round(100 * inN / tot), visPct: Math.round(100 * vis / tot),
+      w: +((Math.min(x1, 1) - Math.max(x0, -1)) / 2 * 100).toFixed(1),
+      h: +((Math.min(y1, 1) - Math.max(y0, -1)) / 2 * 100).toFixed(1),
+      dist,
+    };
+  };
+  // 批量扫：围绕沟道包围盒中心，按 (方位, 俯角, 距离) 网格生成候选并打分
+  window.__frameSweep = (opts = {}) => {
+    let minX = 1e9, maxX = -1e9, minZ = 1e9, maxZ = -1e9, sumY = 0;
+    for (const p of chanPts) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z); sumY += p.y;
+    }
+    const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2, cy = sumY / chanPts.length;
+    const azs = opts.azs || [0, 45, 90, 135, 180, 225, 270, 315];
+    const pitches = opts.pitches || [35, 45, 55, 65, 75];
+    const dists = opts.dists || [10000, 13000, 16000, 20000];
+    const ty = opts.ty || cy + 150;
+    const rows = [];
+    for (const az of azs) for (const pt of pitches) for (const d of dists) {
+      const a = az * Math.PI / 180, p = pt * Math.PI / 180;
+      const hd = d * Math.cos(p), vy = d * Math.sin(p);
+      const px = cx + hd * Math.sin(a), pz = cz + hd * Math.cos(a);
+      const py = Math.max(vy + ty, groundAt(px, pz) + 300);
+      const r = window.__frameTest([px, py, pz], [cx, ty, cz]);
+      const ground = Math.round(groundAt(px, pz));
+      rows.push({ az, pitch: pt, d, ...r, py: Math.round(py), ground,
+                  clear: Math.round(py - ground) });
+    }
+    return { center: [Math.round(cx), Math.round(cy), Math.round(cz)], rows };
   };
   window.__ready = true;
   window.__dbg = () => ({

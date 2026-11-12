@@ -49,6 +49,12 @@ const RISE_TAU = 52.0;             // 涨水惯性时间常数（场秒）
 const C2 = 0.22;                   // (c·dt/dx)²，二维 5 点拉普拉斯稳定域内
 const N_ICE = 260, N_ROCK = 220;   // 碎冰 / 冰碛物实例数
 const N_SPRAY = 900, N_DUST = 420; // 浪花飞溅 / 扬尘粒子数
+// 「图 7 淹没范围」图层：阈值取 0.06（约 15/255）—— shape.bin 里 pot>0 的格点占
+// 7.28%，其中只有 3.82% 达到 0.5 以上，用 0.5 做阈值会把整条主流裁掉一半。
+// 0.06 圈出的正是从图 7 掩膜直接搬过来的那一圈外缘。
+const EXTENT_THRESH = 0.06;
+const EXTENT_OFFSET = 35;          // 贴地余量（场景单位），兜住山脊处的弦高差
+const EXTENT_SDF_SPAN = 24;        // 距离场编码范围：±24 纹素 ≈ ±1.0 km，够包住整条主流
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
@@ -391,6 +397,46 @@ void main() {
 }
 `;
 
+/* ------------------------------ 图 7 淹没范围（贴地层） ------------------------------
+   把「按论文图 7 勾出的淹没范围」直接贴到真实地形上：一层极淡的蓝色填充 +
+   一圈屏幕空间等宽的亮边界线。它回答的是「灾害物质铺到哪里」，与动态水面
+   是两件事：
+     · 水面（WATER_FRAG）跟着到达时间逐帧推进，只画当下有水的地方；
+     · 本层画整场推演的最终包络，时刻 t=0 就能看到终点范围，俯视观感与文献图一致。
+   边界用 fwidth 求屏幕空间梯度，任何缩放/倾角下线宽都稳定；不用几何描边，
+   省掉一套边界提取，也不会因为网格粗而在山脊上切角。 */
+const EXTENT_VERT = `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`;
+
+const EXTENT_FRAG = `
+uniform sampler2D uMask;
+uniform float uSpan;      // 纹理编码覆盖的距离跨度（纹素），与 buildMaskSdf 一致
+uniform vec3  uFill;
+uniform vec3  uRim;
+uniform float uOpacity;
+uniform float uFillA;     // 填充强度（由视距决定：近景只留描边，远景才铺色）
+varying vec2 vUv;
+
+void main() {
+  float m = texture2D(uMask, vUv).r;
+  // 有符号距离场：>0 在范围内（单位＝纹素）。R 通道 0.5 即边界线本身，
+  // 所以边界不再是「0/255 的台阶」，而是可以逐像素插值的等值线。
+  float d = (m - 0.5) * uSpan;
+  // 屏幕空间等宽：fwidth(d) 就是「一个像素跨过多少纹素」
+  float w = max(fwidth(d) * 1.60, 0.02);
+  float rim = 1.0 - smoothstep(0.0, w, abs(d));
+  float inside = smoothstep(0.0, 1.2, d);
+  // 填充只做「淡淡的底」，靠描边读范围：19% 的填充在 2 km 以内的近景会把
+  // 整条谷道糊成一片蓝膜（水面、河床、山脊全被盖住），实测就是这么翻车的。
+  float a = inside * uFillA + rim * 0.92;
+  if (a < 0.006) discard;
+  gl_FragColor = vec4(mix(uFill, uRim, rim), a * uOpacity);
+}`;
+
 /* ------------------------------ 粒子 ------------------------------ */
 const PARTICLE_VERT = `
 attribute float aAlpha;
@@ -488,9 +534,39 @@ export class FloodSystem {
       }
     }
 
-    // c) 逐格合成：T 来自既有 arrival.bin（已含 6 m/s 横向漫流延迟）；
-    //    淹没势由「真实 DEM 相对沟床高差」约束，低阶地/河漫滩才会被淹；
-    //    原始 depth.bin 的沟道核心作为下限保留，不改动既有数据文件。
+    // c) 逐格合成：T 来自 arrival.bin；淹没势优先用预先烘焙的 shape.bin。
+    //
+    //    shape.bin（scripts/build_gyirong_flood_shape.py）是按论文图 7 形态生成的
+    //    包络：源头谷口一片扇形漫开 → 收束进东林藏布峡谷的细长主流 → 口岸。
+    //    横向宽度沿程变化（L(s) 半宽剖面）、沟心恒为满淹没势（连续蓝芯）、
+    //    谷底一侧可漫开而贴壁一侧被地形闸门否决。它替代了下面那段运行时
+    //    「相对沟床高差 / REF_RISE」的现算 —— 后者是各向同性环形衰减，
+    //    各段宽度几乎相同，只会得到一条等宽窄带，和文献图对不上。
+    //    shape.bin 缺失时仍回退到旧口径，页面不至于打不开。
+    const shap = this.shapeBuf ? new Uint8Array(this.shapeBuf) : null;
+    // 中轴到达时间序列（2026-11-12 修）：arrival.bin 在淹没包络之外填的是 u8 最大值
+    // （79×6 = 474 ≈ T_FIELD），含义是「永远不会到」。而沟道中轴沿程有约 4%（11 处、
+    // 合计 ~880 m）的点恰好落在包络外 —— 那里 T 永远到不了、水深恒为 0，表现就是：
+    // 水带断开，跟拍的「可见水头」向上游找不到水而卡住甚至倒退
+    // （实测 t=300→330 前锋走了 646 m，锚点只挪 4 m 还回退了）。
+    // 先把中轴序列的「永不」值按前后有效值线性插值补上，再沿程单调化。
+    const T_BAD = T_FIELD - 12;
+    const nK = chanPts.length;
+    const chanT = new Float32Array(nK);
+    for (let k = 0; k < nK; k++) {
+      const u = (chanPts[k].x + sx / 2) / sx, v = (chanPts[k].z + sz / 2) / sz;
+      const tv = sampleU8(arr, nx, ny, u, v) * field.arrivalScale;
+      chanT[k] = tv >= T_BAD ? NaN : tv;
+    }
+    for (let k = 0; k < nK; k++) {
+      if (!Number.isNaN(chanT[k])) continue;
+      let a = k - 1; while (a >= 0 && Number.isNaN(chanT[a])) a--;
+      let b = k + 1; while (b < nK && Number.isNaN(chanT[b])) b++;
+      const va = a >= 0 ? chanT[a] : (b < nK ? chanT[b] : 0);
+      const vb = b < nK ? chanT[b] : va;
+      chanT[k] = (a >= 0 && b < nK) ? va + (vb - va) * (k - a) / (b - a) : (a >= 0 ? va : vb);
+    }
+    for (let k = 1; k < nK; k++) chanT[k] = Math.max(chanT[k], chanT[k - 1]);
     const srcBytes = new Uint8Array(W * H * 4);
     this.srcT = new Float32Array(W * H);
     this.srcPot = new Float32Array(W * H);
@@ -499,26 +575,36 @@ export class FloodSystem {
     for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
       const q = j * W + i, p4 = q * 4;
       const u = (i + 0.5) / W, v = (j + 0.5) / H;
-      const T = sampleU8(arr, nx, ny, u, v) * field.arrivalScale;
+      let T = sampleU8(arr, nx, ny, u, v) * field.arrivalScale;
       const D = sampleU8(dep, nx, ny, u, v) * field.depthScale;
       const k = bestK[q];
       if (k < 0) { this.srcT[q] = T; srcBytes[p4] = clamp(T / T_SCALE, 0, 1) * 255; continue; }
       const dist = Math.sqrt(best[q]);
+      // 包络外的格子：改为继承最近中轴点的到达时间（横向略晚），
+      // 这样中轴走廊的水不会因为「一格在包络外」而永远不来。
+      if (T >= T_BAD) T = Math.min(chanT[k] + dist / 25, T_BAD + 40);
       const bedN = chanPts[k].y;
       const x = -sx / 2 + (i + 0.5) * cx, z = -sz / 2 + (j + 0.5) * cz;
       const bed = displayY(x, z);
       const delta = Math.max(0, bed - bedN);
-      // 视觉包络：真实 DEM 相对沟床高差决定「水能爬多高」，横向距离决定「能漫多远」。
-      // 指数 0.8 让阶地上的浅水不至于瞬间归零，形成连续的水边而不是一条硬线。
-      let pot = Math.pow(Math.max(0, 1 - delta / REF_RISE), 0.8);
-      pot *= 1 - smoothstep(1200, 4200, dist);
-      pot = Math.max(pot, Math.min(D / 18, 1) * 0.90);
-      pot = clamp(pot, 0, 1);
-      // 展示口径 C：低淹没势区做幂次抬升 → 横向衰减长度放大约 1.6×，
-      // 让 180 m 的窄湿区在跟拍画面里能占住合理宽度。写回 srcPot 与纹理 G 通道，
-      // 使 GPU 顶点高度、GPU 波面、CPU 碎冰/粒子采样三者共用同一份场。
-      // 这不是二维数值解，也不是实测淹没边界。
-      pot = Math.pow(pot, POT_WIDEN_GAMMA);
+      let pot;
+      if (shap) {
+        pot = sampleU8(shap, nx, ny, u, v) / 255;
+        // 中轴走廊兜底（2026-11-12）：shape.bin 是「图 7 包络连通域」，
+        // 沟道中轴是「每切片最低点」—— 两套几何不重合，沿程实测有 11 处、
+        // 合计约 880 m 的中轴点落在包络外（pot=0）。后果不只是水面断开：
+        // 跟拍的「可见水头」向上游找不到水，锚点会卡住甚至往回退。
+        // 这里给中轴 ±110 m 一条恒定的窄芯，保证水带连续、锚点单调推进。
+        pot = Math.max(pot, (1 - smoothstep(45, 115, dist)) * 0.62);
+      } else {
+        // 旧口径（回退）：真实 DEM 相对沟床高差决定「水能爬多高」，
+        // 横向距离决定「能漫多远」，低淹没势幂次抬升做视觉展宽。
+        pot = Math.pow(Math.max(0, 1 - delta / REF_RISE), 0.8);
+        pot *= 1 - smoothstep(1200, 4200, dist);
+        pot = Math.max(pot, Math.min(D / 18, 1) * 0.90);
+        pot = clamp(pot, 0, 1);
+        pot = Math.pow(pot, POT_WIDEN_GAMMA);
+      }
       const slopeK = smoothstep(4, 90, delta);
       const rough = clamp(0.20 + 0.34 * slopeK + 0.62 * bldMask[q] + 0.12 * (D / 18), 0, 1);
       const core = clamp(D / 18, 0, 1);
@@ -535,6 +621,20 @@ export class FloodSystem {
     tex.generateMipmaps = false;
     tex.needsUpdate = true;
     this.sourceTex = tex;
+
+    // c2) 图 7 范围遮罩纹理：直接用 shape.bin 原始 nx×ny（不经过 SW×SH 降采样），
+    //     并把二值掩膜转成有符号距离场再上传。直接上传 0/255 的掩膜会让边界在
+    //     近景变成 42 m 一格的大台阶；距离场的 0.5 等值线可以逐像素插值，
+    //     任何缩放下都是一条平滑闭合线（离边界 >1 km 的格点饱和，不影响观感）。
+    if (this.shapeBuf) {
+      const sdf = buildMaskSdf(new Uint8Array(this.shapeBuf), nx, ny);
+      const mt = new THREE.DataTexture(sdf, nx, ny, THREE.RedFormat, THREE.UnsignedByteType);
+      mt.minFilter = mt.magFilter = THREE.LinearFilter;
+      mt.wrapS = mt.wrapT = THREE.ClampToEdgeWrapping;
+      mt.generateMipmaps = false;
+      mt.needsUpdate = true;
+      this.maskTex = mt;
+    }
 
     // d) CPU 侧流向场：到达时间梯度（低 T → 高 T），供碎冰 / 粒子使用
     this.flowX = new Float32Array(W * H);
@@ -684,6 +784,62 @@ export class FloodSystem {
     this.group.add(this.waterMesh);
   }
 
+  /* ---------- ③b 图 7 淹没范围（贴地图层） ----------
+     网格按 shape.bin 的原始 nx×ny 逐格建，顶点高程取 terrainTriY（与地形网格同一套
+     三角形插值，不是独立再采一次），所以整层是「贴着地形网格」的一条壳，不会陷进
+     坡里；再加 EXTENT_OFFSET 的竖向余量兜住山脊处的弦高差。
+     与水面分开：水面按到达时间逐帧推进，本层画的是整场最终包络。 */
+  buildExtent() {
+    if (!this.maskTex) return;              // shape.bin 缺失时不建这一层
+    const { meta } = this;
+    const nx = this.field.nx, ny = this.field.ny;
+    const sx = meta.sizeMeters.x, sz = meta.sizeMeters.z;
+    const hAt = this.terrainY || this.displayY;
+    const pos = new Float32Array(nx * ny * 3), uv = new Float32Array(nx * ny * 2);
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const q = j * nx + i;
+      // 顶点落在纹素中心：与 DataTexture 的采样位置 1:1，边界不会被插值抹平
+      const u = (i + 0.5) / nx, v = (j + 0.5) / ny;
+      const x = -sx / 2 + sx * u, z = -sz / 2 + sz * v;
+      pos[q * 3] = x;
+      pos[q * 3 + 1] = hAt(x, z) + EXTENT_OFFSET;
+      pos[q * 3 + 2] = z;
+      uv[q * 2] = u; uv[q * 2 + 1] = v;
+    }
+    const idx = new Uint32Array((nx - 1) * (ny - 1) * 6);
+    let k = 0;
+    for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+      const a = j * nx + i, b = a + 1, c = a + nx + 1, d = a + nx;
+      idx[k++] = a; idx[k++] = c; idx[k++] = b;
+      idx[k++] = a; idx[k++] = d; idx[k++] = c;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.computeBoundingSphere();
+
+    this.extentMat = new THREE.ShaderMaterial({
+      vertexShader: EXTENT_VERT, fragmentShader: EXTENT_FRAG,
+      uniforms: {
+        uMask: { value: this.maskTex },
+        uSpan: { value: EXTENT_SDF_SPAN },
+        uFill: { value: new THREE.Color(0.22, 0.62, 0.86) },
+        uRim: { value: new THREE.Color(0.55, 0.90, 1.00) },
+        uOpacity: { value: 1.0 },
+        uFillA:   { value: 0.12 },
+      },
+      transparent: true, depthWrite: false, depthTest: true,
+      side: THREE.FrontSide, extensions: { derivatives: true },
+      polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+    });
+    this.extentMesh = new THREE.Mesh(g, this.extentMat);
+    this.extentMesh.name = 'anchor_flood_extent';
+    this.extentMesh.renderOrder = 3.4;      // 压在水面之上，水面漫过时边界仍可读
+    this.extentMesh.frustumCulled = false;
+    this.group.add(this.extentMesh);
+  }
+
   /* ---------- ④ 碎冰 / 冰碛物（① 的可编辑 Group + 刚体感运动） ---------- */
   buildDebris() {
     const G = makeSculpt({
@@ -784,6 +940,7 @@ export class FloodSystem {
     this.scene.add(this.group);
     this.buildCompute();
     this.buildWater();
+    this.buildExtent();
     this.buildDebris();
     this.buildParticles();
     this.setEnabled(true);
@@ -1118,13 +1275,16 @@ export class FloodSystem {
     const on = this.enabled, wet = this.tField > 1.0;
     this.group.visible = on;
     if (this.waterMesh) this.waterMesh.visible = on && this.layers.water;
+    // 范围层与时间无关：它画的是整场包络，t=0 就该看得见
+    if (this.extentMesh) this.extentMesh.visible = on && this.layers.extent;
     if (this.debrisGroup) this.debrisGroup.visible = on && this.layers.debris && wet;
     if (this.spray) this.spray.points.visible = on && this.layers.spray && wet;
     if (this.dust) this.dust.points.visible = on && this.layers.spray && wet;
   }
   setEnabled(on) { this.enabled = on; this.applyVisibility(); }
   setLayers(L) {
-    this.layers = { water: !!L.flood, debris: !!L.debris, spray: !!L.spray };
+    this.layers = { water: !!L.flood, debris: !!L.debris, spray: !!L.spray,
+                    extent: L.extent === undefined ? true : !!L.extent };
     this.applyVisibility();
   }
   setAlpha(a) { if (this.waterMat) this.waterMat.uniforms.uAlpha.value = a; }
@@ -1151,6 +1311,7 @@ export class FloodSystem {
   diagnose() {
     return {
       enabled: this.enabled, layers: { ...this.layers },
+      extent: !!(this.extentMesh && this.extentMesh.visible),
       hydro: this.probeHydrology(),
       grid: `${SW}x${SH}`, waterMesh: `${MW}x${MH}`,
       substeps: SUBSTEPS, steps: this.diag.steps, resets: this.diag.resets,
@@ -1172,6 +1333,54 @@ export class FloodSystem {
 }
 
 /* ------------------------------ 小工具 ------------------------------ */
+/* 二值掩膜 → 有符号距离场（纹素为单位，内部为负）。
+   两遍 chamfer（3-4 度量）求外距与外距：先求「到最近内部格」的距离给外部格点，
+   再求「到最近外部格」的距离给内部格点，两者合成有符号距离。
+   编码：u8 = 127.5 − sdf · 127.5/SPAN，于是 R=127.5 恰好落在边界上，
+   GPU 端只需 (R−0.5)·SPAN 就能拿回以纹素计的距离。 */
+function chamferTo(target, nx, ny, want) {
+  const INF = 1e9, n = nx * ny;
+  const d = new Float32Array(n);
+  for (let i = 0; i < n; i++) d[i] = target[i] === want ? 0 : INF;
+  const D = 1.4142136;
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const q = j * nx + i; let v = d[q];
+    if (i > 0) v = Math.min(v, d[q - 1] + 1);
+    if (j > 0) {
+      v = Math.min(v, d[q - nx] + 1);
+      if (i > 0) v = Math.min(v, d[q - nx - 1] + D);
+      if (i < nx - 1) v = Math.min(v, d[q - nx + 1] + D);
+    }
+    d[q] = v;
+  }
+  for (let j = ny - 1; j >= 0; j--) for (let i = nx - 1; i >= 0; i--) {
+    const q = j * nx + i; let v = d[q];
+    if (i < nx - 1) v = Math.min(v, d[q + 1] + 1);
+    if (j < ny - 1) {
+      v = Math.min(v, d[q + nx] + 1);
+      if (i < nx - 1) v = Math.min(v, d[q + nx + 1] + D);
+      if (i > 0) v = Math.min(v, d[q + nx - 1] + D);
+    }
+    d[q] = v;
+  }
+  return d;
+}
+
+function buildMaskSdf(buf, nx, ny) {
+  const n = nx * ny;
+  const bin = new Uint8Array(n);
+  const TH = EXTENT_THRESH * 255;
+  for (let i = 0; i < n; i++) bin[i] = buf[i] > TH ? 1 : 0;
+  const out = new Uint8Array(n);
+  const dOut = chamferTo(bin, nx, ny, 1);   // 外部格点 → 最近内部格
+  const dIn = chamferTo(bin, nx, ny, 0);    // 内部格点 → 最近外部格
+  for (let i = 0; i < n; i++) {
+    const s = bin[i] ? -dIn[i] : dOut[i];
+    out[i] = clamp(Math.round(127.5 - s * 127.5 / EXTENT_SDF_SPAN), 0, 255);
+  }
+  return out;
+}
+
 function mulberry32(a) {
   return function () {
     a |= 0; a = a + 0x6D2B79F5 | 0;

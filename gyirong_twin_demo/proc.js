@@ -42,8 +42,13 @@ export const PALETTE = {
   GY_window:  { color: 0x4c6b82, roughness: 0.30, metalness: 0.10 },
   GY_edge:    { color: 0x2b3b45, opacity: 0.85 },
   GY_damage:  { color: 0x5b5044, roughness: 0.97, metalness: 0.0 },
-  GY_ice:     { color: 0xe4f1fb, roughness: 0.40, metalness: 0.04,
-                emissive: 0x17384a, emissiveIntensity: 0.35, flatShading: true },
+  // 冰体要在一片雪白的地表上「认得出来」：旧值 0xe4f1fb 与雪原同色，22 km 全景里
+  // 完全融进背景。压到偏青的冰蓝、抬一点自发光，靠色相而不是亮度区分（2026-11-12）。
+    // 冰体：在雪原/岩壁背景上要「一眼读成冰」而非一块白。旧值近白 + 自发光 0.5，
+  // 近距离直接过曝成纯白球（实测 600 m 处占满画面、没有一点冰的质感）。
+  // 改成饱和冰蓝 + 低自发光 + 较高粗糙度，靠色相而不是亮度区分。
+  GY_ice:     { color: 0x4f9fc8, roughness: 0.45, metalness: 0.05,
+                emissive: 0x0d3a52, emissiveIntensity: 0.18, flatShading: true },
 };
 
 const matCache = new Map();
