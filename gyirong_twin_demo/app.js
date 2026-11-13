@@ -4,7 +4,7 @@ import { OrbitControls } from './lib/OrbitControls.js';
 import { PALETTE, material, makeSculpt, assertAnchors, applyDamage,
          diagnose, attachFacade, attachBank, buildDistanceField } from './proc.js';
 // 洪水演进实景层：④ GPU 高度场 + 亚网格连续曲面 + 碎冰 / 飞溅粒子（④②⑤①⑥）
-import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261114d';
+import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261114e';
 
 /* ==========================================================================
    吉隆「8·26」冰岩崩—泥石流灾害链 · 实景三维数字孪生推演（演示级）

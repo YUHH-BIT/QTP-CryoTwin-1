@@ -294,10 +294,12 @@ void main() {
   float warp = vnoise(vWorld.xz * 0.021) * 4.6 + vnoise(vWorld.xz * 0.058) * 1.7;
   /* 2026-11-14：warp 直接塞进 sin 的相位，等于把 sin 变成「噪声场的一层层等值线」——
      平水面上一放大就是一组同心年轮，整块水面看着像木板纹理。相位扰动只保留
-     打散规则性所需的那一点（p1 ×0.55、p3 ×0.35），不再叠出同心圈。 */
+     打散规则性所需的那一点（p1 ×0.55、p3 ×0.35），不再叠出同心圈。
+     同一处还去掉 p3 里的 depthM*0.035：水深沿到达时间场从池心向外平滑递减，
+     把它塞进 sin 就成了**一层层等深线**，正是「木板年轮」最粗的那组条纹。 */
   float p1 = dot(vWorld.xz, f)*0.055 - uClock*2.35 + warp*0.55;
   float p2 = dot(vWorld.xz, fc)*0.11 + uClock*1.40 + warp*0.45;
-  float p3 = dot(vWorld.xz, f)*0.24 - uClock*3.60 + depthM*0.035 + warp*0.35;
+  float p3 = dot(vWorld.xz, f)*0.24 - uClock*3.60 + warp*0.35;
   // 屏幕空间抗锯齿：相位在相邻像素间变化过大时，这组波纹已低于采样能力，
   // 继续画只会叠成密集锯齿 / 同心摩尔纹（t=505 俯视全景实测很明显）→ 按梯度淡出。
   float aa1 = 1.0 - smoothstep(0.55, 1.45, fwidth(p1));
