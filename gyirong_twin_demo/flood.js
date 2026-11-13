@@ -229,6 +229,17 @@ void main() {
   float T = src.r * T_SCALE;
   float dSim = uTField - T;
   float h = max(0.0, uPeak * src.g * riseFn(dSim));
+  /* 湿边羽化（2026-11-14）：shape.bin 的淹没势是 0/255 硬掩膜，bicubic 也只能把
+     边界摊开一个网格（约 42 m），所以水面一直是一块「厚度均匀、边缘笔直、顶面
+     平整」的板 —— 近景看就是一块土黄色多边形。这里用 4 抽样盒式模糊估一个
+     「离岸远近」，让水深在岸线附近平滑收敛到 0：直边与垂直侧壁随之消失，
+     水里也自然分出深浅两层。只改观感，不动 shape.bin 与任何水文数值。 */
+  float potB = 0.25 * (
+      texture2D(uSource, uv + vec2(uSrcTexel.x * 2.5, 0.0)).g
+    + texture2D(uSource, uv - vec2(uSrcTexel.x * 2.5, 0.0)).g
+    + texture2D(uSource, uv + vec2(0.0, uSrcTexel.y * 2.5)).g
+    + texture2D(uSource, uv - vec2(0.0, uSrcTexel.y * 2.5)).g);
+  h *= smoothstep(0.24, 0.80, potB);
   float wet = smoothstep(0.0, 1.1, h);
 
   // 流向由到达时间场梯度给出（真实场推导，不是手画箭头）
@@ -281,9 +292,12 @@ void main() {
   vec3 gN = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
   if (gN.y < 0.0) gN = -gN;
   float warp = vnoise(vWorld.xz * 0.021) * 4.6 + vnoise(vWorld.xz * 0.058) * 1.7;
-  float p1 = dot(vWorld.xz, f)*0.055 - uClock*2.35 + warp;
-  float p2 = dot(vWorld.xz, fc)*0.11 + uClock*1.40 + warp*0.7;
-  float p3 = dot(vWorld.xz, f)*0.24 - uClock*3.60 + depthM*0.035 + warp*1.6;
+  /* 2026-11-14：warp 直接塞进 sin 的相位，等于把 sin 变成「噪声场的一层层等值线」——
+     平水面上一放大就是一组同心年轮，整块水面看着像木板纹理。相位扰动只保留
+     打散规则性所需的那一点（p1 ×0.55、p3 ×0.35），不再叠出同心圈。 */
+  float p1 = dot(vWorld.xz, f)*0.055 - uClock*2.35 + warp*0.55;
+  float p2 = dot(vWorld.xz, fc)*0.11 + uClock*1.40 + warp*0.45;
+  float p3 = dot(vWorld.xz, f)*0.24 - uClock*3.60 + depthM*0.035 + warp*0.35;
   // 屏幕空间抗锯齿：相位在相邻像素间变化过大时，这组波纹已低于采样能力，
   // 继续画只会叠成密集锯齿 / 同心摩尔纹（t=505 俯视全景实测很明显）→ 按梯度淡出。
   float aa1 = 1.0 - smoothstep(0.55, 1.45, fwidth(p1));
@@ -317,11 +331,13 @@ void main() {
   // 贴图细节为主、程序化波纹只留 25% 作大尺度基底（35% 在近景仍会织出条带）；
   // 贴图缺失时自动全量回退
   vec2 slope = slopeProc * mix(1.0, 0.25, uHasNormals) + slopeTex * uHasNormals;
-  // 近景泥浆（uMuddy→1）：高频法线坡度衰减到 22%，泥浆以漫反射为主。
+  // 近景泥浆（uMuddy→1）：高频法线坡度衰减到 58%（原 78%）。
   // 2026-11-10：曾一度压到完全归零去"修斜纹"，但洋红像素量化证实
   // 斜纹属于山坡卫星影像（水面只占画布右下角约 3.8%），不是水面缺陷，
   // 故恢复为温和衰减，保留一点大尺度明暗起伏。
-  slope *= 1.0 - 0.78 * uMuddy;
+  // 2026-11-14：78% 衰减后近景水面完全没有明暗起伏，读起来是「一块棕色
+  // 多边形」而不是「流动的浑水」。压到 58%，保留可辨的波面坡度。
+  slope *= 1.0 - 0.58 * uMuddy;
   vec3 N = normalize(vec3(-slope.x*1.5, 1.0, -slope.y*1.5));
   // gN 是逐三角形常数，哪怕只借 10% 也会在俯视全景里显出细密的三角形人字纹；
   // 压到 3%，只保留极轻微的地形起伏感。
@@ -334,8 +350,11 @@ void main() {
   float ndh = max(dot(N, Hh), 0.0);
   // 高光不能一片过曝：乘以噪声遮罩，只在波峰的碎点上闪
   float detail = min(aa1, min(aa2, aa3));
-  float spec = (pow(ndh, 96.0)*0.62 + pow(ndh, 20.0)*0.11) *
-               (0.35 + 0.65*fn) * (0.30 + 0.70*detail) * (1.0 - 0.85*uMuddy);
+  // 三档波瓣：96 次（针尖碎光）+ 20 次（中景波峰）+ 6 次（贴水面的宽阔「湿光」）。
+  // 近景泥浆原来把高光整体乘 0.15，水面一点反光都没有 → 和山坡分不开。
+  // 现在泥浆只衰减 60%，并由宽瓣承担「湿面」的主观感（碎光仍压着，不会成片过曝）。
+  float spec = (pow(ndh, 96.0)*0.62 + pow(ndh, 20.0)*0.11 + pow(ndh, 6.0)*0.05) *
+               (0.35 + 0.65*fn) * (0.30 + 0.70*detail) * (1.0 - 0.60*uMuddy);
   float fres = pow(1.0 - max(dot(N, V), 0.0), 4.0);
   float diff = 0.58 + 0.42*max(dot(N, L), 0.0);
 
@@ -349,26 +368,38 @@ void main() {
   ruv = clamp(ruv, 0.002, 0.998);
   vec3 ground = texture2D(uSat, ruv).rgb;
   float ext = 1.0 - exp(-depthM * 0.105);
-  vec3 shallow = vec3(0.46, 0.355, 0.235);   // 浑浊泥黄（浅水）
-  vec3 deep    = vec3(0.185, 0.135, 0.095);  // 深泥褐（主槽）
+  // 2026-11-14：原浅泥黄 0.46/0.355/0.235、深泥褐 0.185/0.135/0.095 都是
+  // 「同色系棕」，与两侧山坡的岩土影像几乎同色，缩到全景里就消失了。
+  // 改成「浅处亮暖赭、主槽暗中性灰褐」——深浅之间拉开明度差，水面自己
+  // 就能读成一条有中心的沟道；深处转中性而不是纯棕，才不会和山坡糊在一起。
+  vec3 shallow = vec3(0.560, 0.400, 0.215);   // 浑浊泥黄（浅水 / 漫流边）
+  vec3 deep    = vec3(0.120, 0.115, 0.112);   // 主槽：暗中性灰褐（高浓度悬浮液）
   vec3 body = mix(shallow, deep, clamp(depthM/18.0, 0.0, 1.0));
   // 卫星底图只透少量并压暖。泥浆模式进一步压到近乎不透明
   // （Unity HDRP「Dirty river」：降低 Absorption Distance）。
   // 注意：画面右侧那片斜纹是**山坡的卫星影像**，不是透过水面来的
   // （洋红像素量化：水面只占画布右下角约 3.8%），改这里不会也不必消掉它。
-  float waterMix = mix(0.72 + 0.28*ext, 0.94 + 0.06*ext, uMuddy);
+  // 近景泥浆几乎不透底（0.97~1.00），远景观感保持原样：卫星地面是棕色，
+  // 透上来只会把水体的明度差抵消掉，越透越看不见。
+  float waterMix = mix(0.72 + 0.28*ext, 0.97 + 0.03*ext, uMuddy);
   body = mix(ground * vec3(0.46, 0.42, 0.34), body, waterMix);
   // 悬浮泥沙（口径 C）：泥流颜色来自高浓度颗粒散射，不是清水表面吸收。
   // Unity HDRP「Dirty river」/ Vortex Suspension 同源做法。
   // 两层**各向同性** fbm 以不同速度沿流向滚动，靠时间产生流动感。
   // 曾用「沿流向低频 × 横向高频」的 fbm 做拉长流纹，那本质是一组平行条带，
   // 会把条纹换个方向请回来；各向同性才不会织出方向性纹理。
+  // 悬浮泥沙（口径 C）：泥流颜色来自高浓度颗粒散射，不是清水表面吸收。
+  // 2026-11-14：这一项原来整体乘 uMuddy，而 uMuddy 只在 900 m 内才接近 1，
+  // 于是 2 km 外的水面**一丝色斑都没有**，成了一整块平涂色板（用户看到的就是这个）。
+  // 改成 (0.45 + 0.55·uMuddy)：任何视距都保留约四成颗粒斑驳，近景再加强。
   float sediment = fbm(vWorld.xz * 0.035 + f * uClock * 0.40);
   float mudFlow = 0.60 * fbm(vWorld.xz * 0.012 + f * uClock * 0.85)
                 + 0.40 * fbm(vWorld.xz * 0.026 - f * uClock * 0.55 + 11.7);
-  body *= 1.0 - uMuddy * (0.20 - 0.30 * sediment - 0.18 * mudFlow);
-  vec3 col = body * diff + uSky * fres * mix(0.10, 0.02, uMuddy)
-             + vec3(1.0, 0.94, 0.80) * spec * 0.55;
+  body *= 1.0 - (0.45 + 0.55 * uMuddy) * (0.20 - 0.30 * sediment - 0.18 * mudFlow);
+  // 天空反射：泥浆从 2% 提到 7% —— 哪怕浑浊，湿面也总有掠射角的天空反光，
+  // 这是「一眼认出是水」最便宜的线索，且只在边缘掠射角生效，不会洗白水体。
+  vec3 col = body * diff + uSky * fres * mix(0.10, 0.07, uMuddy)
+             + vec3(1.0, 0.94, 0.80) * spec * 0.60;
 
   // --- 湍流：噪声主导，不再用顺流向正弦 ---
   // sin(dot(world.xz, f)*0.30) 的周期约 21 m，在 600 m 视距下正好是屏幕上
@@ -380,13 +411,19 @@ void main() {
   // --- 泡沫 / 浪花：只在窄前锋带、波峰破碎处与湿边出现 ---
   float crest = smoothstep(ETA_MAX*0.34, ETA_MAX*0.90, vEta);
   float edge  = 1.0 - smoothstep(0.0, 1.8, vH);
-  float foamK = clamp(vFoam*0.78 + vFront*0.88 + crest*vFront*0.55 + edge*0.20, 0.0, 1.0);
+  // 湿边泡沫 0.20 → 0.34：水面本身只有几十米宽，远景里全靠这道水线交代
+  // 「水铺到哪里」；只靠颜色填充，很容易被棕色底图吃掉。
+  float foamK = clamp(vFoam*0.78 + vFront*0.88 + crest*vFront*0.55 + edge*0.34, 0.0, 1.0);
   foamK *= 0.28 + 0.82*fn;
   // 泥流的泡沫不是纯白，而是夹着细颗粒的暖白
   vec3 foamCol = mix(vec3(0.66, 0.63, 0.54), vec3(0.99, 0.96, 0.88), fn);
   col = mix(col, foamCol, clamp(foamK, 0.0, 0.78));
   // 湿边压暗形成水线，泡沫边缘的高光碎点模拟《后天》式溃坝浪花颗粒
-  col *= 1.0 - 0.24 * edge;
+  col *= 1.0 - 0.26 * edge;
+  // 水线外侧补一道很淡的冷色反光（天空掠射的残影）：泥色与棕色山坡同色系，
+  // 边界特别容易糊掉，这道亮边把「水铺到这里为止」交代清楚。
+  // 只在最外圈（vH < 1.8 m）生效，不会把水体整体洗白。
+  col += vec3(0.46, 0.52, 0.55) * pow(edge, 2.0) * 0.14;
   col += vec3(0.85) * smoothstep(0.78, 0.97, fn) * foamK * 0.20;
 
   float alpha = clamp(uAlpha * (0.76 + 0.24*ext) * smoothstep(0.0, 1.0, vH), 0.0, 1.0);

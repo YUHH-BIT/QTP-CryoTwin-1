@@ -1,10 +1,10 @@
-import * as THREE from './lib/three.module.js?v=20261111a';
-import { OrbitControls } from './lib/OrbitControls.js?v=20261111a';
+import * as THREE from './lib/three.module.js?v=20261114d';
+import { OrbitControls } from './lib/OrbitControls.js?v=20261114d';
 // 程序化建模骨架：spec → 可编辑 THREE.Group + 材质色板 + 着色器画岸边/立面
 import { PALETTE, material, makeSculpt, assertAnchors, applyDamage,
-         diagnose, attachFacade, attachBank, buildDistanceField } from './proc.js?v=20261111a';
+         diagnose, attachFacade, attachBank, buildDistanceField } from './proc.js?v=20261114d';
 // 洪水演进实景层：④ GPU 高度场 + 亚网格连续曲面 + 碎冰 / 飞溅粒子（④②⑤①⑥）
-import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261112ao';
+import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261114d';
 
 /* ==========================================================================
    吉隆「8·26」冰岩崩—泥石流灾害链 · 实景三维数字孪生推演（演示级）
@@ -945,7 +945,7 @@ function buildOSMBuildings() {
    直接跌进错坚河上游。这是 8·26 冰岩崩的形态：源区在山背后高处，不在河谷里。
    （试过西北 3.5 km 的 5435 m 平缓冰斗：与沟道不连通，要绕 13 km 或翻 6400 m 垭口，
      物理上不成立，已废弃。） */
-const GLACIER_LL = [85.4985, 28.2605];
+const GLACIER_LL = [85.51028, 28.25899];
 
 /* 2026-11-12 18:50 用户要求：删掉源区那五个大冰块。
    冰体本身是示意几何（Icosahedron），在 22 km 全景里既不像真实冰体、又抢主体水面的
@@ -958,50 +958,47 @@ function buildGlacier() {
   scene.add(glacierGroup);
 }
 
-/* 冰崩崩落带：冰体失稳后顺坡崩落、跌进错坚河上游的通道。
-   用 DEM 上的「最陡下行路径」算出来（只允许每步上升 ≤8 m 的硬约束，得到唯一一条
-   从源区 6925 m 落到沟道起点 5245 m 的走廊，长 2.34 km、落差 1680 m）。
-   冰体本身藏在山脊后面，光有冰块观众看不出源区在哪；这条带子把「山那边的冰源」
-   和「山这边的沟道口」在视觉上连起来，冰崩的来路一眼可读（2026-11-12 用户指正）。
-   带宽由 95 m 渐变到 170 m（崩落扇），贴地 20 单位，跟随「冰川源区」图层开关。 */
+/* 冰崩崩落带：冰体失稳后顺坡崩落、跌进沟道起点的通道。
+   2026-11-13 重算：演进起点已从坡底（5255 m）裁到坡顶（6738 m），源区随之
+   挪到起点东侧 1.6 km 的 6951 m 山脊 —— 从那条脊往西是一路下坡，中途只翻一道
+   6884 m 的小梁，不再出现「先爬 1400 m 再下坡」。路径用固定终点的 Dijkstra
+   （上升 1 m 折算 25 m 行程）求得，带宽 95→170 m 渐变，贴地 20 单位。 */
 const ICE_TRACK = [
-  [85.4984, 28.26048],
-  [85.4984, 28.26008],
-  [85.4984, 28.25967],
+  [85.51028, 28.25899],
+  [85.51006, 28.25899],
+  [85.50984, 28.25913],
+  [85.5094, 28.25926],
+  [85.50896, 28.2594],
+  [85.50852, 28.25953],
+  [85.50808, 28.25967],
+  [85.50764, 28.25981],
+  [85.5072, 28.25981],
+  [85.50676, 28.25994],
+  [85.50632, 28.26008],
+  [85.50588, 28.26008],
+  [85.50544, 28.26008],
+  [85.505, 28.26008],
+  [85.50456, 28.26021],
+  [85.50412, 28.26035],
+  [85.50368, 28.26048],
+  [85.50324, 28.26048],
+  [85.5028, 28.26048],
+  [85.50236, 28.26035],
+  [85.50192, 28.26021],
+  [85.50148, 28.26008],
+  [85.50104, 28.26008],
+  [85.5006, 28.25994],
+  [85.50016, 28.25967],
+  [85.49972, 28.25953],
+  [85.49928, 28.25953],
+  [85.49884, 28.2594],
   [85.4984, 28.25926],
-  [85.4984, 28.25886],
-  [85.4984, 28.25846],
-  [85.4984, 28.25805],
-  [85.4984, 28.25765],
-  [85.4984, 28.25724],
-  [85.4984, 28.25683],
-  [85.4984, 28.25643],
-  [85.4984, 28.25603],
-  [85.4984, 28.25562],
-  [85.4984, 28.25521],
-  [85.4984, 28.25481],
-  [85.4984, 28.2544],
-  [85.4984, 28.254],
-  [85.4984, 28.2536],
-  [85.4984, 28.25319],
-  [85.4984, 28.25278],
-  [85.4984, 28.25238],
-  [85.4984, 28.25198],
-  [85.4984, 28.25157],
-  [85.4984, 28.25117],
-  [85.4984, 28.25076],
-  [85.4984, 28.25035],
-  [85.4984, 28.24995],
-  [85.4984, 28.24955],
-  [85.4984, 28.24914],
-  [85.4984, 28.24873],
-  [85.4984, 28.24833],
-  [85.4984, 28.24792],
-  [85.4984, 28.24752],
-  [85.4984, 28.24712],
-  [85.4984, 28.24671],
-  [85.4984, 28.2463],
-  [85.49818, 28.2459],
+  [85.49796, 28.25913],
+  [85.49752, 28.25899],
+  [85.49708, 28.25899],
+  [85.49664, 28.25886],
+  [85.4962, 28.25872],
+  [85.49598, 28.25859],
 ];
 let iceTrackMesh = null;
 function buildIceTrack() {
@@ -1200,7 +1197,12 @@ function onUserTakeover() {
     postCesium({ type: 'setAutoCam', value: false });
     changed = true;
   }
-  if (changed) pushLog('已接管视角：自动运镜与洪水跟拍已停止，鼠标操作不再被拉回。', 'info', state.t);
+  // 用户一旦手动动镜头，就不再是「全景机位」这个成片视角了：无条件灭掉高亮，
+  // 但不动时间轴与图层（那是 resetView 的活）。
+  syncViewBtns(null);
+  if (changed) {
+    pushLog('已接管视角：自动运镜与洪水跟拍已停止，鼠标操作不再被拉回。', 'info', state.t);
+  }
 }
 /* 地图式缩放：滚轮以「光标下的地面点」为锚点，而不是永远围绕固定 target。
    把相机与轨道中心同时相对锚点 P 按比例缩放：
@@ -1330,6 +1332,7 @@ function resetView() {
   applyLayers();
   markFloodJump();
   applyOverviewCam(true);
+  syncViewBtns('overview');
 }
 
 /* -------------------- 播放跟拍：镜头始终在灾害上方 -------------------- */
@@ -1402,7 +1405,7 @@ const RIG = {
   // 会把相机抬到 2 km 以上，反而不是「谷上方」。离地由 CAM_AUTO_CLEAR 兜底。
   // back 区间收窄：fill 反馈只做 ±15% 微调，别让它一路顶到上下限把机位拉走。
   follow: { back: 2100, lat: -520, alt: 1200, pitch: 0, fill: 0.26,
-            backMin: 1950, backMax: 2350,
+            pitchMin: 18, pitchMax: 46, backMin: 1950, backMax: 2350,
             sRate: 2.0, posRate: 1.9, tgtRate: 2.1, intro: 2.4, ahead: 400 },
   // 贴水面近景（?cam=near 切换）：取 __rigSearch 在 t=300 实测的最优区
   // （H 160~250、湿带占画高 45~50%、水头居中、零遮挡）。俯角只有约 10°，
@@ -1410,14 +1413,34 @@ const RIG = {
   near:   { back: 1000, lat: 220, alt: 0, pitch: 10, fill: 0.48,
             backMin: 700, backMax: 1600,
             sRate: 2.2, posRate: 2.6, tgtRate: 2.8, intro: 1.4, ahead: 300 },
-  // 洪水航拍保留贴近水面的近景，作为与默认俯视并存的另一种观察方式。
-  cine:   { back: 430, lat: -150, pitch: 26, fill: 0.55, backMin: 430, backMax: 1500,
-            sRate: 2.8, posRate: 3.0, tgtRate: 3.2, intro: 1.1, ahead: 140 },
+  /* 洪水航拍（2026-11-13 v2）：从「贴水面近景」改成真正的无人机斜俯拍。
+     audit 实测旧参数（back 430 + 俯角 26° 反解）四个毛病：
+       · 斜距只有 570~950 m，不是航拍而是「跟在水头后面跑」；
+       · 实际俯角 26→50.3→31.7→42.6° 乱跳（高度常被 groundAt 兜底顶起）；
+       · t=360 视线被山体切断 9/14 个采样点、最深挡 40 m；
+       · 湿带占画高恒为 0（rigFill 采样点落到画外，见 rigFill 注释）。
+     新参数：绝对高度 alt 520 m + back 850 m + 侧偏 280 m ⇒ 斜距 ≈ 1.0~1.2 km，
+     俯角 22~42°；ahead 240 m 让画面留出前方沟道，洪水有推进方向感。
+     avoid 开启后由 losPenalty 逐级避让山体（换边 → 抬高 → 推近）。
+     fill 设为 0 = 关闭「按占画高自动推拉」：航拍要可预测的匀速跟拍，而 rigFill 在
+     水头附近湿点稀疏的段落只采到 1~2 个点（fn 字段），占比系统性偏低，
+     反馈会把 back 一路拉到下限 650，反而变回「贴脸」。 */
+  /* 洪水航拍 v3（2026-11-13，用户原话「不太好看，可以换成别的吗，还有没有别的」）：
+     v2 是「正后方跟着水头跑」—— 斜距 919~1171 m，画面里沟道沿视线方向收成一条，
+     洪水的横向宽度、两岸坡形全被压扁，只剩一条竖直的水带。
+     v3 换成**近距离高位跟拍**：相机贴着水头上方 300 m 起步、侧偏 120 m，视线短
+     （back 220 + ahead 100）所以弯道挡不住 —— 实测 1018 个节点里只有 4.3% 视线被
+     地形切断（v2 是 27~34%）。高度由「本段地形 ±420 m 最高点 + 140」兜底，
+     俯角稳定在 50~60°，画面像无人机俯冲跟拍。
+     遮挡/高度解算全部在 bakeRig 离线完成，运行时只查表（见上方抖动注释）。 */
+  cine:   { back: 220, lat: 120, alt: 300, pitch: 0, fill: 0,
+            pitchMin: 26, pitchMax: 42, backMin: 650, backMax: 1900,
+            sRate: 2.2, posRate: 2.4, tgtRate: 2.6, intro: 1.8, ahead: 100, avoid: false },
 };
 // 跟拍预设：默认折中俯瞰；加 ?cam=near 换成贴水面近景，便于直接对比。
 // 不新增按钮——工具条固定五项是 11-09 定的。
 const CAM_PRESET = new URLSearchParams(location.search).get('cam') === 'near' ? 'near' : 'follow';
-const rig = { mode: null, s: 0, back: 600, fill: 0, snap: true, introT: 1,
+const rig = { mode: null, s: 0, headS: -1, back: 600, fill: 0, snap: true, introT: 1,
               cam0: new THREE.Vector3(), tgt0: new THREE.Vector3(),
               pos: new THREE.Vector3(), aim: new THREE.Vector3(), dbg: null };
 const rigTmp = new THREE.Vector3();
@@ -1446,6 +1469,19 @@ function rigHead(f, L) {
   }
   return s0;
 }
+/* 相机 → 目标之间是否被地形切断（2026-11-13）：沿视线 n 等分采样地形高度，
+   返回「越过视线最多那一处」的米数，0 = 完全通视。
+   必须用 terrainTriY 而不是 displayY —— 山脊是凸地形，双线性值偏低，
+   实测会漏判几十米的遮挡（这正是「冰块被埋进山里」的同一个坑）。 */
+function losPenalty(x0, y0, z0, x1, y1, z1, n = 14) {
+  let worst = 0;
+  for (let k = 1; k < n; k++) {
+    const u = k / n;
+    const d = terrainTriY(x0 + (x1 - x0) * u, z0 + (z1 - z0) * u) - (y0 + (y1 - y0) * u);
+    if (d > -8 && d > worst) worst = d;
+  }
+  return worst;
+}
 /* 湿带在画面里的纵向占比（0~1），供 back 反馈用。
    2026-11-10 逐点诊断（__rigFillDiag）确认：湿区是沿沟道的**楔形** ——
    可见水头处收成尖端，越往上游越宽；且到达时间场含横向漫流延迟，
@@ -1461,23 +1497,196 @@ function rigFill(cam, f, s0, L) {
     const w = f.waterY(c.x, c.z, f.tField);
     return { c, w, wet: w.h / pk > 0.005 };
   };
-  let sWet = s0;
-  for (let d = 0; d <= 900; d += 30) {
-    const s = cs(s0 - d);
-    if (wetAt(s).wet) sWet = s;
-  }
   cam.updateMatrixWorld(true);
   cam.matrixWorldInverse.copy(cam.matrixWorld).invert();
+  /* 取样跨度必须跟机位远近匹配（2026-11-13 修）：原来固定取 sWet → s0 的整段
+     （最多 900 m），但航拍 back 只有 400~1000 m，画面纵向只覆盖 300~700 m，
+     于是三个采样点里两个落到画外、n<2 直接返回 0 —— `rigFill` 长期读 0，
+     back 反馈形同失效（audit 里 8 个时刻 fill 全是 0 就是证据）。
+     现在按「相机到水头的水平距离」定跨度，5 点等分，全部落在画面覆盖范围内。 */
+  const hc0 = f.chanAt(cs(s0));
+  const camD = Math.hypot(cam.position.x - hc0.x, cam.position.z - hc0.z);
+  const span = Math.min(900, Math.max(180, camD * 0.55));
   let y0 = 9, y1 = -9, n = 0;
-  for (const s of [sWet, (sWet + s0) / 2, s0]) {
+  for (let i = 0; i < 5; i++) {
+    const s = cs(s0 - span * i / 4);
     const { c, w, wet } = wetAt(s);
     if (!wet) continue;
     rigTmp.set(c.x, w.y, c.z).project(cam);
     if (rigTmp.z > 1 || Math.abs(rigTmp.x) > 1 || Math.abs(rigTmp.y) > 1) continue;
     n++; y0 = Math.min(y0, rigTmp.y); y1 = Math.max(y1, rigTmp.y);
   }
+  rig.fillN = n;
   return n >= 2 ? Math.max(0, Math.min(y1, 1) - Math.max(y0, -1)) / 2 : 0;
 }
+/* ================= 机位轨迹烘焙（2026-11-13，替代 updateRig 的逐帧求解）=================
+   抖动根因（实测，不是猜）：旧机位是「每帧现解」的，四个反馈环互相拉扯 ——
+     ① avoid 三选一每帧重算，遮挡罚分在 4 m 临界处来回切 → 高度/侧向逐帧跳变；
+     ② pitchMax/pitchMin 每帧改 back，back 一变 groundAt 也变 → py 变 → 俯角再变；
+     ③ 高度以「当前时刻水面 + alt」为目标，而水深随帧变 → 高度跟着抖；
+     ④ rigFill 再叠一层自动推拉。
+   调参治不了这种互锁。根治办法是把求解**搬到离线**：按里程每 40 m 解一个机位
+   （高度用固定床面高程，与时间无关），遮挡逐级避让，最后整条轨迹滑动平均。
+   运行时只查表 + 线性插值 —— 机位是里程的确定函数，没有任何反馈环，物理上不可能抖。 */
+const RIG_STEP = 40;
+const RIG_PATH = { follow: null, cine: null, near: null };
+
+/* s 邻域 (±120 m) 的最低床面：中轴个别段落骑在山脊上，直接取 chanAt(s).y
+   会把机位基准抬高几十米；取局部最低更接近真实谷底。 */
+function rigBedAt(f, s, cs) {
+  let m = Infinity;
+  for (let d = -120; d <= 120; d += 60) {
+    const y = f.chanAt(cs(s + d)).y;
+    if (y < m) m = y;
+  }
+  return m;
+}
+
+function bakeRig(mode) {
+  const f = flood; if (!f || !f.chanAt) return null;
+  const cfg = RIG[mode], L = f.channel.lengthM;
+  const cs = v => Math.max(0, Math.min(L, v));
+  const n = Math.floor(L / RIG_STEP) + 1;
+  /* 1) 全程定一侧：侧移镜头一旦中途换边，画面会瞬间镜像翻转（比抖还难接受）。
+     抽样 13 个里程，比较 +lat / −lat 的遮挡总罚分，取小的那一侧。 */
+  let penP = 0, penN = 0;
+  for (let k = 0; k < 13; k++) {
+    const s = cs(L * (0.05 + 0.9 * k / 12));
+    const c = f.chanAt(s), t = rigTangent(s, f, L);
+    const a = f.chanAt(cs(s + cfg.ahead)), bed = rigBedAt(f, s, cs);
+    for (const sg of [1, -1]) {
+      const x = c.x - t.z * cfg.lat * sg, zz = c.z + t.x * cfg.lat * sg;
+      const y = Math.max(bed + cfg.alt, groundAt(x, zz) + CAM_AUTO_CLEAR);
+      const pen = losPenalty(x, y, zz, a.x, a.y + 25, a.z);
+      if (sg > 0) penP += pen; else penN += pen;
+    }
+  }
+  const side = penN < penP ? -1 : 1;
+  const pos = new Float32Array(n * 3), tgt = new Float32Array(n * 3);
+  for (let k = 0; k < n; k++) {
+    const s = Math.min(k * RIG_STEP, L);
+    /* 机位里程 s − back；落后于起点时沿切线**反向外推**，而不是把里程钳到 0。
+       钳到 0 会让相机与瞄准点重合、斜距只剩侧偏量 —— 就是「一开场怼在冰面上」。
+       反向外推还能让水头刚起步那几秒保持同一景别。 */
+    const spRaw = s - cfg.back, sp = cs(spRaw);
+    const t = rigTangent(sp, f, L);
+    const c = f.chanAt(sp), c0 = f.chanAt(0), over = Math.max(0, -spRaw);
+    const ts = cs(s + cfg.ahead), ac = f.chanAt(ts);
+    const bedT = rigBedAt(f, ts, cs);
+    const tX = ac.x, tY = bedT + 30, tZ = ac.z;
+    const at = lt => spRaw < 0
+      ? { x: c0.x - t.x * over - t.z * lt, z: c0.z - t.z * over + t.x * lt }
+      : { x: c.x - t.z * lt, z: c.z + t.x * lt };
+    /* 2) 高度求解（2026-11-13 重做）。
+       旧写法只取「谷底 + alt」，再逐档抬高 —— 在峡谷里同一侧的山脊会横在
+       相机与水头之间，实测 28~34% 的节点视线仍被挡，且三档侧偏在节点间跳来
+       跳去（lat 1050→630→0），造成每 20 m 达 97 m 的位置折角 —— 这就是抖动。
+       新写法：侧偏全程固定；高度先按「本段地形 ±420 m 内最高点 + 140」兜底，
+       保证相机在局部山脊之上；仍被挡时再逐级 +160 m，且**记录最优解**而不是
+       第一档。上限 bedT + 1.9×alt，避免山区把相机顶到 2 km（那样俯角就成了拍地图）。 */
+    const p0 = at(cfg.lat * side);
+    let lmax = -Infinity;
+    for (let a = 0; a < 8; a++) {
+      const ang = a * Math.PI / 4;
+      lmax = Math.max(lmax, terrainTriY(p0.x + Math.cos(ang) * 420, p0.z + Math.sin(ang) * 420));
+    }
+    const yLo = bedT + cfg.alt, yHi = bedT + cfg.alt * 1.9;
+    const py0 = Math.max(yLo, lmax + 140, groundAt(p0.x, p0.z) + CAM_AUTO_CLEAR);
+    let px = p0.x, pz = p0.z, py = py0, bestLos = 1e9;
+    for (let k2 = 0; k2 <= 3; k2++) {
+      const yy = Math.min(py0 + 160 * k2, yHi + 400);
+      const los = losPenalty(px, yy, pz, tX, tY, tZ);
+      if (los < bestLos) { bestLos = los; py = yy; }
+      if (los <= 4) { py = yy; break; }
+    }
+    /* 3) 瞄准点重选（2026-11-13）：如果从这台机位看不到 s+ahead 的沟道点，
+       就在前方/后方 ±360 m 内找一个真正能看见的沟道点当目标 —— 否则镜头会
+       整整一段对着挡住水头的山嘴。实测这一步把「视线被挡」的节点从 27% 降到个位数。 */
+    let tXf = tX, tYf = tY, tZf = tZ;
+    if (bestLos > 4) {
+      let found = false;
+      for (let d = 40; d <= 360 && !found; d += 40) {
+        for (const sg of [1, -1]) {
+          const ss = cs(s + cfg.ahead + sg * d), cc = f.chanAt(ss);
+          const cy = cc.y + 30;
+          if (losPenalty(px, py, pz, cc.x, cy, cc.z) <= 4) {
+            tXf = cc.x; tYf = cy; tZf = cc.z; found = true; break;
+          }
+        }
+      }
+    }
+    pos[k * 3] = px; pos[k * 3 + 1] = py; pos[k * 3 + 2] = pz;
+    tgt[k * 3] = tXf; tgt[k * 3 + 1] = tYf; tgt[k * 3 + 2] = tZf;
+  }
+  /* 4) 轨迹平滑：机位 ±3 节点（±120 m）、目标点 ±3 节点。逐节点避让会留下
+     一阶不连续的台阶，在 60 fps 下就是轻微顿挫。 */
+  const sm = (arr, rad) => {
+    const out = new Float32Array(arr.length), n3 = arr.length / 3;
+    for (let k = 0; k < n3; k++) {
+      let sx = 0, sy = 0, sz = 0, m = 0;
+      for (let d = -rad; d <= rad; d++) {
+        const q = Math.max(0, Math.min(n3 - 1, k + d));
+        sx += arr[q * 3]; sy += arr[q * 3 + 1]; sz += arr[q * 3 + 2]; m++;
+      }
+      out[k * 3] = sx / m; out[k * 3 + 1] = sy / m; out[k * 3 + 2] = sz / m;
+    }
+    return out;
+  };
+  RIG_PATH[mode] = { step: RIG_STEP, n, side, pos: sm(pos, 3), tgt: sm(tgt, 3) };
+  return RIG_PATH[mode];
+}
+
+function rigSample(mode, s, outPos, outAim) {
+  const p = RIG_PATH[mode] || bakeRig(mode);
+  if (!p) return false;
+  const g = Math.max(0, Math.min(p.n - 1.001, s / p.step));
+  const i = Math.floor(g), u = g - i, a = i * 3, b = Math.min(i + 1, p.n - 1) * 3;
+  outPos.set(p.pos[a] + (p.pos[b] - p.pos[a]) * u,
+             p.pos[a + 1] + (p.pos[b + 1] - p.pos[a + 1]) * u,
+             p.pos[a + 2] + (p.pos[b + 2] - p.pos[a + 2]) * u);
+  outAim.set(p.tgt[a] + (p.tgt[b] - p.tgt[a]) * u,
+             p.tgt[a + 1] + (p.tgt[b + 1] - p.tgt[a + 1]) * u,
+             p.tgt[a + 2] + (p.tgt[b + 2] - p.tgt[a + 2]) * u);
+  return true;
+}
+
+function updateRigBaked(dt, mode) {
+  const f = flood; if (!f || !f.chanAt) return;
+  const cfg = RIG[mode], L = f.channel.lengthM;
+  const snap = rig.mode !== mode || rig.snap;
+  const hd = rigHead(f, L);
+  if (snap) {
+    rig.mode = mode; rig.snap = false; rig.headS = hd;
+    rig.cam0.copy(camera.position); rig.tgt0.copy(controls.target);
+    rig.introT = 0; rig.intro0 = performance.now();
+  }
+  /* 锚点只增不减：水头物理上不会倒退，但 rigHead「向上游回看第一个有水处」
+     会在阈值边界跳几十米；旧实现直接喂给 rig.s，镜头就会往回退一下 ——
+     这是「镜头又往后退」的残留原因。现在记历史最大值，只允许前进。 */
+  if (!(rig.headS >= 0) || hd > rig.headS) rig.headS = hd;
+  rig.s = snap ? rig.headS : rig.s + (rig.headS - rig.s) * (1 - Math.exp(-dt * cfg.sRate));
+  if (!rigSample(mode, rig.s, rig.pos, rig.aim)) return;
+  const k = snap ? 1 : 1 - Math.exp(-dt * cfg.posRate);
+  const kt = snap ? 1 : 1 - Math.exp(-dt * cfg.tgtRate);
+  camera.position.lerp(rig.pos, k);
+  controls.target.lerp(rig.aim, kt);
+  // 摇臂式切入：按墙钟计时（SwiftShader 只有 0.25 fps，用 dt 累加会把 1.6 s 拖到几十秒）
+  if (rig.introT < 1) {
+    rig.introT = Math.min(1, (performance.now() - rig.intro0) / (cfg.intro * 1000));
+    const e = smooth(rig.introT);
+    camera.position.lerpVectors(rig.cam0, rig.pos, e);
+    controls.target.lerpVectors(rig.tgt0, rig.aim, e);
+  }
+  camera.lookAt(controls.target);
+  rig.fill = rig.introT >= 1 ? rigFill(camera, f, rig.s, L) : 0;
+  rig.dbg = { mode, step: RIG_STEP, s: Math.round(rig.s), head: Math.round(rig.headS),
+              side: RIG_PATH[mode] ? RIG_PATH[mode].side : 0,
+              fill: +rig.fill.toFixed(2), intro: +rig.introT.toFixed(2),
+              clear: +(camera.position.y - groundAt(camera.position.x, camera.position.z)).toFixed(1) };
+}
+
+/* 以下 updateRig 是 2026-11-13 之前的逐帧求解版，已由 updateRigBaked 取代。
+   保留代码作为对照，不再被默认路径调用。 */
 function updateRig(dt, mode) {
   const f = flood; if (!f || !f.chanAt) return;
   const cfg = RIG[mode], L = f.channel.lengthM;
@@ -1498,34 +1707,97 @@ function updateRig(dt, mode) {
   const backUse = cfg.back + 2600 * srcK;
   const altUse = cfg.alt ? cfg.alt + 1150 * srcK : 0;
   if (snap) rig.back = backUse;
-  else if (rig.fill > 0) rig.back = clamp(rig.back * clamp(rig.fill / cfg.fill, 0.85, 1.18),
+  // fill 反馈只做 ±6% 微调（原 ±18% 会把 back 拉得忽远忽近，俯角跟着抖）；
+  // cine 的 fill 设 0，整段跳过自动推拉。
+  else if (rig.fill > 0 && cfg.fill > 0) rig.back = clamp(rig.back * clamp(rig.fill / cfg.fill, 0.94, 1.06),
                                           cfg.backMin + 2600 * srcK, cfg.backMax + 2600 * srcK);
-  // 机位点：常规取 s−back；源区（s < back）时沿沟道切线**反向外推**到起点之外，
-  // 而不是把里程钳到 0。钳到 0 会让相机和瞄准点几乎重合、斜距只剩侧偏量，
-  // 等于把镜头怼在冰川面上 —— 这是「一开始推演贴太近」的直接原因。
-  const scRaw = rig.s - rig.back;
-  const sc = cs(scRaw);
-  const t = rigTangent(sc, f, L);
-  let px, pz;
-  if (scRaw < 0) {
-    const c0 = f.chanAt(0), over = -scRaw;   // 切线 t 指向下游，上游要取负
-    px = c0.x - t.x * over - t.z * cfg.lat;
-    pz = c0.z - t.z * over + t.x * cfg.lat;
-  } else {
-    const c = f.chanAt(sc);
-    px = c.x - t.z * cfg.lat;
-    pz = c.z + t.x * cfg.lat;
-  }
+  /* 机位点：常规取 s−back；源区（s < back）时沿沟道切线**反向外推**到起点之外，
+     而不是把里程钳到 0。钳到 0 会让相机和瞄准点几乎重合、斜距只剩侧偏量，
+     等于把镜头怼在冰川面上 —— 这是「一开始推演贴太近」的直接原因。
+     place() 抽成函数是为了让下面的「遮挡回避」能反复试算备选机位（反侧 / 抬高 / 推近），
+     保证三种备选与主路径用的是同一套外推、贴地、离地兜底规则。 */
   const aS = cs(rig.s + cfg.ahead), ac = f.chanAt(aS), aw = f.waterY(ac.x, ac.z, f.tField);
+  const place = (bk, lt, al) => {
+    const scR = rig.s - bk, sc2 = cs(scR), t2 = rigTangent(sc2, f, L);
+    let x, z;
+    if (scR < 0) {
+      const c0 = f.chanAt(0), over = -scR;   // 切线指向下游，上游要取负
+      x = c0.x - t2.x * over - t2.z * lt;
+      z = c0.z - t2.z * over + t2.x * lt;
+    } else {
+      const c = f.chanAt(sc2);
+      x = c.x - t2.z * lt;
+      z = c.z + t2.x * lt;
+    }
+    let y = cfg.alt
+      ? aw.y + al
+      : aw.y + 20 + Math.hypot(x - ac.x, z - ac.z) * Math.tan(cfg.pitch * Math.PI / 180);
+    y = Math.max(y, groundAt(x, z) + CAM_AUTO_CLEAR);
+    return { x, y, z };
+  };
+  let P = place(rig.back, cfg.lat, altUse);
+  let px = P.x, py = P.y, pz = P.z;
+  /* 山体遮挡回避（2026-11-13）。audit 实测旧航拍（back 430）在 t=360 有 9 个采样点被
+     山体切断、最深挡 40 m —— 观众看到的就是「水头被山吃掉」，也就是用户说的山体欺负。
+     无人机航拍的通行做法不是硬撞，而是逐级避让：
+       ① 换边：弯道内侧岸壁挡视线时，改走沟道另一侧（判定要省 30 m 才换，防抖）；
+       ② 抬高：每次 +150 m、最多 +450 m —— 再高俯角就变成「正上方拍地图」，比被挡还难看；
+       ③ 推近：峡谷两侧都不通时把 back 缩到 60%，从山脊这侧切进去。
+     判定 = losPenalty()：沿相机→可见水头 14 等分采样地形，越过视线即记挡。
+     三种备选的位移最终都经由 camera.position.lerp 平滑，不会瞬移。 */
+  let losPen = 0, avoidMode = '', raised = 0, latFinal = cfg.lat;
+  if (cfg.avoid && srcK < 0.5) {
+    const hp = f.chanAt(cs(rigHead(f, L))), hw = f.waterY(hp.x, hp.z, f.tField);
+    const hy = hw.y + 20;
+    losPen = losPenalty(px, py, pz, hp.x, hy, hp.z);
+    if (losPen > 4) {
+      const sP = place(rig.back, -cfg.lat, altUse);
+      const sPen = losPenalty(sP.x, sP.y, sP.z, hp.x, hy, hp.z);
+      if (sPen < losPen - 30) {
+        P = sP; px = P.x; py = P.y; pz = P.z; losPen = sPen; avoidMode = 'side';
+        latFinal = -cfg.lat;
+      }
+    }
+    const latUse = avoidMode === 'side' ? -cfg.lat : cfg.lat;
+    for (let i = 1; i <= 3 && losPen > 4; i++) {
+      const uP = place(rig.back, latUse, altUse + 150 * i);
+      const uPen = losPenalty(uP.x, uP.y, uP.z, hp.x, hy, hp.z);
+      if (uPen < losPen) {
+        P = uP; px = P.x; py = P.y; pz = P.z; losPen = uPen;
+        raised = 150 * i; avoidMode = 'raise';
+      }
+    }
+    if (losPen > 4) {
+      const nP = place(Math.max(rig.back * 0.6, cfg.backMin * 0.7), latUse, altUse + raised);
+      const nPen = losPenalty(nP.x, nP.y, nP.z, hp.x, hy, hp.z);
+      if (nPen < losPen) {
+        P = nP; px = P.x; py = P.y; pz = P.z; losPen = nPen; avoidMode = 'near';
+      }
+    }
+  }
+  /* 俯角约束（2026-11-13）：目标高度是「水面上方 alt」，但离地兜底会把相机推到
+     山脊之上 —— 实测俯角因此从 20.1° 跳到 54.6°，观感就是无人机忽高忽低。
+     这里不降高度（再降就穿山），改用**景别**把俯角拉回 [pitchMin, pitchMax]：
+     俯角过大就后退、过小就推近，幅度按 atan2(Δy, 水平距) 反解。
+     每帧最多 ±400 m，位置本身还有 lerp，所以不会瞬移。 */
+  if (cfg.pitchMax || cfg.pitchMin) {
+    const dyT = py - (aw.y + 20);
+    const hz0 = Math.hypot(px - ac.x, pz - ac.z);
+    const pNow = Math.atan2(dyT, Math.max(hz0, 1)) * 180 / Math.PI;
+    const pMax = cfg.pitchMax || 90, pMin = cfg.pitchMin || 6;
+    let nb = rig.back;
+    if (pNow > pMax) nb = Math.max(nb, dyT / Math.tan(pMax * Math.PI / 180));
+    else if (pNow < pMin) nb = Math.min(nb, dyT / Math.tan(pMin * Math.PI / 180));
+    nb = clamp(nb, cfg.backMin + 2600 * srcK, cfg.backMax + 2600 * srcK);
+    nb = clamp(nb, rig.back - 400, rig.back + 400);
+    if (Math.abs(nb - rig.back) > 1) {
+      rig.back = nb;
+      P = place(nb, latFinal, altUse + raised);
+      px = P.x; py = P.y; pz = P.z;
+    }
+  }
   let tgtX = ac.x, tgtY = aw.y + 20, tgtZ = ac.z;
   let horiz = Math.hypot(px - ac.x, pz - ac.z);
-  // 高度：跟随/航拍用目标俯角反解（固定「抬高 620 m」在源区会变成仰视、
-  // 口岸又俯得太狠）；战术俯视用绝对高度 alt，看整条沟谷的空间关系。
-  // 两者都由离地钳制兜底，绝不把相机塞进山体。
-  let py = cfg.alt
-    ? aw.y + altUse
-    : aw.y + 20 + horiz * Math.tan(cfg.pitch * Math.PI / 180);
-  py = Math.max(py, groundAt(px, pz) + CAM_AUTO_CLEAR);
   /* 源区回望机位（2026-11-12）：冰崩源已挪到沟道起点北偏西 3.5 km 的山背后。
      常规沿沟道后退的机位在源区会退到雪原上、背对冰体，画面只剩一屏雪坡。
      源区（s 小）时改成「站在冰源—起点连线的起点一侧 4.3 km 处回望」：
@@ -1570,20 +1842,28 @@ function updateRig(dt, mode) {
   rig.fill = rig.introT >= 1 ? rigFill(camera, f, rig.s, L) : 0;
   rig.dbg = { mode, back: Math.round(rig.back), pitch: +pitchNow.toFixed(1), s: Math.round(rig.s),
               fill: +rig.fill.toFixed(2), intro: +rig.introT.toFixed(2),
+              los: Math.round(losPen), avoid: avoidMode || null,
               clear: +(camera.position.y - groundAt(camera.position.x, camera.position.z)).toFixed(1) };
 }
 function updateDisasterFollow(dt) {
   if (followSnap) { rig.snap = true; followSnap = false; }
-  updateRig(dt, CAM_PRESET);
+  updateRigBaked(dt, CAM_PRESET);
 }
 function updateCineCamera(dt) {
   if (cineSnap) { rig.snap = true; cineSnap = false; }
-  updateRig(dt, 'cine');
+  updateRigBaked(dt, 'cine');
+}
+/* 视角按钮互斥高亮（2026-11-13）：工具条现在有两个"成片视角"——
+   「全景机位」（整条沟谷一屏）+「洪水航拍」（贴水跟拍），只可能有一个生效；
+   用户拖画布接管后两个都要灭掉，否则会以为还在自动运镜。 */
+function syncViewBtns(which) {
+  $('btn-ov').classList.toggle('active', which === 'overview');
+  $('btn-flood').classList.toggle('active', which === 'cine');
 }
 function enableCine(on) {
   cineCam = on;
   cineSnap = on;
-  $('btn-flood').classList.toggle('active', on);
+  syncViewBtns(on ? 'cine' : null);
   if (on) {
     if (state.engine !== 'three') setEngine('three');
     state.layers.flood = true;
@@ -1876,6 +2156,7 @@ function bindEvents() {
     state.playing = !state.playing;
     autoFly = false;
     flight = null; followSnap = false;
+    if (state.playing) syncViewBtns('overview');   // 推演锁定全景机位
     $('btn-play').textContent = state.playing ? '暂停' : '播放';
     if (state.playing && state.t >= computeFrame(0, state.vol).total - 1) state.t = 0;
   });
@@ -1902,6 +2183,19 @@ function bindEvents() {
     pushLog(`聚焦口岸聚落：${bldFocus ? bldFocus.count : 0} 栋 OSM 实测轮廓 · 程序化立面与勾边`, 'info', state.t);
   });
   $('btn-flood').addEventListener('click', () => enableCine(!cineCam));
+  /* 全景机位（2026-11-13 用户要求）：与「洪水航拍」并列的第二个成片视角。
+     只做视角切换 —— 不重置时间轴、不重播水面，推演播到一半也能随时切回全景看全局。 */
+  $('btn-ov').addEventListener('click', () => {
+    if (state.engine !== 'three') setEngine('three');
+    if (cineCam) enableCine(false);
+    autoFly = false; flight = null; followSnap = false;
+    state.rotating = false;
+    controls.autoRotate = false;
+    $('btn-rotate').classList.remove('active');
+    applyOverviewCam(true);
+    syncViewBtns('overview');
+    pushLog('已切到全景机位：整条沟道与淹没范围一屏看全', 'info', state.t);
+  });
   $('btn-rotate').addEventListener('click', () => {
     state.rotating = !state.rotating;
     controls.autoRotate = state.rotating;
@@ -2176,6 +2470,14 @@ function loop(now) {
     (imm ? 0.22 : state.layers.flood ? 0.62 : 1);
   if (frontMarker.children[1]) {
     frontMarker.children[1].scale.setScalar(1 + 0.16 * Math.sin(now / 320));
+  }
+  /* 前锋符号按视距等比缩放（2026-11-14）。必须放在**每帧**这里：放在 updateHazard
+     里只能跟着时间轴变化重算，相机自己飞近飞远时缩放会停在旧值 —— 实测就出现过
+     相机到 2.5 km、缩放还停在 22.5 km 对应的 2.16 倍，屏幕上成了一块半屏大的
+     橙色盘子（非常像「一块土黄色」的假色块）。目标：屏幕直径恒定约 60 px。 */
+  if (frontMarker.visible) {
+    const dFm = camera.position.distanceTo(frontMarker.position);
+    frontMarker.scale.setScalar(clamp(dFm / 2500, 0.08, 9) * 0.24);
   }
   updateFlight(now);
   // 必须把 dt 传给 update()：r160 才按真实时间算自动旋转角速度，
@@ -2482,6 +2784,154 @@ async function boot() {
              sWet0: wetS.length ? Math.round(wetS[0]) : null,
              sWet1: wetS.length ? Math.round(wetS[wetS.length - 1]) : null,
              frontGap: Math.round(sFront - s0), pts: pts.length, wetPts, rows };
+  };
+  /* 洪水航拍构图与遮挡审计（2026-11-13 优化前基线）。
+     按 RIG[mode] 的公式在多个时刻**复算**机位（不动真实相机、不动播放状态），
+     输出俯角、斜距、离地、水头是否入画、视线被山体切断的采样点数、湿带占画高。
+     用途：改参数前后各跑一次做 A/B —— 只看截图在 SwiftShader 下既慢又会漏判遮挡。 */
+  window.__cineAudit = (mode = 'cine', ts = [60, 120, 180, 240, 300, 360, 420, 480]) => {
+    const f = flood;
+    if (!f || !f.chanAt) return { err: 'no flood' };
+    const L = f.channel.lengthM, cs = v => Math.max(0, Math.min(L, v));
+    const cfg = RIG[mode] || RIG.cine;
+    const savePos = camera.position.clone(), saveTgt = controls.target.clone();
+    const saveQ = camera.quaternion.clone();
+    const saveRatio = f.tField / FLOOD_CONSTANTS.T_FIELD;
+    const v = new THREE.Vector3(), tgtV = new THREE.Vector3();
+    const rows = [];
+    for (const T of ts) {
+      const fr = computeFrame(T, state.vol);
+      f.setFrame(clamp(T / fr.total, 0, 1), state.vol, true);
+      const s = rigHead(f, L);
+      const scRaw = s - cfg.back, sc = cs(scRaw), tan = rigTangent(sc, f, L);
+      let px, pz;
+      if (scRaw < 0) {
+        const c0 = f.chanAt(0), over = -scRaw;
+        px = c0.x - tan.x * over - tan.z * cfg.lat;
+        pz = c0.z - tan.z * over + tan.x * cfg.lat;
+      } else {
+        const c = f.chanAt(sc);
+        px = c.x - tan.z * cfg.lat;
+        pz = c.z + tan.x * cfg.lat;
+      }
+      const aS = cs(s + cfg.ahead), ac = f.chanAt(aS), aw = f.waterY(ac.x, ac.z, f.tField);
+      const horiz = Math.hypot(px - ac.x, pz - ac.z);
+      const py = Math.max(cfg.alt ? aw.y + cfg.alt
+                                 : aw.y + 20 + horiz * Math.tan(cfg.pitch * Math.PI / 180),
+                          groundAt(px, pz) + CAM_AUTO_CLEAR);
+      tgtV.set(ac.x, aw.y + 20, ac.z);
+      camera.position.set(px, py, pz);
+      camera.lookAt(tgtV);
+      camera.updateMatrixWorld(true);
+      camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+      // 视线遮挡：相机 → 可见水头，16 步取地形（三角插值），越过视线即算被挡
+      const hc = f.chanAt(s), hw = f.waterY(hc.x, hc.z, f.tField);
+      let blk = 0, worst = 0;
+      for (let k = 1; k < 16; k++) {
+        const u = k / 16;
+        const x = px + (hc.x - px) * u, z = pz + (hc.z - pz) * u;
+        const lineY = py + (hw.y + 20 - py) * u;
+        const g = terrainTriY(x, z);
+        if (g > lineY - 8) { blk++; worst = Math.max(worst, g - lineY); }
+      }
+      v.set(hc.x, hw.y + 20, hc.z).project(camera);
+      const inView = !(v.z > 1 || Math.abs(v.x) > 1 || Math.abs(v.y) > 1);
+      rows.push({
+        t: T, s: Math.round(s),
+        dist: Math.round(camera.position.distanceTo(tgtV)),
+        pitch: +(Math.atan2(py - (aw.y + 20), Math.max(horiz, 1)) * 180 / Math.PI).toFixed(1),
+        clear: Math.round(py - groundAt(px, pz)),
+        blocked: blk, worst: Math.round(worst),
+        headInView: inView, headX: +v.x.toFixed(2), headY: +v.y.toFixed(2),
+        fill: +rigFill(camera, f, s, L).toFixed(2),
+      });
+    }
+    f.setFrame(saveRatio, state.vol, true);
+    camera.position.copy(savePos); controls.target.copy(saveTgt);
+    camera.quaternion.copy(saveQ); camera.updateMatrixWorld(true);
+    return rows;
+  };
+  /* 航拍机位离线审计（2026-11-13）：不渲染、不依赖帧率 —— 沿烘焙轨迹按 20 m 采样，
+     报「位移曲率 / 俯角 / 斜距 / 离地 / 视线遮挡」。SwiftShader 只有 ~1 fps 时，
+     用连续帧位移测抖动是假指标（4x 速下一帧位移 1.7 km），这套离线量才是直接判据。 */
+  window.__rigAudit = (mode = 'cine') => {
+    const f = flood; if (!f || !f.chanAt) return { err: 'no flood' };
+    RIG_PATH[mode] = null;
+    const pth = bakeRig(mode);
+    if (!pth) return { err: 'bake failed' };
+    const L = f.channel.lengthM, ds = 20;
+    const P = new THREE.Vector3(), T = new THREE.Vector3();
+    const pos = [], tgt = [], rows = [];
+    for (let s = 0; s <= L; s += ds) {
+      rigSample(mode, s, P, T); pos.push(P.clone()); tgt.push(T.clone());
+    }
+    const steps = [];
+    for (let i = 1; i < pos.length; i++) steps.push(pos[i].distanceTo(pos[i - 1]));
+    const curv = [];
+    for (let i = 1; i < steps.length; i++) curv.push(Math.abs(steps[i] - steps[i - 1]));
+    const mean = a => a.reduce((x, y) => x + y, 0) / Math.max(a.length, 1);
+    let blk = 0;
+    const pitch = [], dist = [];
+    for (let k = 0; k < pos.length; k++) {
+      const los = losPenalty(pos[k].x, pos[k].y, pos[k].z, tgt[k].x, tgt[k].y, tgt[k].z);
+      if (los > 4) blk++;
+      const hz = Math.hypot(pos[k].x - tgt[k].x, pos[k].z - tgt[k].z);
+      const pt = Math.atan2(pos[k].y - tgt[k].y, Math.max(hz, 1)) * 180 / Math.PI;
+      pitch.push(pt); dist.push(pos[k].distanceTo(tgt[k]));
+      if (k % 25 === 0) rows.push({ s: Math.round(k * ds), pitch: +pt.toFixed(1),
+        dist: +dist[k].toFixed(0),
+        clear: +(pos[k].y - groundAt(pos[k].x, pos[k].z)).toFixed(0), los: Math.round(los) });
+    }
+    return { mode, step: pth.step, side: pth.side, nodes: pth.n,
+             d1mean: +mean(steps).toFixed(2), d1max: +Math.max(...steps).toFixed(1),
+             curveMean: +mean(curv).toFixed(3), curveMax: +Math.max(...curv).toFixed(2),
+             blocked: blk, nodesTot: pos.length,
+             distMin: +Math.min(...dist).toFixed(0), distMax: +Math.max(...dist).toFixed(0),
+             pitchMin: +Math.min(...pitch).toFixed(1), pitchMax: +Math.max(...pitch).toFixed(1),
+             pitchMean: +mean(pitch).toFixed(1), rows };
+  };
+  /* 参数扫查：改 cine 参数并强制重烘焙（一次启动比多组机位用）。 */
+  window.__rigTune = (o = {}) => {
+    Object.assign(RIG.cine, o);
+    RIG_PATH.cine = null;
+    rig.snap = true;
+    return bakeRig('cine') ? { ok: 1, side: RIG_PATH.cine.side, n: RIG_PATH.cine.n } : { ok: 0 };
+  };
+  /* 真实跑一遍 cine 机位（含遮挡回避）：直接推 updateCineCamera 若干步让 lerp 收敛，
+     不渲染、不动播放状态。用来验证「避让到底有没有把视线打通」。 */
+  window.__cineRun = (ts = [60, 120, 180, 240, 300, 360, 420, 480]) => {
+    const f = flood;
+    if (!f || !f.chanAt) return { err: 'no flood' };
+    const saveRatio = f.tField / FLOOD_CONSTANTS.T_FIELD;
+    const saveCine = cineCam, saveMode = rig.mode;
+    const savePos = camera.position.clone(), saveTgt = controls.target.clone();
+    const rows = [];
+    cineCam = true;
+    for (const T of ts) {
+      const fr = computeFrame(T, state.vol);
+      f.setFrame(clamp(T / fr.total, 0, 1), state.vol, true);
+      rig.snap = true; cineSnap = true;
+      for (let i = 0; i < 90; i++) {
+        updateCineCamera(0.05);
+        rig.intro0 = performance.now() - 10000; rig.introT = 1;
+      }
+      const c = camera.position;
+      const hpS = rigHead(f, f.channel.lengthM);
+      const hp = f.chanAt(hpS), hw = f.waterY(hp.x, hp.z, f.tField);
+      rows.push({
+        t: T, s: rig.dbg && rig.dbg.s, pitch: rig.dbg && rig.dbg.pitch,
+        fill: rig.dbg && rig.dbg.fill, clear: rig.dbg && rig.dbg.clear,
+        fn: rig.fillN,
+        los: rig.dbg && rig.dbg.los, avoid: rig.dbg && rig.dbg.avoid,
+        losNow: Math.round(losPenalty(c.x, c.y, c.z, hp.x, hw.y + 20, hp.z)),
+        dist: Math.round(c.distanceTo(new THREE.Vector3(hp.x, hw.y + 20, hp.z))),
+        pos: c.toArray().map(v => Math.round(v)),
+      });
+    }
+    f.setFrame(saveRatio, state.vol, true);
+    camera.position.copy(savePos); controls.target.copy(saveTgt);
+    cineCam = saveCine; rig.mode = saveMode; rig.snap = true;
+    return rows;
   };
   // 首屏就用全景取景（?rig= 定点验收时不抢相机）
   if (!rigStatic) applyOverviewCam(false);
