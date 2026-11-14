@@ -1,10 +1,10 @@
-import * as THREE from './lib/three.module.js?v=20261114r';
-import { OrbitControls } from './lib/OrbitControls.js?v=20261114r';
+import * as THREE from './lib/three.module.js?v=20261114u';
+import { OrbitControls } from './lib/OrbitControls.js?v=20261114u';
 // 程序化建模骨架：spec → 可编辑 THREE.Group + 材质色板 + 着色器画岸边/立面
 import { PALETTE, material, makeSculpt, assertAnchors, applyDamage,
-         diagnose, attachFacade, attachBank, buildDistanceField } from './proc.js?v=20261114r';
+         diagnose, attachFacade, attachBank, buildDistanceField } from './proc.js?v=20261114u';
 // 洪水演进实景层：④ GPU 高度场 + 亚网格连续曲面 + 碎冰 / 飞溅粒子（④②⑤①⑥）
-import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261114r';
+import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261114u';
 
 /* ==========================================================================
    吉隆「8·26」冰岩崩—泥石流灾害链 · 实景三维数字孪生推演（演示级）
@@ -95,7 +95,9 @@ const LAYERS = [
   { id: 'labels',    label: '地名标签',   on: true,  group: '场景与标注' },
 ];
 
-const SPEEDS = [1, 2, 4, 8];
+// 默认 1.5×（2026-11-14 用户「速度再稍快一点」）：只改演示播放倍率，
+// 论文 505 s 的仿真总时长与所有 KPI 口径不变。1.5 纳入选项，倍速按钮高亮才不会错位。
+const SPEEDS = [1, 1.5, 2, 4, 8];
 const SIM_SECONDS_PER_REAL_SECOND = 14;
 
 /* ------------------------------ 工具函数 ------------------------------ */
@@ -467,7 +469,7 @@ let avgFrame = 1 / 60, dpr = Math.min(window.devicePixelRatio || 1, 1.5);
 const MAX_DPR = 1.5;
 
 const state = {
-  t: 0, playing: false, speed: 1, vol: 1.80,
+  t: 0, playing: false, speed: 1.5, vol: 1.80,
   rotating: false,
   engine: 'three', autoCam: false,   // Cesium 视图默认 22 km 全景；点「自动运镜」才切近景跟拍
   // field 不再单独做成开关（本地已被 flood 取代），但 Cesium 侧仍用它控制泥流帧场
@@ -2223,16 +2225,15 @@ function jumpToNode(idx) {
   refresh();
 }
 function bindEvents() {
-  // 播放不再跟拍：全链条推演默认在「打开系统时的那台全景机位」下演绎（2026-11-12 用户
-  // 拍板，用于演示视频）。固定机位的好处是洪水沿沟道推进的整个空间过程能一屏看完，
-  // 也避免跟拍在源区/峡谷处反复调整带来的画面跳动。用户手动拖画布照旧生效，
-  // 「洪水航拍」按钮仍可单独开启贴水近景。
+  // 普通「播放/暂停」不抢机位：相机保持当前视角（含进入系统时默认开启的自动旋转）。
+  // 「全链条自动推演」按钮另行切到洪水航拍（见下方 btn-replay），两者不要混。
+  // 用户手动拖画布由 onUserTakeover 接管，随时能停掉自动运镜/旋转。
   $('btn-play').addEventListener('click', () => {
     state.playing = !state.playing;
     autoFly = false;
     flight = null; followSnap = false;
-    // 播放时相机是「打开系统时的默认机位」，不是全景机位按钮那台俯视 —— 不高亮它
-    if (state.playing) syncViewBtns(null);
+    // 播放不改机位：若当前在洪水航拍就保留航拍高亮，否则不高亮任何视角按钮
+    if (state.playing) syncViewBtns(cineCam ? 'cine' : null);
     $('btn-play').textContent = state.playing ? '暂停' : '播放';
     if (state.playing && state.t >= computeFrame(0, state.vol).total - 1) state.t = 0;
   });
@@ -2245,13 +2246,11 @@ function bindEvents() {
   $('btn-replay').addEventListener('click', () => {
     state.t = 0; state.playing = true; autoFly = false; lastStageIdx = -1; markFloodJump();
     $('btn-play').textContent = '暂停';
+    flight = null; followSnap = false;
     if (state.engine === 'cesium') resetCesiumView();
-    // 重播回到「打开系统时」的默认机位（不是俯视全景），按钮状态一并清掉
-    else {
-      flight = null; followSnap = false;
-      applyOverviewCam(true, DEFAULT_POSE);
-      syncViewBtns(null);
-    }
+    // 2026-11-14 用户：全链条推演默认用「洪水航拍」视角，不再是静态默认机位。
+    // enableCine 内部会切图层、关自动旋转、点亮航拍按钮；已在航拍时不重复开启。
+    else if (!cineCam) enableCine(true);
     refresh();
   });
   $('btn-reset').addEventListener('click', resetView);
@@ -2270,9 +2269,12 @@ function bindEvents() {
     pushLog('已切到全景机位：俯视整条沟道与淹没范围', 'info', state.t);
   });
   $('btn-rotate').addEventListener('click', () => {
-    state.rotating = !state.rotating;
-    controls.autoRotate = state.rotating;
-    $('btn-rotate').classList.toggle('active', state.rotating);
+    const next = !state.rotating;
+    // 航拍与自动旋转互斥：两者都改相机，叠加会抖。开旋转先退出航拍。
+    if (next && cineCam) enableCine(false);
+    state.rotating = next;
+    controls.autoRotate = next;
+    $('btn-rotate').classList.toggle('active', next);
   });
   $('btn-about').addEventListener('click', () => $('about').classList.remove('hidden'));
   $('btn-about-close').addEventListener('click', () => $('about').classList.add('hidden'));
@@ -3141,6 +3143,18 @@ async function boot() {
   };
   // 首屏 = 打开系统时的默认斜侧机位（与「重置视角」一致）；俯视全景要点按钮
   if (!rigStatic) applyOverviewCam(false, DEFAULT_POSE);
+  // 2026-11-14 用户：进入系统默认打开自动旋转。
+  // 验收/定点链接（?t= / ?cine= / ?follow= / ?rig= / ?diag= / Cesium）不自动转，
+  // 免得截图时相机漂移；已在航拍或跟拍时也不叠加旋转。
+  // 用户一拖画布，onUserTakeover 会立刻把它关掉（用户操作永远优先）。
+  const qs0 = new URLSearchParams(location.search);
+  const diagMode = qs0.has('t') || qs0.has('cine') || qs0.has('follow') ||
+                   qs0.has('rig') || qs0.has('diag') || qs0.get('engine') === 'cesium';
+  if (!rigStatic && !diagMode && !cineCam && !autoFly && state.engine === 'three') {
+    state.rotating = true;
+    controls.autoRotate = true;
+    $('btn-rotate').classList.add('active');
+  }
   // 沟道端点 / 场景尺寸：给「重置视角」取景与外部验收用（不是给页面用的）
   window.__chan = () => {
     const n = chanPts.length;

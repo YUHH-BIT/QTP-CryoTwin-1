@@ -30,8 +30,8 @@
                  垂直放大系数——只影响观感，不产出流量/流速/到达时间
    ========================================================================== */
 
-import * as THREE from './lib/three.module.js?v=20261114r';
-import { makeSculpt } from './proc.js?v=20261114r';
+import * as THREE from './lib/three.module.js?v=20261114u';
+import { makeSculpt } from './proc.js?v=20261114u';
 
 /* ------------------------------ 可调常量 ------------------------------ */
 const SW = 192, SH = 108;          // GPU 状态 / 淹没源网格
