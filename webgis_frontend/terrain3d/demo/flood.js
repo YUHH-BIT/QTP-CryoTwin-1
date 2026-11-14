@@ -30,8 +30,8 @@
                  垂直放大系数——只影响观感，不产出流量/流速/到达时间
    ========================================================================== */
 
-import * as THREE from './lib/three.module.js?v=20261111a';
-import { makeSculpt } from './proc.js?v=20261111a';
+import * as THREE from './lib/three.module.js?v=20261114r';
+import { makeSculpt } from './proc.js?v=20261114r';
 
 /* ------------------------------ 可调常量 ------------------------------ */
 const SW = 192, SH = 108;          // GPU 状态 / 淹没源网格
@@ -66,6 +66,181 @@ function riseFn(dt) {
   const x = dt / RISE_TAU;
   const r = 1 - Math.exp(-1.35 * x) * (Math.cos(1.05 * x) + 0.42 * Math.sin(1.05 * x));
   return clamp(r, 0, 1.16) * (1 - 0.30 * smoothstep(230, 470, dt));
+}
+
+function interpSeries(S, T, s) {
+  const n = S.length;
+  if (!n) return 0;
+  if (s <= S[0]) return T[0];
+  if (s >= S[n - 1]) return T[n - 1];
+  let lo = 0, hi = n - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (S[m] <= s) lo = m; else hi = m; }
+  const k = (s - S[lo]) / Math.max(S[hi] - S[lo], 1e-6);
+  return T[lo] + (T[hi] - T[lo]) * k;
+}
+
+/* ---------------- 口岸下游外延（2026-11-14）----------------
+   用户要求：「镜头到吉隆口岸为止，但洪水还要沿谷道再往外延伸」，并且「东西两支都漫」。
+   图 7 的淹没包络到口岸就截止（shape.bin 的 pot 在口岸外约 300 m 归零），
+   所以水到口岸是一刀切。口岸本身是个三叉口：东北是来水沟道，东南向是下游
+   宽谷（实测一路下探 −57），西北向是一条缓升的谷道（吉隆镇方向）。
+   做法：从口岸按真实 DEM 往**两个**方向各追一条谷底线（最陡下降，步长 80 m），
+   自动挑「走得最远、且彼此分开」的两支 —— 不写死方位：
+     · 候选 = 24 个初始方位各走一条；
+     · 先取得分最高（距离 + 3×落差）的一条；
+     · 再取与它终点相距 > 800 m 的最高分那条，作为第二支。
+   沿线给窄带淹没势（中段最宽约 ±380 m、两端收窄、末端 30% 淡出），
+   到达时间取「口岸 392 s + 沿程 72 s」。同时把这两圈写进「淹没范围」掩膜，
+   免得水漫出框线。
+   ⚠ 这是 D 层视觉外延：**不在论文图 7 的淹没范围内**，只用于演示观感；
+   `?tail=0` 可整段关闭。 */
+const TAIL_STEP = 80, TAIL_N = 22;
+// ?tailfan=0 关掉「短支扇形漫溢」，回到原来两头收窄的纺锤形
+const TAIL_FAN = typeof location === 'undefined' ||
+                 new URLSearchParams(location.search).get('tailfan') !== '0';
+// 外延水面允许画到比口岸高多少（场景单位，1.3× 夸张）。
+// 200 ≈ 154 m 实高：只让水贴着坎脚铺成扇形，不让它翻上台地顶；
+// ?tailclimb=0 回到严格值 120（≈92 m），西支会缩回一条细带。
+const TAIL_RISE = (typeof location !== 'undefined' &&
+                   new URLSearchParams(location.search).get('tailclimb') === '0') ? 120 : 200;
+
+function buildPortTails(fs) {
+  const P = fs.projector, port = fs.channel.port;
+  const x0 = P.x(port[0]), z0 = P.z(port[1]);
+  // 3×3 平均后的地形：单格 DEM 噪点会把「最陡下降」带进冲沟
+  const H = (x, z) => (fs.displayY(x - 60, z) + fs.displayY(x, z - 60) + fs.displayY(x, z)
+                     + fs.displayY(x + 60, z) + fs.displayY(x, z + 60)) / 5;
+  const walk = (az0) => {
+    const line = [{ x: x0, z: z0 }];
+    let ang = az0 * Math.PI / 180, x = x0, z = z0, y = H(x, z);
+    for (let i = 0; i < TAIL_N; i++) {
+      let best = null;
+      for (let da = -0.85; da <= 0.851; da += 0.17) {
+        const a = ang + da;
+        const xx = x + Math.cos(a) * TAIL_STEP, zz = z + Math.sin(a) * TAIL_STEP;
+        const yy = H(xx, zz);
+        const sc = yy + Math.abs(da) * 26;      // 轻微惩罚转角，避免左右摆
+        if (!best || sc < best.sc) best = { sc, xx, zz, a, yy };
+      }
+      // 总爬升预算 65（≈50 m）：能顺着缓谷/台地漫出去，但翻不过山脊
+      if (best.yy - H(x0, z0) > 65 && i > 2) break;
+      x = best.xx; z = best.zz; y = best.yy; ang = best.a;
+      line.push({ x, z });
+    }
+    return line;
+  };
+  /* 来水方向：末段沟道切向（指向口岸）。往这个方向漫等于让水倒流回沟里，
+     候选分支里要排除这一带（±50°）。 */
+  const cp = fs.chanPts, cn = cp.length;
+  // 末段切向指向口岸（顺流），上游方向 = 反向
+  const upAz = Math.atan2(cp[cn - 1].z - cp[cn - 6].z, cp[cn - 1].x - cp[cn - 6].x) + Math.PI;
+  const angDiff = (a, b) => {
+    const d = Math.abs(a - b) % (2 * Math.PI);
+    return d > Math.PI ? 2 * Math.PI - d : d;
+  };
+  const cands = [];
+  for (let az = 0; az < 360; az += 15) {
+    const pts = walk(az);
+    if (pts.length < 5) continue;               // 走不到 300 m 的方向不要
+    const last = pts[pts.length - 1];
+    /* 判定用**终点方位**而不是出发方位：最陡下降会拐弯，好几个出发角最后都
+       汇进同一条谷 —— 拿出发角做「是否同一支」的判据会选中两个同款。 */
+    const endAz = Math.atan2(last.z - z0, last.x - x0);
+    if (angDiff(endAz, upAz) < 50 * Math.PI / 180) continue;   // 不往上游漫
+    const d = Math.hypot(last.x - x0, last.z - z0);
+    const drop = H(x0, z0) - H(last.x, last.z);
+    cands.push({ endAz, pts, last, score: d + Math.max(0, drop) * 3 });
+  }
+  if (!cands.length) return [];
+  cands.sort((x1, x2) => x2.score - x1.score);
+  const a1 = cands[0];
+  // 第二支：终点方位与第一支差 ≥70°，保证是另一侧的谷道
+  const a2 = cands.find(c => angDiff(c.endAz, a1.endAz) >= 70 * Math.PI / 180);
+  return a2 ? [a1.pts, a2.pts] : [a1.pts];
+}
+
+/* 某点到外延中线的距离 → 淹没势 / 到达时间。返回 null 表示不在外延内。 */
+function tailProbe(tails, x, z) {
+  let bestPot = 0, bestU = 0;
+  for (const line of tails) {
+    const segs = line.length - 1;
+    if (segs < 2) continue;
+    let d0 = 1e9, u0 = 0;
+    for (let i = 0; i < segs; i++) {
+      const a = line[i], b = line[i + 1];
+      const vx = b.x - a.x, vz = b.z - a.z;
+      const L2 = vx * vx + vz * vz || 1;
+      let t = ((x - a.x) * vx + (z - a.z) * vz) / L2;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d = Math.hypot(x - (a.x + vx * t), z - (a.z + vz * t));
+      if (d < d0) { d0 = d; u0 = (i + t) / segs; }
+    }
+    /* 宽度：长支保持「中段宽、两头窄」的纺锤形；短支（被台地挡住的那一支）
+       改成**扇形漫溢** —— 越往坎脚越宽、末端不收窄，水撞到坎之后左右铺开，
+       而不是硬爬上高坎。长度不变（还是 540 m），只换形状，物理上说得通。 */
+    const armLen = segs * TAIL_STEP;
+    const fan = TAIL_FAN && armLen < 900;
+    const half = fan ? 200 + 200 * u0            // 从 ±200 m 张到坎脚 ±400 m（总宽约 800 m）
+                     : 170 + 210 * Math.sin(Math.PI * Math.min(1, u0 * 1.12));
+    if (d0 > half) continue;
+    // 扇形要是一整片水，不是只在中心一条芯：边缘衰减起点推后
+    const lat = 1 - smoothstep(fan ? 0.62 : 0.45, 1.0, d0 / half);
+    const end = 1 - smoothstep(fan ? 0.88 : 0.68, 1.0, u0);
+    const pot = 0.32 * lat * end;
+    if (pot > bestPot) { bestPot = pot; bestU = u0; }
+  }
+  if (bestPot < 0.02) return null;
+  return { u: bestU, pot: bestPot, T: 392 + 72 * bestU };
+}
+
+/* ---------------- 前缘速度台阶（2026-11-14，默认不做平滑） ----------------
+   现象（用户）：洪水过「色琼断面」后速度突然变慢。
+   量出来的原因（.workbuddy/tmp/…，见下）：剖面到达时刻只有三个锚点
+   （论文正文 0 s@0 km、180 s@15 km、505 s@22 km，model.json → paperCalibration），
+   profile 的 T 列就是这三点线性插值，于是前缘速度是**两段常数**：
+     s = 14 002 → 14 974 m：ds/dT 恒为 83.35 m/s
+     s ≥ 15 912 m：         ds/dT 恒为 21.54 m/s
+   在 15 km 一步从 83.3 掉到 21.5（−74%）。
+   ——这不是渲染问题，也不是模型突变：三条锚点**唯一确定**的就是两段常速。
+   试过两种平滑（两段线性解在 ±1.4 km 内混合、五点 PCHIP），都不成立：
+     · 混合法在断面上游把速度顶到 100 m/s 再急刹（因为两条线在分离，
+       混合项的导数把斜率抵掉了一半）；
+     · PCHIP 同样外凸（实测上游 93 m/s、下游 18 m/s），因为 T 的斜率不是单调的；
+     · 根本矛盾：只要让减速**提前**开始，15 km 就一定晚于 180 s；
+       只要让减速延后，22 km 就一定晚于 505 s。要两者都保住，速度只能是两段常数。
+   所以默认保持论文口径不动。真要视觉上缓一档，得动锚点时刻（例如减速从
+   色琼前 1.5 km 开始、色琼推到 183 s），那属于研究口径，需要用户拍板 ——
+   把下面这个开关打开即可（FRONT_SMOOTH=true，band=1400 m），届时 15 km 处到达
+   时间会变成约 183 s，0/505 s 两端不变。 */
+const FRONT_SMOOTH = false;
+const FRONT_BAND = 1400;
+
+function smoothFrontT(S, T, anchorsS, anchorsT, band) {
+  if (!Array.isArray(anchorsS) || !Array.isArray(anchorsT) ||
+      anchorsS.length < 2 || anchorsS.length !== anchorsT.length) return null;
+  // 校验：profile 必须就是锚点线性插值，否则不与未知数据源打架
+  for (let i = 0; i < S.length; i++) {
+    if (Math.abs(T[i] - interpSeries(anchorsS, anchorsT, S[i])) > 0.05) return null;
+  }
+  const out = new Float32Array(S.length);
+  for (let i = 0; i < S.length; i++) {
+    const s = S[i];
+    let acc = T[i];
+    for (let a = 1; a < anchorsS.length - 1; a++) {
+      const A = anchorsS[a];
+      const w = smoothstep(A - band, A + band, s);
+      if (w <= 0 || w >= 1) continue;
+      // 上游段（a-1→a）与下游段（a→a+1）在该点的取值
+      const up = anchorsT[a - 1] + (anchorsT[a] - anchorsT[a - 1]) *
+                 (s - anchorsS[a - 1]) / Math.max(anchorsS[a] - anchorsS[a - 1], 1e-6);
+      const dn = anchorsT[a] + (anchorsT[a + 1] - anchorsT[a]) *
+                 (s - anchorsS[a]) / Math.max(anchorsS[a + 1] - anchorsS[a], 1e-6);
+      acc = up + (dn - up) * w;
+    }
+    out[i] = acc;
+  }
+  for (let i = 1; i < out.length; i++) if (out[i] < out[i - 1]) out[i] = out[i - 1];  // 保单调
+  return out;
 }
 
 /* ------------------------------ GLSL 公共片段 ------------------------------ */
@@ -457,7 +632,7 @@ uniform float uSpan;      // 纹理编码覆盖的距离跨度（纹素），与
 uniform vec3  uFill;
 uniform vec3  uRim;
 uniform float uOpacity;
-uniform float uFillA;     // 填充强度（由视距决定：近景只留描边，远景才铺色）
+uniform float uFillA;     // 恒为 0（2026-11-14）：只留线框，不要填充色
 varying vec2 vUv;
 
 void main() {
@@ -469,8 +644,8 @@ void main() {
   float w = max(fwidth(d) * 1.60, 0.02);
   float rim = 1.0 - smoothstep(0.0, w, abs(d));
   float inside = smoothstep(0.0, 1.2, d);
-  // 填充只做「淡淡的底」，靠描边读范围：19% 的填充在 2 km 以内的近景会把
-  // 整条谷道糊成一片蓝膜（水面、河床、山脊全被盖住），实测就是这么翻车的。
+  // 原来按视距铺 4%~13% 的蓝色底膜，近景会把整条谷道糊成一片；
+  // 现在 uFillA 恒 0，只剩 rim（鲜艳橙线框）。
   float a = inside * uFillA + rim * 0.92;
   if (a < 0.006) discard;
   gl_FragColor = vec4(mix(uFill, uRim, rim), a * uOpacity);
@@ -512,6 +687,7 @@ export class FloodSystem {
    */
   constructor(opts) {
     Object.assign(this, opts);
+    this.cenAtFn = opts.cenAt || null;   // 演进中轴线（居中），缺省时回退到 chanAt
     this.enabled = true;
     this.layers = { water: true, debris: true, spray: true };
     this.tField = 0;
@@ -535,6 +711,34 @@ export class FloodSystem {
     const cx = sx / W, cz = sz / H;
     const arr = new Uint8Array(arrBuf), dep = new Uint8Array(depBuf);
     const nx = field.nx, ny = field.ny;
+
+    /* 里程基准与速度台阶（2026-11-14）：
+       ① 2026-11-13 把中轴上端 1610 m（谷底 → 坡顶）裁掉后，channel 的弧长从 0 重新起算，
+          而 model.json / arrival.bin 仍是「谷底起算」的旧基准 —— channel.json 的
+          sOffsetM 记的就是这 1610 m。剖面里程 = 沟道里程 + sOffsetM。
+       ② 剖面 T 在 15 km 处是两段常速的插值台阶（详见 smoothFrontT 注释），
+          这里把 T 平滑一档，并把它与原始 T 的差做成沿程修正 dTk，
+          同时加到到达时间场上，免得「前锋标记平滑了、水面还在原地顿一下」。 */
+    this.sOff = this.channel && this.channel.sOffsetM ? this.channel.sOffsetM : 0;
+    const prof = this.model.profile || [];
+    this.profS = prof.map(p => p[0]);
+    this.profT0 = prof.map(p => p[4]);
+    const cal = this.model.paperCalibration || {};
+    const smT = FRONT_SMOOTH
+      ? smoothFrontT(this.profS, this.profT0, cal.frontArrivalDistM, cal.frontArrivalSec, FRONT_BAND)
+      : null;
+    this.profT = smT ? Array.from(smT) : this.profT0.slice();
+    this.profTMax = this.profT.length ? this.profT[this.profT.length - 1] : 390;
+    // 场时间口径 → 论文口径的换算系数（470/505 = 0.9307，见 inverseT 注释①）
+    this.tComp = this.profTMax > 1 ? T_FIELD / this.profTMax : 1;
+    this.dTk = new Float32Array(chanPts.length);
+    if (smT) {
+      for (let k = 0; k < chanPts.length; k++) {
+        const s = (this.chanS ? this.chanS[k] : 0) + this.sOff;
+        const a = interpSeries(this.profS, this.profT0, s);
+        this.dTk[k] = interpSeries(this.profS, this.profT, s) - a;
+      }
+    }
 
     // a) 语义粗糙度底图（⑥）：建筑轮廓内阻力高，陡坡次之，河床最低
     const bldMask = new Uint8Array(W * H);
@@ -595,7 +799,8 @@ export class FloodSystem {
     for (let k = 0; k < nK; k++) {
       const u = (chanPts[k].x + sx / 2) / sx, v = (chanPts[k].z + sz / 2) / sz;
       const tv = sampleU8(arr, nx, ny, u, v) * field.arrivalScale;
-      chanT[k] = tv >= T_BAD ? NaN : tv;
+      // 分速台阶的沿程修正（见 smoothFrontT）：场与剖面同步平滑，避免「标记平滑、水面顿一下」
+      chanT[k] = tv >= T_BAD ? NaN : tv + this.dTk[k];
     }
     for (let k = 0; k < nK; k++) {
       if (!Number.isNaN(chanT[k])) continue;
@@ -611,19 +816,27 @@ export class FloodSystem {
     this.srcPot = new Float32Array(W * H);
     this.srcRough = new Float32Array(W * H);
     this.srcCore = new Float32Array(W * H);
+    // 口岸下游外延（见 buildPortTails 注释）；?tail=0 关掉
+    const tail = (typeof location !== 'undefined' &&
+                  new URLSearchParams(location.search).get('tail') === '0')
+      ? null : buildPortTails(this);
+    this.portTail = tail;
     for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
       const q = j * W + i, p4 = q * 4;
       const u = (i + 0.5) / W, v = (j + 0.5) / H;
       let T = sampleU8(arr, nx, ny, u, v) * field.arrivalScale;
       const D = sampleU8(dep, nx, ny, u, v) * field.depthScale;
       const k = bestK[q];
+      const x = -sx / 2 + (i + 0.5) * cx, z = -sz / 2 + (j + 0.5) * cz;
+      const tp = tail ? tailProbe(tail, x, z) : null;
       if (k < 0) { this.srcT[q] = T; srcBytes[p4] = clamp(T / T_SCALE, 0, 1) * 255; continue; }
       const dist = Math.sqrt(best[q]);
       // 包络外的格子：改为继承最近中轴点的到达时间（横向略晚），
       // 这样中轴走廊的水不会因为「一格在包络外」而永远不来。
-      if (T >= T_BAD) T = Math.min(chanT[k] + dist / 25, T_BAD + 40);
+      if (T >= T_BAD) {
+        T = tp ? tp.T : Math.min(chanT[k] + dist / 25, T_BAD + 40);
+      } else T = Math.max(0, T + this.dTk[k]);
       const bedN = chanPts[k].y;
-      const x = -sx / 2 + (i + 0.5) * cx, z = -sz / 2 + (j + 0.5) * cz;
       const bed = displayY(x, z);
       const delta = Math.max(0, bed - bedN);
       let pot;
@@ -645,6 +858,8 @@ export class FloodSystem {
         pot = Math.pow(pot, POT_WIDEN_GAMMA);
       }
       const slopeK = smoothstep(4, 90, delta);
+      // 口岸外延：只在地形不高于口岸床面 TAIL_RISE 的范围内补淹没势（别爬到山坡顶上）
+      if (tp && bed - chanPts[nK - 1].y < TAIL_RISE) pot = Math.max(pot, tp.pot);
       const rough = clamp(0.20 + 0.34 * slopeK + 0.62 * bldMask[q] + 0.12 * (D / 18), 0, 1);
       const core = clamp(D / 18, 0, 1);
 
@@ -666,7 +881,30 @@ export class FloodSystem {
     //     近景变成 42 m 一格的大台阶；距离场的 0.5 等值线可以逐像素插值，
     //     任何缩放下都是一条平滑闭合线（离边界 >1 km 的格点饱和，不影响观感）。
     if (this.shapeBuf) {
-      const sdf = buildMaskSdf(new Uint8Array(this.shapeBuf), nx, ny);
+      /* 外延那圈要一起写进「淹没范围」的掩膜，否则水面会漫出框线 ——
+         sdf 的 0.5 等值线就是页面上那条描边。只在 50 m 栅格上补最近邻，
+         181k 格全扫太慢，先按外延包围盒裁。 */
+      let mb = new Uint8Array(this.shapeBuf);
+      if (tail && tail.length) {
+        let bx0 = 1e9, bx1 = -1e9, bz0 = 1e9, bz1 = -1e9;
+        for (const line of tail) for (const p of line) {
+          bx0 = Math.min(bx0, p.x); bx1 = Math.max(bx1, p.x);
+          bz0 = Math.min(bz0, p.z); bz1 = Math.max(bz1, p.z);
+        }
+        const pad = 500;   // 扇形短支半宽可到 380 m，包围盒要留够
+        const mx = sx / nx, mz = sz / ny;
+        const i0 = clamp(Math.floor((bx0 - pad + sx / 2) / mx), 0, nx - 1);
+        const i1 = clamp(Math.ceil((bx1 + pad + sx / 2) / mx), 0, nx - 1);
+        const j0 = clamp(Math.floor((bz0 - pad + sz / 2) / mz), 0, ny - 1);
+        const j1 = clamp(Math.ceil((bz1 + pad + sz / 2) / mz), 0, ny - 1);
+        for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+          if (mb[j * nx + i]) continue;
+          const x = -sx / 2 + (i + 0.5) * mx, z = -sz / 2 + (j + 0.5) * mz;
+          const tp = tailProbe(tail, x, z);
+          if (tp && tp.pot > 0.10) mb[j * nx + i] = 255;
+        }
+      }
+      const sdf = buildMaskSdf(mb, nx, ny);
       const mt = new THREE.DataTexture(sdf, nx, ny, THREE.RedFormat, THREE.UnsignedByteType);
       mt.minFilter = mt.magFilter = THREE.LinearFilter;
       mt.wrapS = mt.wrapT = THREE.ClampToEdgeWrapping;
@@ -689,10 +927,7 @@ export class FloodSystem {
     }
 
     // e) 到达时间 → 沟道弧长反查（前锋位置与粒子生成用）
-    const prof = this.model.profile || [];
-    this.profT = prof.map(p => p[4]);
-    this.profS = prof.map(p => p[0]);
-    this.profTMax = this.profT.length ? this.profT[this.profT.length - 1] : 390;
+    //    profT / profTMax / tComp 已在 bakeSource 开头算好（见「里程基准与速度台阶」）
   }
 
   /* ---------- ② GPU 状态纹理与计算场景 ---------- */
@@ -863,10 +1098,10 @@ export class FloodSystem {
       uniforms: {
         uMask: { value: this.maskTex },
         uSpan: { value: EXTENT_SDF_SPAN },
-        uFill: { value: new THREE.Color(0.22, 0.62, 0.86) },
-        uRim: { value: new THREE.Color(0.55, 0.90, 1.00) },
+        uFill: { value: new THREE.Color(1.00, 0.48, 0.02) },   // 与线框同色，边缘渐变不泛杂色
+        uRim: { value: new THREE.Color(1.00, 0.48, 0.02) },   // 鲜艳橙 #FF7A05（用户 2026-11-14）
         uOpacity: { value: 1.0 },
-        uFillA:   { value: 0.12 },
+        uFillA:   { value: 0.0 },     // 只留线框，无填充
       },
       transparent: true, depthWrite: false, depthTest: true,
       side: THREE.FrontSide, extensions: { derivatives: true },
@@ -1035,15 +1270,35 @@ export class FloodSystem {
   }
 
   /* ---------- 前锋（与水面自身到达时间一致） ---------- */
+  /* 返回的是**当前沟道弧长**。这里有两个基准差必须换算，否则前锋标记会跑到水面外面：
+     ① 时间口径：场时间 tField 是「比例 1.0 = 470 s」的压缩口径（timeCompress
+        0.9307 = 470/505，见 field.json → frontArrivalSrc），而剖面 T 是论文的
+        0 / 180 / 505 s。直接拿 tField 查剖面等于把时间轴拉长 7.4%。
+     ② 里程口径：剖面 / 场仍是 2026-11-13 裁剪前「谷底起算」的基准，与当前沟道差
+        sOff = 1610 m（channel.json → sOffsetM）。
+     两处都换算后，前锋才落在真实湿边：t=180 s 处 15 000 − 1 610 = 13 390 m，
+     与场里实测的「速度台阶位置」（13.4 km）吻合；不换算时它在前 1.2 km 的干沟道上。 */
   inverseT(t) {
     const a = this.profT || [], s = this.profS || [];
-    if (!a.length) return clamp(t / 390, 0, 1) * this.channel.lengthM;
-    if (t <= a[0]) return s[0];
-    if (t >= a[a.length - 1]) return s[s.length - 1];
-    let lo = 0, hi = a.length - 1;
-    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (a[m] <= t) lo = m; else hi = m; }
-    const k = (t - a[lo]) / Math.max(a[hi] - a[lo], 1e-6);
-    return s[lo] + (s[hi] - s[lo]) * k;
+    const L = this.channel.lengthM, so = this.sOff || 0;
+    if (!a.length) return clamp(t / 390, 0, 1) * L;
+    const tp = t / (this.tComp || 1);        // 场时间 → 论文口径
+    let v;
+    if (tp <= a[0]) v = s[0];
+    else if (tp >= a[a.length - 1]) v = s[s.length - 1];
+    else {
+      let lo = 0, hi = a.length - 1;
+      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (a[m] <= tp) lo = m; else hi = m; }
+      const k = (tp - a[lo]) / Math.max(a[hi] - a[lo], 1e-6);
+      v = s[lo] + (s[hi] - s[lo]) * k;
+    }
+    return clamp(v - so, 0, L);
+  }
+  /* 比例 → 前锋球所在的沟道比例（0~1）。与 inverseT 同一口径，
+     让「前锋球 / 跟拍机位 / 水面湿边」三者不再互相错位几公里。 */
+  frontPathAt(ratio) {
+    const L = this.channel.lengthM;
+    return clamp(this.inverseT(clamp(ratio, 0, 1) * T_FIELD) / L, 0, 1);
   }
   tangentAt(s) {
     const L = this.channel.lengthM;
@@ -1052,7 +1307,10 @@ export class FloodSystem {
     return { x: dx / d, z: dz / d };
   }
   frontPoint() {
-    const c = this.chanAt(clamp(this.frontS || 0, 0, this.channel.lengthM));
+    // 2026-11-14：优先用「居中中轴线」—— 原沟道有 2% 的段落落在淹没包络之外，
+    // 前锋符号与浪花锚点会挂在干坡上
+    const f = this.cenAtFn || this.chanAt;
+    const c = f(clamp(this.frontS || 0, 0, this.channel.lengthM));
     return c;
   }
   frontHint() {

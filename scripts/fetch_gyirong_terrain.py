@@ -18,7 +18,7 @@ import numpy as np
 from PIL import Image
 
 ROOT = r"F:\QTP‑CryoTwin"
-DATA = os.path.join(ROOT, "gyirong_twin_demo", "data")
+DATA = os.path.join(ROOT, "webgis_frontend", "terrain3d", "demo", "data")
 TMP = os.path.join(ROOT, ".workbuddy", "tmp")
 CACHE = os.path.join(TMP, "tilecache")
 os.makedirs(CACHE, exist_ok=True)

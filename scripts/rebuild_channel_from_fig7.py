@@ -10,7 +10,7 @@ import numpy as np
 from scipy import ndimage
 
 ROOT = r"F:\QTP‑CryoTwin"
-DATA = os.path.join(ROOT, "gyirong_twin_demo", "data")
+DATA = os.path.join(ROOT, "webgis_frontend", "terrain3d", "demo", "data")
 TMP = os.path.join(ROOT, ".workbuddy", "tmp")
 
 meta = json.load(io.open(os.path.join(DATA, "meta.json"), encoding="utf-8"))

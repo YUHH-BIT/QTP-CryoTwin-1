@@ -352,6 +352,9 @@ body.hide-right .stage-top { right: calc(var(--pane-pad) + var(--tab-w) + 8px); 
 .stage-tools {
   flex: 0 0 auto; display: flex; gap: 5px; flex-wrap: wrap;
   justify-content: flex-end; max-width: 62%; pointer-events: auto;
+  /* 左侧 HUD / 品牌框若被隐藏，space-between 会把唯一的工具条推到左边；
+     margin-left:auto 把剩余空间全吃掉，保证按钮恒在右侧。 */
+  margin-left: auto;
 }
 .tool {
   font-size: 10.5px; padding: 5px 9px; border-radius: 6px;
@@ -411,8 +414,7 @@ body.hide-right .stage-top { right: calc(var(--pane-pad) + var(--tab-w) + 8px); 
 @keyframes qtp-spin { to { transform: rotate(360deg); } }
 .cesium-only { display: none; }
 body.cesium .cesium-only { display: inline-block; }
-body.cesium #btn-rotate,
-body.cesium #btn-port { display: none; }
+body.cesium #btn-rotate { display: none; }
 
 /* ---------- 时间轴 ---------- */
 /* 底部播控：改成居中的悬浮条，不再横贯整屏。原来 left/right 双向铺满，

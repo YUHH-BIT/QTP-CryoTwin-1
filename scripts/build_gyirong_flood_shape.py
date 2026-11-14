@@ -27,7 +27,7 @@ import numpy as np
 from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA = os.path.join(ROOT, "gyirong_twin_demo", "data")
+DATA = os.path.join(ROOT, "webgis_frontend", "terrain3d", "demo", "data")
 TMP = os.path.join(ROOT, ".workbuddy", "tmp")
 
 NX = 512

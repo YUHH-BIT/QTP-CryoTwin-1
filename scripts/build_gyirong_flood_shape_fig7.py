@@ -22,7 +22,7 @@ from scipy import ndimage
 
 ROOT = r"F:\QTP‑CryoTwin"
 PDF = os.path.join(ROOT, "docs", "西藏吉隆“8·26”冰岩崩泥石流灾害链数字孪生推演分析_刘昌军.pdf")
-DATA = os.path.join(ROOT, "gyirong_twin_demo", "data")
+DATA = os.path.join(ROOT, "webgis_frontend", "terrain3d", "demo", "data")
 TMP = os.path.join(ROOT, ".workbuddy", "tmp")
 
 # ---------- 标定常数 ----------

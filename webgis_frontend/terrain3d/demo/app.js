@@ -1,10 +1,10 @@
-import * as THREE from './lib/three.module.js?v=20261114e';
-import { OrbitControls } from './lib/OrbitControls.js?v=20261114e';
+import * as THREE from './lib/three.module.js?v=20261114r';
+import { OrbitControls } from './lib/OrbitControls.js?v=20261114r';
 // 程序化建模骨架：spec → 可编辑 THREE.Group + 材质色板 + 着色器画岸边/立面
 import { PALETTE, material, makeSculpt, assertAnchors, applyDamage,
-         diagnose, attachFacade, attachBank, buildDistanceField } from './proc.js?v=20261114e';
+         diagnose, attachFacade, attachBank, buildDistanceField } from './proc.js?v=20261114r';
 // 洪水演进实景层：④ GPU 高度场 + 亚网格连续曲面 + 碎冰 / 飞溅粒子（④②⑤①⑥）
-import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261114e';
+import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261114r';
 
 /* ==========================================================================
    吉隆「8·26」冰岩崩—泥石流灾害链 · 实景三维数字孪生推演（演示级）
@@ -84,13 +84,11 @@ const LAYERS = [
   { id: 'flood',     label: '洪水淹没场', on: true,  group: '灾害与水体', alias: ['field'] },
   // 「图7 淹没范围」= 直接把论文图 7 勾出的包络贴在地形上（范围图层，与时间无关），
   // 动态水面只画「此刻有水」的地方，这一层画「最终铺到哪里」，两者互补不重复。
-  { id: 'extent',    label: '文献淹没范围', on: true, group: '灾害与水体' },
+  { id: 'extent',    label: '淹没范围',     on: true, group: '灾害与水体' },
   { id: 'debris',    label: '碎冰 / 冰碛物', on: true, group: '灾害与水体' },
   { id: 'spray',     label: '浪花 / 扬尘', on: true, group: '灾害与水体' },
   { id: 'lake',      label: '堰塞水体',   on: true,  group: '灾害与水体' },
 
-  { id: 'buildings', label: 'OSM 建筑',   on: true,  group: '场景与标注' },
-  { id: 'facade',    label: '立面窗格',   on: true,  group: '场景与标注' },
   { id: 'bank',      label: '岸边细节',   on: true,  group: '场景与标注' },
   { id: 'glacier',   label: '冰川源区',   on: true,  group: '场景与标注' },
   { id: 'nodes',     label: '节点标记',   on: true,  group: '场景与标注' },
@@ -135,10 +133,47 @@ function interpScenario(vol) {
   };
 }
 // 前缘位置：t=0 源区；基准工况 180 s 到色琼(path .72)；总历时到口岸(path 1.0)
+// 2026-11-14：优先用洪水层换算出的前锋比例（与水面湿边、跟拍机位同一口径）。
+// 原来这条是按「180 s → 0.72、505 s → 1.0」手标的两段折线，和场里的实际湿边
+// 差 1.2~1.6 km（时间口径 470/505 + 裁剪后里程基准 1610 m 两处都没换算），
+// 观感就是「球跑到水前面去了」。洪水层没建好时仍回退到这条折线。
 function frontPath(ratio) {
+  if (flood && flood.frontPathAt) return flood.frontPathAt(ratio);
   const rSeq = 180 / BASE_TOTAL;
   const r = clamp(ratio, 0, 1);
   return r <= rSeq ? 0.72 * (r / rSeq) : 0.72 + 0.28 * ((r - rSeq) / (1 - rSeq));
+}
+/* 橙色前锋球的位置（2026-11-14）：球原本钉在「到达时间等值线」frontS 上，
+   实测 field T 与球位置只差 ≤5 s，位置是对的；但水到了之后要 riseFn 十几秒
+   才涨到看得见的深度 —— 可见泥石流前缘比球落后 100~600 m（深水前缘 400~1300 m），
+   观感就是「球自己先跑，水没跟上」。
+   这里让球改跟「实际有水的下游端点」：从 frontS 向上游按 80 m 扫，
+   横断面取 3 点（±180 m）避免单格场噪声，h/peak > 0.12 才算看得见的水。
+   只增不减 + 时间轴回拨时重置，保证球不抖、不倒退。 */
+let markerS = -1, markerRatio = -1;
+function visibleFrontS(f, ratio, L) {
+  const cs = v => Math.max(0, Math.min(L, v));
+  const pk = Math.max(f.peak || 1, 1e-3);
+  const s0 = cs(f.frontS || 0);
+  const wet = s => {
+    const c = cenAt(s), n = cenAt(cs(s + 100));
+    const dx = n.x - c.x, dz = n.z - c.z, d = Math.hypot(dx, dz) || 1;
+    const nx = -dz / d, nz = dx / d;
+    for (const o of [-180, 0, 180]) {
+      if (f.waterY(c.x + nx * o, c.z + nz * o, f.tField).h / pk > 0.12) return true;
+    }
+    return false;
+  };
+  let found = -1;
+  for (let d = 0; d <= 1800; d += 80) {
+    const s = cs(s0 - d);
+    if (wet(s)) { found = s; break; }
+  }
+  if (found < 0) found = s0;
+  if (ratio < markerRatio - 0.01) markerS = -1;   // 拖动时间轴往回，允许球退回
+  markerRatio = ratio;
+  markerS = markerS < 0 ? found : Math.max(markerS, found);
+  return cs(markerS);
 }
 function stageIndexAt(ratio) {
   let idx = 0;
@@ -319,6 +354,87 @@ function chanAt(s) {
   };
 }
 
+// 演进沟道点列（由 buildHazardCenter 生成），供画线 / 前锋球 / 节点 / 机位共用。
+// `?center=0` 时不生成，所有消费方自动退回原始 chanPts。
+const HAZ_CEN = { on: false, s: null, x: null, y: null, z: null, half: null };
+let cenPts = [];
+
+/* ================= 演进沟道 = 一条顺滑的线（2026-11-14 重做）=================
+   之前按「断面形心」逐点沿法向加偏移：急弯处法向翻转、爬升限幅又逐点独立收缩，
+   相邻两点偏移能差几百米 —— 实测 16 组自交、34 处 180° 掉头、最大跳点 772 m，
+   看起来就是缠绕打结，前锋沿线推进也会来回绕。
+   原沟道本身自交 0、无折返（最大转角 97.8°），所以现在不做任何横向偏移：
+   按里程均匀重采样 → 滑动平均 → 端点渐变 → 再顺一遍，得到一条从头到尾
+   单调前进的线。实测转角 p90 < 10°、最大步长 < 100 m。 */
+function buildHazardCenter() {
+  if (new URLSearchParams(location.search).get('center') === '0') return;
+  const L = channel.lengthM, DS = 60;
+  const n = Math.floor(L / DS) + 1;
+  const S = new Float32Array(n), X = new Float32Array(n), Z = new Float32Array(n);
+  for (let k = 0; k < n; k++) {
+    const s = (k === n - 1) ? L : k * DS, c = chanAt(s);   // 末点精确落到口岸
+    S[k] = s; X[k] = c.x; Z[k] = c.z;
+  }
+  const mv = (a, rad) => {
+    const out = new Float32Array(a.length);
+    for (let k = 0; k < a.length; k++) {
+      let sum = 0, m = 0;
+      for (let d = -rad; d <= rad; d++) {
+        sum += a[clamp(k + d, 0, a.length - 1)]; m++;
+      }
+      out[k] = sum / m;
+    }
+    return out;
+  };
+  let cx = X, cz = Z;
+  for (let r = 0; r < 3; r++) { cx = mv(cx, 3); cz = mv(cz, 3); }
+  // 端点渐变：把首尾硬钉回原点会让第一/最后一段突然跳几百米
+  const TAPER = 10;
+  for (let k = 0; k < n; k++) {
+    const w = Math.min(1, k / TAPER, (n - 1 - k) / TAPER);
+    cx[k] = X[k] * (1 - w) + cx[k] * w;
+    cz[k] = Z[k] * (1 - w) + cz[k] * w;
+  }
+  // 末轮再顺一遍，抹掉残余的小折角
+  for (let r = 0; r < 2; r++) { cx = mv(cx, 2); cz = mv(cz, 2); }
+  const cy = new Float32Array(n);
+  for (let k = 0; k < n; k++) cy[k] = displayY(cx[k], cz[k]);
+  HAZ_CEN.on = true; HAZ_CEN.s = S; HAZ_CEN.half = null;
+  HAZ_CEN.x = cx; HAZ_CEN.y = cy; HAZ_CEN.z = cz;
+  cenPts = Array.from({ length: n }, (_, k) => ({
+    lon: P.lon(cx[k]), lat: P.lat(cz[k]), x: cx[k], y: cy[k], z: cz[k],
+  }));
+  // 自检出口：转角与步长，防止以后又把线改回打结状态
+  let maxTurn = 0, maxStep = 0;
+  for (let k = 1; k < n - 1; k++) {
+    const ax = cx[k] - cx[k - 1], az = cz[k] - cz[k - 1];
+    const bx = cx[k + 1] - cx[k], bz = cz[k + 1] - cz[k];
+    const la = Math.hypot(ax, az) || 1, lb = Math.hypot(bx, bz) || 1;
+    const ang = Math.acos(clamp((ax * bx + az * bz) / (la * lb), -1, 1)) * 180 / Math.PI;
+    maxTurn = Math.max(maxTurn, ang); maxStep = Math.max(maxStep, la);
+  }
+  window.__hazCenter = () => ({
+    n, maxTurn: +maxTurn.toFixed(1), maxStep: +maxStep.toFixed(0),
+    centerOffset: 0,
+  });
+}
+
+function cenAt(s) {
+  if (!HAZ_CEN.on) return chanAt(s);
+  const S = HAZ_CEN.s, n = S.length;
+  const a = i => ({ x: HAZ_CEN.x[i], y: HAZ_CEN.y[i], z: HAZ_CEN.z[i] });
+  if (s <= S[0]) return a(0);
+  if (s >= S[n - 1]) return a(n - 1);
+  let lo = 0, hi = n - 1;
+  while (hi - lo > 1) { const m = (lo + hi) >> 1; if (S[m] <= s) lo = m; else hi = m; }
+  const k = (s - S[lo]) / Math.max(S[hi] - S[lo], 1e-6);
+  return {
+    x: lerp(HAZ_CEN.x[lo], HAZ_CEN.x[hi], k),
+    y: lerp(HAZ_CEN.y[lo], HAZ_CEN.y[hi], k),
+    z: lerp(HAZ_CEN.z[lo], HAZ_CEN.z[hi], k),
+  };
+}
+
 /* ------------------------------ 三维场景 ------------------------------ */
 let renderer, scene, camera, controls;
 let chartArrival = null, chartFlow = null;   // 情景卡片两张趋势图（ECharts）
@@ -334,17 +450,13 @@ let cineCam = false, cineSnap = false, cineVecA = null, cineVecB = null;
 const bankUniforms = {
   uBank: { value: null }, uBankOn: { value: 1 }, uBankTime: { value: 0 },
 };
-const facadeUniforms = {
-  uFacadeOn: { value: 1 }, uFacadeDamage: { value: 0 },
-};
 const hazardShared = {
   uFront: { value: 0 }, uTime: { value: 0 },
   uGain: { value: 0 }, uWidthBoost: { value: 0 },
-  uAlpha: { value: 1 },          // 近景时淡出，别把口岸建筑与岸边糊住
+  uAlpha: { value: 1 },          // 近景时淡出，别把岸边细节糊住
 };
 let lakeKVal = 0, overlayDepth = false;
-let nodeMarks = [], labelEls = [], pickables = [], buildings = [];
-let bldFocus = null;             // OSM 建筑最密集的一簇，供「口岸聚落」近景镜头
+let nodeMarks = [], labelEls = [], pickables = [];
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let pointerOrigin = null;
@@ -359,15 +471,10 @@ const state = {
   rotating: false,
   engine: 'three', autoCam: false,   // Cesium 视图默认 22 km 全景；点「自动运镜」才切近景跟拍
   // field 不再单独做成开关（本地已被 flood 取代），但 Cesium 侧仍用它控制泥流帧场
-  layers: Object.assign({ field: true }, Object.fromEntries(LAYERS.map(l => [l.id, l.on]))),
+  // buildings 只用于同步 Cesium 视图（那边另有 glTF 示意建筑），
+  // 本地沙盘已不绘制三维建筑，故不在图层卡里出现。
+  layers: Object.assign({ field: true, buildings: true }, Object.fromEntries(LAYERS.map(l => [l.id, l.on]))),
 };
-
-/* 未开始推演时，画面顶部 HUD 位显示演示介绍（标题 + 副标题 + 演示级徽章），
-   左面板阶段列表不高亮任何一项；用户一旦真正开始推演（播放 / 选阶段 / 拖时间轴
-   / ?t= 定位），翻为 false，该位置切换为阶段播报并高亮当前阶段。 */
-/* 仅内嵌模式启用「介绍态」：独立预览页顶部有自己的 56px 品牌栏，
-   若 HUD 位再放一遍介绍标题会重复，故独立模式 introMode 恒为 false。 */
-let introMode = new URLSearchParams(location.search).get('embedded') === '1';
 
 /* -------------------- 第二视图：Cesium 三维地球 -------------------- */
 // 时间映射口径：Cesium 页基准工况到达口岸为 500 s，本页表 4 基准为 505 s。
@@ -378,7 +485,7 @@ const CESIUM_LAYER_KEYS = ['imagery', 'channel', 'hazard', 'field',
 // 本地沙盘专有图层：切到三维地球时置灰。
 // 「洪水淹没场」不在此列 —— 它已合并了三维地球侧控制泥流帧场的 field 位，
 // 两个视图都有意义，所以切换后仍可勾选。
-const THREE_ONLY_LAYERS = ['contour', 'nodes', 'facade', 'bank',
+const THREE_ONLY_LAYERS = ['contour', 'nodes', 'bank',
                            'debris', 'spray', 'extent'];
 const DIAG = new URLSearchParams(location.search).get('diag') === '1';
 let cesiumFrame = null, cesiumRequested = false, cesiumReady = false;
@@ -709,7 +816,7 @@ function buildFlood() {
   flood = new FloodSystem({
     scene, renderer,
     meta, field, channel, model, osm, projector: P,
-    chanPts, chanS, chanAt, displayY, terrainY: terrainTriY,
+    chanPts, chanS, chanAt, cenAt, displayY, terrainY: terrainTriY,
     texSat, texWaterN0, texWaterN1, exag: EXAG,
     arrBuf: fieldBuffers.arrBuf, depBuf: fieldBuffers.depBuf,
     shapeBuf: fieldBuffers.shapeBuf,
@@ -722,10 +829,12 @@ function buildFlood() {
 function buildChannelLine() {
   // WebGL 的 LineBasicMaterial 线宽固定 1px，22 km 全景等于看不见；
   // 用细管代替，半径 26 m 才是这个尺度上可辨的沟道
-  const pts = chanPts.map(p => new THREE.Vector3(p.x, p.y + 34, p.z));
+  // 2026-11-14：改走「居中中轴线」（见 buildHazardCenter），不再贴着一岸走
+  const src = cenPts.length ? cenPts : chanPts;
+  const pts = src.map(p => new THREE.Vector3(p.x, p.y + 34, p.z));
   const cv = new THREE.CatmullRomCurve3(pts);
   channelLine = new THREE.Mesh(
-    new THREE.TubeGeometry(cv, Math.min(chanPts.length, 460), 75, 8, false),
+    new THREE.TubeGeometry(cv, Math.min(src.length, 460), 75, 8, false),
     // 峡谷里山脊会挡住谷底，态势层不做深度测试，保证全段可辨
     new THREE.MeshBasicMaterial({
       color: 0x7dd3fc, transparent: true, opacity: 0.88, depthTest: false, depthWrite: false,
@@ -762,8 +871,10 @@ function makeHazardGeometry(widthScale, liftExtra) {
   const SEG = 340;
   // 真实沟道点密集且急弯多，用 chanAt(s+Δ) 差分求法向会让带子折断；
   // 用弧长参数化的 CatmullRom 切线才连续平滑（与项目既有三维页同一做法）
+  // 2026-11-14：跟「居中中轴线」走，避免与演进线、淹没体三者互相错位
+  const src = cenPts.length ? cenPts : chanPts;
   const cv = new THREE.CatmullRomCurve3(
-    chanPts.map(p => new THREE.Vector3(p.x, p.y, p.z)), false, 'catmullrom', 0.5
+    src.map(p => new THREE.Vector3(p.x, p.y, p.z)), false, 'catmullrom', 0.5
   );
   const pos = new Float32Array((SEG + 1) * 2 * 3);
   const ts = new Float32Array((SEG + 1) * 2), sides = new Float32Array((SEG + 1) * 2);
@@ -851,93 +962,6 @@ void main() {
   scene.add(hazardMesh);
 }
 
-// OSM 实测建筑轮廓 → 真实坐标挤出（不是随机摆的示意盒子，也不是倾斜摄影）
-// 建模走 proc.js 的 spec 工厂：一份 spec 描述「墙/屋顶/基座/轮廓线/锚点」，
-// 材质全用命名约定从色板取，立面窗格由 GLSL 依侧面 UV 程序化生成。
-function buildOSMBuildings() {
-  const port = channel.port;
-  const feats = (osm.features || []).filter(f => f.geometry && f.geometry.type === 'Polygon');
-  const picked = [];
-  for (const f of feats) {
-    const ring = f.geometry.coordinates[0];
-    if (!ring || ring.length < 4) continue;
-    const lon = ring.reduce((a, p) => a + p[0], 0) / ring.length;
-    const lat = ring.reduce((a, p) => a + p[1], 0) / ring.length;
-    const d = Math.hypot((lon - port[0]) * P.kx, (lat - port[1]) * KZ);
-    if (d > 3200) continue;                  // 只保留口岸核心区，避免整幅铺满
-    picked.push({ f, ring, lon, lat, d });
-    if (picked.length >= 220) break;
-  }
-  picked.sort((a, b) => a.d - b.d);
-
-  // OSM 这批数据没有 height/levels，且分成了「口岸近旁 3 栋」与「2.7 km 外成片聚落」
-  // 两簇。按 600 m 网格找最密的一簇，作为专门的立面近景镜头焦点。
-  const cells = new Map();
-  for (const it of picked) {
-    const k = `${Math.round(xOf(it.lon) / 600)},${Math.round(zOf(it.lat) / 600)}`;
-    if (!cells.has(k)) cells.set(k, []);
-    cells.get(k).push(it);
-  }
-  const densest = [...cells.values()].sort((a, b) => b.length - a.length)[0] || picked;
-  bldFocus = {
-    x: densest.reduce((a, it) => a + xOf(it.lon), 0) / densest.length,
-    z: densest.reduce((a, it) => a + zOf(it.lat), 0) / densest.length,
-    count: densest.length,
-  };
-
-  let seq = 0;
-  for (const it of picked) {
-    try {
-      const shape = new THREE.Shape();
-      it.ring.forEach(([lo, la], i) => {
-        const sx = xOf(lo), sz = -zOf(la);   // rotateX(-90°) 后 y→-z，故先取 -z
-        if (i === 0) shape.moveTo(sx, sz); else shape.lineTo(sx, sz);
-      });
-      shape.closePath();
-      const lv = parseFloat(it.f.properties.levels);
-      const hh0 = parseFloat(it.f.properties.height);
-      let hh = Number.isFinite(hh0) ? hh0 : (Number.isFinite(lv) ? lv * 3.2 : 8 + (it.d % 7));
-      hh = clamp(hh, 5, 30);
-      // OSM 该批数据无 height/levels 字段，8~15 m 是示意层高；
-      // 做 2× 视觉放大才能让立面窗格在近景可辨（页面「说明」里已注明，不代表真实楼高）。
-      hh = clamp(hh * 2.0, 10, 46);
-      const baseY = displayY(xOf(it.lon), zOf(it.lat));
-
-      // 主体：ExtrudeGeometry 的 group 0 = 顶/底盖、group 1 = 侧壁，
-      // 用材质数组一次分出屋顶与墙面，不需要再建模。
-      const geo = new THREE.ExtrudeGeometry(shape, { depth: hh, bevelEnabled: false });
-      geo.rotateX(-Math.PI / 2);             // (x, y, z) → (x, z, -y)
-      geo.translate(0, baseY, 0);
-
-      // 基座薄台：同一轮廓再挤一次，颜色由色板区分（不做 scale，避免绝对坐标漂移）
-      const baseGeo = new THREE.ExtrudeGeometry(shape, { depth: 1.8, bevelEnabled: false });
-      baseGeo.rotateX(-Math.PI / 2);
-      baseGeo.translate(0, baseY - 1.4, 0);
-
-      // 轮廓线：22 km 全景里建筑只有几个像素，勾边比贴图更能勾出聚落肌理
-      const edgeGeo = new THREE.EdgesGeometry(geo, 24);
-
-      const id = `osm_${String(seq++).padStart(3, '0')}`;
-      const anchor = `anchor_${id}`;
-      const g = makeSculpt({
-        id, kind: 'building',
-        parts: [
-          { name: 'part_wall',  role: 'body', geometry: geo,
-            material: [material('GY_roof'), material('GY_wall')] },
-          { name: 'part_base',  role: 'base', geometry: baseGeo, material: material('GY_base') },
-          { name: 'part_edge',  role: 'edge', geometry: edgeGeo,
-            material: material('GY_edge'), line: true, renderOrder: 2 },
-        ],
-        anchor,
-        meta: { baseY, hh, delay: it.d / 3200,
-                levels: Number.isFinite(lv) ? lv : 0, anchorName: anchor },
-      });
-      scene.add(g);
-      buildings.push(g);
-    } catch (e) { /* 单个轮廓自交时跳过，不影响整体 */ }
-  }
-}
-
 /* 冰崩源位置（2026-11-12 用户指正）：不能压在沟道口上，要放在「靠近演进路线那座山的
    另一边」。按 DEM 实测，取沟道起点（85.4981, 28.2460, 5245 m）正北 2.3 km 的
    6911 m 冰壁北坡 (85.4985, 28.2605)：它与沟道之间隔着一道山脊（起点方向上被地形挡
@@ -958,6 +982,12 @@ function buildGlacier() {
   scene.add(glacierGroup);
 }
 
+/* 冰崩崩落带：冰体失稳后顺坡崩落、跌进错坚河上游的通道。
+   用 DEM 上的「最陡下行路径」算出来（只允许每步上升 ≤8 m 的硬约束，得到唯一一条
+   从源区 6925 m 落到沟道起点 5245 m 的走廊，长 2.34 km、落差 1680 m）。
+   冰体本身藏在山脊后面，光有冰块观众看不出源区在哪；这条带子把「山那边的冰源」
+   和「山这边的沟道口」在视觉上连起来，冰崩的来路一眼可读（2026-11-12 用户指正）。
+   带宽由 95 m 渐变到 170 m（崩落扇），贴地 20 单位，跟随「冰川源区」图层开关。 */
 /* 冰崩崩落带：冰体失稳后顺坡崩落、跌进沟道起点的通道。
    2026-11-13 重算：演进起点已从坡底（5255 m）裁到坡顶（6738 m），源区随之
    挪到起点东侧 1.6 km 的 6951 m 山脊 —— 从那条脊往西是一路下坡，中途只翻一道
@@ -1085,7 +1115,7 @@ function buildLakeAndImpact() {
 }
 
 function nodePos(n) {
-  const c = chanAt(n.t * channel.lengthM);
+  const c = cenAt(n.t * channel.lengthM);   // 节点跟着居中中轴线，别悬在淹没体边上
   return new THREE.Vector3(c.x, c.y, c.z);
 }
 function buildNodes() {
@@ -1251,17 +1281,6 @@ function flyToNode(idx) {
   flyTo(target, cam, 900);
 }
 
-// 专门的「口岸聚落」近景：OSM 建筑大多不在沟道终点，点节点看的是灾害冲击，
-// 想看立面层次得飞到建筑最密集的那一簇。
-function flyToBuildings() {
-  if (!bldFocus) return;
-  const y = displayY(bldFocus.x, bldFocus.z);
-  const target = new THREE.Vector3(bldFocus.x, y + 26, bldFocus.z);
-  // 低俯角 + 近距离：从上方看只能看到屋顶，立面窗格要接近平视才看得见
-  const d = 900;
-  const cam = target.clone().add(new THREE.Vector3(-d * 0.50, d * 0.34, d * 0.86));
-  flyTo(target, cam, 950);
-}
 function updateFlight(now) {
   if (!flight) return;
   const k = clamp((now - flight.t0) / flight.dur, 0, 1);
@@ -1270,43 +1289,54 @@ function updateFlight(now) {
   controls.target.lerpVectors(flight.fromTgt, flight.toTgt, e);
   if (k >= 1) flight = null;
 }
-/* 全景取景（2026-11-12 用户拍板：退回最初那台机位，只把模型朝正面稍微转一点）。
-   上一版按沟道包围盒现算（俯角 65°、斜距 13 km），几何指标更「正确」——
-   入画 100%、无遮挡 100%、占画幅 78%×70% —— 但用户看下来觉得「不好看」：
-   俯角太陡变成了正上方拍地图，丢了沙盘模型那种斜侧透视的立体感。
-   所以退回固定机位 (−8200,15000,16500)→(0,2200,0)：俯角约 35°、斜距 22.5 km，
-   正是「站在模型斜上方看整条沟谷」的观感。
-   OV_POSE.yaw 是绕竖直轴的整体旋转（单位度，0 = 原机位）：把模型往正面掰一点，
-   让沟谷长轴不要那么「斜插出画」。正负决定转哪边，?oyaw= 可临时覆盖试角度。 */
-const OV_POSE = {
-  // 以最初那台机位为基准反推出来的极坐标：方位角 −26.4°、俯角 34.8°、斜距 22.5 km，
-  // 即 cam(−8200,15000,16500) → tgt(0,2200,0)。改成极坐标只为了能单拧方位角/俯角。
+/* 两套固定机位，互不干扰（2026-11-14 用户强调：「全景机位」≠「重置视角」）。
+   ① DEFAULT_POSE = 打开系统时的斜侧沙盘机位，俯角 34.8°、斜距 22.5 km、
+      cam(−8200,15000,16500)→tgt(0,2200,0)。首屏、重置视角、重播都用它，
+      **逐字保持原样**，不受这次俯视改动影响。
+   ② OV_POSE = 画布工具条「全景机位」按钮专用，按用户要求改成近正上方俯视：
+      俯角 78°（留 12° 倾角，别变成正交平面图）、斜距 19.5 km、方位角 0，
+      按 fov 46° 反算竖向覆盖 ≈16.2 km，装得下 14.9 km 南北 / 21.6 km 东西；
+      沟谷长轴在画面里横着展开（东→西），符合看地图习惯。
+   调参：?opitch= / ?oyaw= 只作用于全景机位；?dpitch= / ?dyaw= 只作用于默认机位。 */
+const DEFAULT_POSE = {
   tgt: [0, 2200, 0],
   baseAz: -26.4,
   dist: 22500,
+  yaw: (() => {
+    const q = parseFloat(new URLSearchParams(location.search).get('dyaw'));
+    return Number.isFinite(q) ? q : 0;
+  })(),
+  pitch: (() => {
+    const q = parseFloat(new URLSearchParams(location.search).get('dpitch'));
+    return Number.isFinite(q) ? q : 34.8;
+  })(),
+};
+const OV_POSE = {
+  tgt: [0, 2200, 0],
+  baseAz: 0,
+  dist: 19500,
   yaw: (() => {
     const q = parseFloat(new URLSearchParams(location.search).get('oyaw'));
     return Number.isFinite(q) ? q : 0;
   })(),
   pitch: (() => {
     const q = parseFloat(new URLSearchParams(location.search).get('opitch'));
-    return Number.isFinite(q) ? q : 34.8;
+    return Number.isFinite(q) ? q : 78;
   })(),
 };
-function overviewCamera() {
-  if (!OV_POSE) return null;
-  const [tx, ty, tz] = OV_POSE.tgt;
-  // yaw 在基准方位角上叠加：转到与沟道长轴平行时，地形会在画面里「立」成竖向纵深；
-  // pitch 压低后两侧山脊立起来，成两侧夹一谷的立面观感。
-  const a = (OV_POSE.baseAz + OV_POSE.yaw) * Math.PI / 180;
-  const p = OV_POSE.pitch * Math.PI / 180;
-  const hd = OV_POSE.dist * Math.cos(p), vy = OV_POSE.dist * Math.sin(p);
+function overviewCamera(pose) {
+  const P = pose || DEFAULT_POSE;
+  const [tx, ty, tz] = P.tgt;
+  const a = (P.baseAz + P.yaw) * Math.PI / 180;
+  const p = P.pitch * Math.PI / 180;
+  const hd = P.dist * Math.cos(p), vy = P.dist * Math.sin(p);
   const px = tx + hd * Math.sin(a), pz = tz + hd * Math.cos(a);
   const py = Math.max(ty + vy, groundAt(px, pz) + CAM_AUTO_CLEAR);
   return { cam: new THREE.Vector3(px, py, pz), tgt: new THREE.Vector3(tx, ty, tz) };
 }
-function applyOverviewCam(anim) {
-  const o = overviewCamera();
+/* pose 不传 = 默认（重置）机位；只有「全景机位」按钮显式传 OV_POSE。 */
+function applyOverviewCam(anim, pose) {
+  const o = overviewCamera(pose);
   if (!o) return null;
   if (anim) flyTo(o.tgt, o.cam, 950);
   else {
@@ -1318,7 +1348,8 @@ function applyOverviewCam(anim) {
   return o;
 }
 
-/* 重置视角（原顶栏按钮已挪到画布右上工具条）：回到整条沟道的全景取景。
+/* 重置视角：回到**打开系统时那台斜侧沙盘机位**（DEFAULT_POSE），不是俯视全景。
+   2026-11-14 用户明确：全景机位按钮与重置视角是两个机位，不能混。
    必须先把跟拍 / 自动运镜 / 自动旋转停掉——否则下一帧 updateDisasterFollow
    会把相机又拉回水头，用户看到的就是「点了没反应」。 */
 function resetView() {
@@ -1331,8 +1362,9 @@ function resetView() {
   followSnap = false;
   applyLayers();
   markFloodJump();
-  applyOverviewCam(true);
-  syncViewBtns('overview');
+  applyOverviewCam(true, DEFAULT_POSE);
+  // 重置后是默认机位，不是俯视全景 —— 别把「全景机位」按钮点亮
+  syncViewBtns(null);
 }
 
 /* -------------------- 播放跟拍：镜头始终在灾害上方 -------------------- */
@@ -1404,9 +1436,17 @@ const RIG = {
   // 用绝对高度 alt（相对瞄准点水面）而不是俯角反解 —— 俯角反解在 back 变大时
   // 会把相机抬到 2 km 以上，反而不是「谷上方」。离地由 CAM_AUTO_CLEAR 兜底。
   // back 区间收窄：fill 反馈只做 ±15% 微调，别让它一路顶到上下限把机位拉走。
-  follow: { back: 2100, lat: -520, alt: 1200, pitch: 0, fill: 0.26,
-            pitchMin: 18, pitchMax: 46, backMin: 1950, backMax: 2350,
-            sRate: 2.0, posRate: 1.9, tgtRate: 2.1, intro: 2.4, ahead: 400 },
+  /* 2026-11-14 改：站位从「水头后 2.1 km、瞄水头前 400 m」改成「水头后 3.0 km、
+     瞄水头上游 600 m」。理由是可量的，不是口味：
+       __frameScore 在 t=180/330 两处扫「机位沿轨迹平移 ds」，
+       原参数（ds=0）湿水点入画只有 35~53%、占画高 0.49~0.59；
+       退到 ds=−1600 后入画 88%、占画高 0.72（t=330），画面主体变成洪水本身。
+     根因是瞄点落在水头**前方**：水头是前锋尖端，往前 400 m 已是干沟道，
+     镜头自然对着空谷。现在瞄点落在水头上游，水体正好铺满中景。
+     高度同步抬到 1500（俯角约 27°）—— 退远后仍保持斜俯拍，不变成拍地图。 */
+  follow: { back: 3000, lat: -520, alt: 1500, pitch: 0, fill: 0.26,
+            pitchMin: 18, pitchMax: 46, backMin: 2700, backMax: 3300,
+            sRate: 2.0, posRate: 1.9, tgtRate: 2.1, intro: 2.4, ahead: -600, avoid: true },
   // 贴水面近景（?cam=near 切换）：取 __rigSearch 在 t=300 实测的最优区
   // （H 160~250、湿带占画高 45~50%、水头居中、零遮挡）。俯角只有约 10°，
   // 是「贴着水面看推进」的第一视角，与上面的俯瞰是两种观察方式，不互相替代。
@@ -1419,27 +1459,34 @@ const RIG = {
        · 实际俯角 26→50.3→31.7→42.6° 乱跳（高度常被 groundAt 兜底顶起）；
        · t=360 视线被山体切断 9/14 个采样点、最深挡 40 m；
        · 湿带占画高恒为 0（rigFill 采样点落到画外，见 rigFill 注释）。
-     新参数：绝对高度 alt 520 m + back 850 m + 侧偏 280 m ⇒ 斜距 ≈ 1.0~1.2 km，
-     俯角 22~42°；ahead 240 m 让画面留出前方沟道，洪水有推进方向感。
-     avoid 开启后由 losPenalty 逐级避让山体（换边 → 抬高 → 推近）。
-     fill 设为 0 = 关闭「按占画高自动推拉」：航拍要可预测的匀速跟拍，而 rigFill 在
-     水头附近湿点稀疏的段落只采到 1~2 个点（fn 字段），占比系统性偏低，
-     反馈会把 back 一路拉到下限 650，反而变回「贴脸」。 */
+     新参数：绝对高度 alt 640 m（不反解 → 俯角稳定在 31° 左右）+ back 1000 m +
+     侧偏 300 m ⇒ 斜距 ≈ 1.2 km；ahead 240 m 让画面留出前方沟道，洪水有推进方向感。
+     avoid 开启后由 losPenalty 逐级避让山体（换边 → 抬高 → 推近）。 */
+  /* fill 设为 0 = 关闭「按占画高自动推拉」。航拍要的是可预测的匀速跟拍，
+     而 rigFill 在「水头附近水很浅、湿点稀疏」的段落只能采到 1~2 个点（fn 字段），
+     测出来的占比系统性偏低（0.07~0.14），反馈会把 back 一路拉到下限 650 —— 
+     反而变回「贴脸」。固定 back 850 + 俯角约束已经够稳。 */
   /* 洪水航拍 v3（2026-11-13，用户原话「不太好看，可以换成别的吗，还有没有别的」）：
      v2 是「正后方跟着水头跑」—— 斜距 919~1171 m，画面里沟道沿视线方向收成一条，
      洪水的横向宽度、两岸坡形全被压扁，只剩一条竖直的水带。
-     v3 换成**近距离高位跟拍**：相机贴着水头上方 300 m 起步、侧偏 120 m，视线短
-     （back 220 + ahead 100）所以弯道挡不住 —— 实测 1018 个节点里只有 4.3% 视线被
-     地形切断（v2 是 27~34%）。高度由「本段地形 ±420 m 最高点 + 140」兜底，
-     俯角稳定在 50~60°，画面像无人机俯冲跟拍。
+     v3 换成**侧岸高位侧移**（纪录片常用的侧跟镜头）：相机在沟道一侧 1.05 km、
+     床面之上 620 m，视线大致垂直于沟谷走向，沟道横穿画面 —— 一屏里同时读得出
+     「水面有多宽」「两岸坡多陡」「水头在上游还是下游」。斜距约 1.3 km、俯角约 28°。
      遮挡/高度解算全部在 bakeRig 离线完成，运行时只查表（见上方抖动注释）。 */
-  cine:   { back: 220, lat: 120, alt: 300, pitch: 0, fill: 0,
-            pitchMin: 26, pitchMax: 42, backMin: 650, backMax: 1900,
-            sRate: 2.2, posRate: 2.4, tgtRate: 2.6, intro: 1.8, ahead: 100, avoid: false },
+  /* 2026-11-14 用户：「洪水航拍视角还是要提高一点，现在还是太近了」。
+     __cam() 实测 t=300 时斜距只有 469 m、离地 435 m、离水头 277 m —— 不是航拍，
+     是贴着水头跑。现在把绝对高度 300→900、后退 220→900、侧偏 120→520，
+     目标斜距 1.3~1.6 km、俯角 35~40°，一屏里能同时读到水面宽度与两岸坡形。
+     仍然走 bakeRig 离线烘焙，运行时只查表，不会引入抖动。 */
+  cine:   { back: 900, lat: 520, alt: 900, pitch: 0, fill: 0,
+            pitchMin: 22, pitchMax: 40, backMin: 800, backMax: 1600,
+            sRate: 2.2, posRate: 2.4, tgtRate: 2.6, intro: 1.8, ahead: 220, avoid: false },
 };
 // 跟拍预设：默认折中俯瞰；加 ?cam=near 换成贴水面近景，便于直接对比。
 // 不新增按钮——工具条固定五项是 11-09 定的。
 const CAM_PRESET = new URLSearchParams(location.search).get('cam') === 'near' ? 'near' : 'follow';
+// 末段推进到口岸（?endpush=0 关闭，见 updateRigBaked）
+const END_PUSH = new URLSearchParams(location.search).get('endpush') !== '0';
 const rig = { mode: null, s: 0, headS: -1, back: 600, fill: 0, snap: true, introT: 1,
               cam0: new THREE.Vector3(), tgt0: new THREE.Vector3(),
               pos: new THREE.Vector3(), aim: new THREE.Vector3(), dbg: null };
@@ -1447,7 +1494,8 @@ const rigTmp = new THREE.Vector3();
 
 function rigTangent(s, f, L) {
   const cs = v => Math.max(0, Math.min(L, v));
-  const a = f.chanAt(cs(s - 300)), b = f.chanAt(cs(s + 300));
+  // 2026-11-14：切线取自居中中轴线，机位侧偏方向才与「线在哪」一致
+  const a = cenAt(cs(s - 300)), b = cenAt(cs(s + 300));
   const dx = b.x - a.x, dz = b.z - a.z, d = Math.hypot(dx, dz) || 1;
   return { x: dx / d, z: dz / d };
 }
@@ -1459,13 +1507,30 @@ function rigHead(f, L) {
   const cs = v => Math.max(0, Math.min(L, v));
   const pk = Math.max(f.peak || 1, 1e-3);
   const s0 = cs(f.frontS || 0);
-  // 回看上限 600 m、阈值 0.005（2026-11-12 修）。原来 1500 m / 0.01 会在
-  // 「刚漫到、水深还没起来」的段落一路往上游找，锚点于是落后前锋 650 m、
-  // 甚至比上一时刻更靠上游 —— 观感就是镜头卡住、往回退。
-  // 现在宁可让锚点贴着前锋，也不回看太远。
+  const wet = s => {
+    const c = cenAt(s);
+    return f.waterY(c.x, c.z, f.tField).h / pk > 0.005;
+  };
+  // 回看上限 600 m、阈值 0.005（2026-11-12 修）……
   for (let d = 0; d <= 600; d += 50) {
-    const s = cs(s0 - d), c = f.chanAt(s);
-    if (f.waterY(c.x, c.z, f.tField).h / pk > 0.005) return s;
+    const s = cs(s0 - d);
+    if (wet(s)) return s;
+  }
+  /* 回看扩到 2600 m（2026-11-14）。__frontAudit 实测：t=330 时剖面给出的前锋在
+     16 621 m，而到达时间场里有水的只有到 14 800 m —— 场是按「最近旧中轴点 + 横向
+     延迟」铺的，峡谷段比剖面晚 1~2 km，而中轴原先又贴着包络边，几个因素叠起来
+     差距能到 1.8 km。只回看 600 m 就找不到水，锚点停在干沟道上，
+     机位于是越过水面：t=330 全帧没有一个湿点入画（wetInView 0/96）。 */
+  for (let d = 700; d <= 2600; d += 100) {
+    const s = cs(s0 - d);
+    if (!wet(s)) continue;
+    // 在 [s, s+100] 内二分找「最下游的湿点」，避免锚点一下退太多
+    let lo = s, hi = cs(s + 100);
+    for (let i = 0; i < 4; i++) {
+      const m = (lo + hi) / 2;
+      if (wet(m)) lo = m; else hi = m;
+    }
+    return lo;
   }
   return s0;
 }
@@ -1493,7 +1558,7 @@ function rigFill(cam, f, s0, L) {
   const cs = v => Math.max(0, Math.min(L, v));
   const pk = Math.max(f.peak || 1, 1e-3);
   const wetAt = s => {
-    const c = f.chanAt(cs(s));
+    const c = cenAt(cs(s));      // 2026-11-14：采样走居中中轴线（湿区中间），不是沟道边
     const w = f.waterY(c.x, c.z, f.tField);
     return { c, w, wet: w.h / pk > 0.005 };
   };
@@ -1504,7 +1569,7 @@ function rigFill(cam, f, s0, L) {
      于是三个采样点里两个落到画外、n<2 直接返回 0 —— `rigFill` 长期读 0，
      back 反馈形同失效（audit 里 8 个时刻 fill 全是 0 就是证据）。
      现在按「相机到水头的水平距离」定跨度，5 点等分，全部落在画面覆盖范围内。 */
-  const hc0 = f.chanAt(cs(s0));
+  const hc0 = cenAt(cs(s0));
   const camD = Math.hypot(cam.position.x - hc0.x, cam.position.z - hc0.z);
   const span = Math.min(900, Math.max(180, camD * 0.55));
   let y0 = 9, y1 = -9, n = 0;
@@ -1532,7 +1597,9 @@ const RIG_STEP = 40;
 const RIG_PATH = { follow: null, cine: null, near: null };
 
 /* s 邻域 (±120 m) 的最低床面：中轴个别段落骑在山脊上，直接取 chanAt(s).y
-   会把机位基准抬高几十米；取局部最低更接近真实谷底。 */
+   会把机位基准抬高几十米；取局部最低更接近真实谷底。
+   2026-11-14：这里保留 chanAt（河床基准），横向居中只影响机位与瞄准点，
+   不把「谷底高程」换成「断面中心地表高程」，否则机位基准会随横向挪动漂。 */
 function rigBedAt(f, s, cs) {
   let m = Infinity;
   for (let d = -120; d <= 120; d += 60) {
@@ -1552,8 +1619,8 @@ function bakeRig(mode) {
   let penP = 0, penN = 0;
   for (let k = 0; k < 13; k++) {
     const s = cs(L * (0.05 + 0.9 * k / 12));
-    const c = f.chanAt(s), t = rigTangent(s, f, L);
-    const a = f.chanAt(cs(s + cfg.ahead)), bed = rigBedAt(f, s, cs);
+    const c = cenAt(s), t = rigTangent(s, f, L);
+    const a = cenAt(cs(s + cfg.ahead)), bed = rigBedAt(f, s, cs);
     for (const sg of [1, -1]) {
       const x = c.x - t.z * cfg.lat * sg, zz = c.z + t.x * cfg.lat * sg;
       const y = Math.max(bed + cfg.alt, groundAt(x, zz) + CAM_AUTO_CLEAR);
@@ -1570,10 +1637,12 @@ function bakeRig(mode) {
        反向外推还能让水头刚起步那几秒保持同一景别。 */
     const spRaw = s - cfg.back, sp = cs(spRaw);
     const t = rigTangent(sp, f, L);
-    const c = f.chanAt(sp), c0 = f.chanAt(0), over = Math.max(0, -spRaw);
-    const ts = cs(s + cfg.ahead), ac = f.chanAt(ts);
+    const c = cenAt(sp), c0 = cenAt(0), over = Math.max(0, -spRaw);
+    const ts = cs(s + cfg.ahead), ac = cenAt(ts);
     const bedT = rigBedAt(f, ts, cs);
-    const tX = ac.x, tY = bedT + 30, tZ = ac.z;
+    // 瞄准抬高量取「床面 +30」与「断面中心地表 +20」的较大者：
+    // 横向居中后中心点可能比河床高出几十米，只按床面抬会瞄准到山体里
+    const tX = ac.x, tY = Math.max(bedT + 30, ac.y + 20), tZ = ac.z;
     const at = lt => spRaw < 0
       ? { x: c0.x - t.x * over - t.z * lt, z: c0.z - t.z * over + t.x * lt }
       : { x: c.x - t.z * lt, z: c.z + t.x * lt };
@@ -1607,7 +1676,7 @@ function bakeRig(mode) {
       let found = false;
       for (let d = 40; d <= 360 && !found; d += 40) {
         for (const sg of [1, -1]) {
-          const ss = cs(s + cfg.ahead + sg * d), cc = f.chanAt(ss);
+          const ss = cs(s + cfg.ahead + sg * d), cc = cenAt(ss);
           const cy = cc.y + 30;
           if (losPenalty(px, py, pz, cc.x, cy, cc.z) <= 4) {
             tXf = cc.x; tYf = cy; tZf = cc.z; found = true; break;
@@ -1653,6 +1722,10 @@ function rigSample(mode, s, outPos, outAim) {
 function updateRigBaked(dt, mode) {
   const f = flood; if (!f || !f.chanAt) return;
   const cfg = RIG[mode], L = f.channel.lengthM;
+  /* ?rigds=<米>：只在验收时把跟拍机位沿轨迹整体前后平移（负 = 退后），
+     用来 A/B「机位该退多远才框得住演进体」，不参与默认播放。 */
+  const qds = parseFloat(new URLSearchParams(location.search).get('rigds'));
+  const DS = Number.isFinite(qds) ? qds : 0;
   const snap = rig.mode !== mode || rig.snap;
   const hd = rigHead(f, L);
   if (snap) {
@@ -1665,7 +1738,22 @@ function updateRigBaked(dt, mode) {
      这是「镜头又往后退」的残留原因。现在记历史最大值，只允许前进。 */
   if (!(rig.headS >= 0) || hd > rig.headS) rig.headS = hd;
   rig.s = snap ? rig.headS : rig.s + (rig.headS - rig.s) * (1 - Math.exp(-dt * cfg.sRate));
+  if (DS) rig.s = Math.max(0, Math.min(L, rig.s + DS));
   if (!rigSample(mode, rig.s, rig.pos, rig.aim)) return;
+  /* 收尾推进（2026-11-14，用户：「镜头就到吉隆口岸就行了」）：
+     末段 1.8 km 把机位从「水头后 3.0 km」推到「口岸后 1.3 km、抬高 520」，
+     收在口岸被冲击的那一下 —— 否则整段视频的终点是 3 km 外的一个小点。
+     不改烘焙轨迹：rig.s 仍是里程的确定函数，这里只是把 pos/aim 往口岸混过去，
+     没有反馈环。?endpush=0 关闭。 */
+  const ek = (mode === 'follow' && END_PUSH)
+    ? smooth(clamp((rig.s - (L - 1800)) / 1300, 0, 1)) : 0;
+  if (ek > 0) {
+    const c = cenAt(L), tg = rigTangent(L - 240, f, L);
+    const ex = c.x - tg.x * 1300, ez = c.z - tg.z * 1300;
+    const ey = Math.max(displayY(ex, ez) + 420, c.y + 520);
+    rig.pos.lerp(rigTmp.set(ex, ey, ez), ek);
+    rig.aim.lerp(rigTmp.set(c.x, c.y + 40, c.z), ek);
+  }
   const k = snap ? 1 : 1 - Math.exp(-dt * cfg.posRate);
   const kt = snap ? 1 : 1 - Math.exp(-dt * cfg.tgtRate);
   camera.position.lerp(rig.pos, k);
@@ -1686,7 +1774,7 @@ function updateRigBaked(dt, mode) {
 }
 
 /* 以下 updateRig 是 2026-11-13 之前的逐帧求解版，已由 updateRigBaked 取代。
-   保留代码作为对照，不再被默认路径调用。 */
+   保留代码作为对照（?legacyRig=1 时仍可用），不再被默认路径调用。 */
 function updateRig(dt, mode) {
   const f = flood; if (!f || !f.chanAt) return;
   const cfg = RIG[mode], L = f.channel.lengthM;
@@ -1707,8 +1795,7 @@ function updateRig(dt, mode) {
   const backUse = cfg.back + 2600 * srcK;
   const altUse = cfg.alt ? cfg.alt + 1150 * srcK : 0;
   if (snap) rig.back = backUse;
-  // fill 反馈只做 ±6% 微调（原 ±18% 会把 back 拉得忽远忽近，俯角跟着抖）；
-  // cine 的 fill 设 0，整段跳过自动推拉。
+  // fill 反馈只做 ±6% 微调（原 ±18% 会把 back 拉得忽远忽近，俯角跟着抖）
   else if (rig.fill > 0 && cfg.fill > 0) rig.back = clamp(rig.back * clamp(rig.fill / cfg.fill, 0.94, 1.06),
                                           cfg.backMin + 2600 * srcK, cfg.backMax + 2600 * srcK);
   /* 机位点：常规取 s−back；源区（s < back）时沿沟道切线**反向外推**到起点之外，
@@ -1898,7 +1985,7 @@ function buildUI() {
     el.addEventListener('click', () => jumpToStage(+el.dataset.idx));
   });
 
-  // 图层按组渲染：组标题 + 两列开关，避免 14 个复选框平铺成一堵墙
+  // 图层按组渲染：组标题 + 两列开关，避免复选框平铺成一堵墙
   const groups = [];
   LAYERS.forEach(l => {
     let g = groups.find(x => x.name === l.group);
@@ -2042,7 +2129,6 @@ function applyLayers() {
   // 岸边细节着色器画的是「常水位河道 + 规则 V 形流纹 + 白泡沫带」，
   // 洪水层开启时必须压掉，否则规则白纹会盖在真实水面上像一块编织布。
   bankUniforms.uBankOn.value = L.bank && !L.flood ? 1 : 0;
-  facadeUniforms.uFacadeOn.value = L.facade ? 1 : 0;
   contourMesh.visible = L.contour;
   // 跟拍模式隐藏彩色态势叠加层：贴近灾害时巨大的前锋球 / 圆环示意符号
   // 会盖住真实水面与地形，正是「看不到灾害」的另一半原因
@@ -2053,7 +2139,6 @@ function applyLayers() {
   if (flood) flood.setLayers(L);
   frontMarker.visible = L.channel && !immersiveCam();
   channelLine.visible = L.channel && !immersiveCam();
-  buildings.forEach(m => { m.visible = L.buildings; });
   glacierGroup.visible = L.glacier;
   if (iceTrackMesh) iceTrackMesh.visible = L.glacier;
   // 堰塞湖蓝饼、受灾范围圈、节点小球与地名标签也都是态势标注，一并收掉
@@ -2069,16 +2154,12 @@ function applyLayers() {
 
 function updatePanels(f) {
   const s = f.s, st = STAGES[f.stageIdx];
-  // 顶部 HUD 位双态：未开演 = 演示介绍；开演后 = 阶段播报。二者共用一个位置，
-  // 避免标题长期占着地图顶部。时钟仍只在底部时间轴出现一次。
-  $('stage-intro').classList.toggle('hidden', !introMode);
-  $('stage-hud').classList.toggle('hidden', introMode);
-  if (!introMode) {
-    $('hud-idx').textContent = `${f.stageIdx + 1}/${STAGES.length}`;
-    $('hud-stage').textContent = st.name;
-    $('hud-desc').textContent = st.desc;
-    $('stage-hud').classList.toggle('crit', st.lvl === 'crit');
-  }
+  // 画面左上只报「第几阶段 + 阶段名 + 一句话机理」；
+  // 时钟交给底部时间轴（唯一读数），避免同一时刻在页面上出现三遍。
+  $('hud-idx').textContent = `${f.stageIdx + 1}/${STAGES.length}`;
+  $('hud-stage').textContent = st.name;
+  $('hud-desc').textContent = st.desc;
+  $('stage-hud').classList.toggle('crit', st.lvl === 'crit');
   const node = NODES.find(n => n.id === st.node);
   $('focus-name').textContent = node.name;
   $('focus-sub').textContent = node.sub;
@@ -2100,10 +2181,7 @@ function updatePanels(f) {
   $('tl-total').textContent = `总历时 ${fmtDur(f.total)}`;
   $('tl-fill').style.width = `${f.ratio * 100}%`;
   $('tl-cursor').style.left = `${f.ratio * 100}%`;
-  // 左面板高亮跟随 HUD 双态：未开演一项都不亮（此时顶部是演示介绍，不是阶段）；
-  // 开演后才高亮当前阶段，避免"还没推演就高亮第 1 阶段"的错位。
-  document.querySelectorAll('.stage-item').forEach((el, i) =>
-    el.classList.toggle('active', !introMode && i === f.stageIdx));
+  document.querySelectorAll('.stage-item').forEach((el, i) => el.classList.toggle('active', i === f.stageIdx));
   const secName = f.section ? f.section.name : '';
   $('sect-body').querySelectorAll('tr').forEach(tr => {
     tr.classList.toggle('active', SECTIONS[+tr.dataset.sec].name === secName);
@@ -2120,7 +2198,6 @@ function onStageChange(idx, f) {
   // —— 阶段跳飞正是「镜头晃动 / 看不到灾害」的根因；Cesium 侧由地球自身运镜。
 }
 function jumpToStage(idx) {
-  introMode = false;
   const f = computeFrame(0, state.vol);
   state.t = STAGES[idx].r * f.total;
   autoFly = false; markFloodJump();
@@ -2130,7 +2207,6 @@ function jumpToStage(idx) {
   refresh();
 }
 function jumpToNode(idx) {
-  introMode = false;
   const f = computeFrame(0, state.vol);
   const target = NODES[idx].t;
   let best = 0, bd = Infinity;
@@ -2152,36 +2228,33 @@ function bindEvents() {
   // 也避免跟拍在源区/峡谷处反复调整带来的画面跳动。用户手动拖画布照旧生效，
   // 「洪水航拍」按钮仍可单独开启贴水近景。
   $('btn-play').addEventListener('click', () => {
-    if (!state.playing) introMode = false;   // 首次点「播放」＝开始推演，顶部从介绍切阶段
     state.playing = !state.playing;
     autoFly = false;
     flight = null; followSnap = false;
-    if (state.playing) syncViewBtns('overview');   // 推演锁定全景机位
+    // 播放时相机是「打开系统时的默认机位」，不是全景机位按钮那台俯视 —— 不高亮它
+    if (state.playing) syncViewBtns(null);
     $('btn-play').textContent = state.playing ? '暂停' : '播放';
     if (state.playing && state.t >= computeFrame(0, state.vol).total - 1) state.t = 0;
   });
-  $('btn-prev').addEventListener('click', () => { introMode = false; autoFly = false; markFloodJump(); state.t = Math.max(0, state.t - 30); refresh(); });
+  $('btn-prev').addEventListener('click', () => { autoFly = false; markFloodJump(); state.t = Math.max(0, state.t - 30); refresh(); });
   $('btn-next').addEventListener('click', () => {
-    introMode = false; autoFly = false; markFloodJump();
+    autoFly = false; markFloodJump();
     state.t = Math.min(computeFrame(0, state.vol).total, state.t + 30);
     refresh();
   });
   $('btn-replay').addEventListener('click', () => {
-    introMode = false;
     state.t = 0; state.playing = true; autoFly = false; lastStageIdx = -1; markFloodJump();
     $('btn-play').textContent = '暂停';
     if (state.engine === 'cesium') resetCesiumView();
-    // 固定默认全景机位：与打开系统时完全一致，全程不动（演示视频用）。
-    else { flight = null; followSnap = false; applyOverviewCam(true); }
+    // 重播回到「打开系统时」的默认机位（不是俯视全景），按钮状态一并清掉
+    else {
+      flight = null; followSnap = false;
+      applyOverviewCam(true, DEFAULT_POSE);
+      syncViewBtns(null);
+    }
     refresh();
   });
   $('btn-reset').addEventListener('click', resetView);
-  $('btn-port').addEventListener('click', () => {
-    if (state.engine !== 'three') setEngine('three');
-    autoFly = false; followSnap = false;   // 主动聚焦口岸，退出播放跟拍
-    flyToBuildings();
-    pushLog(`聚焦口岸聚落：${bldFocus ? bldFocus.count : 0} 栋 OSM 实测轮廓 · 程序化立面与勾边`, 'info', state.t);
-  });
   $('btn-flood').addEventListener('click', () => enableCine(!cineCam));
   /* 全景机位（2026-11-13 用户要求）：与「洪水航拍」并列的第二个成片视角。
      只做视角切换 —— 不重置时间轴、不重播水面，推演播到一半也能随时切回全景看全局。 */
@@ -2192,9 +2265,9 @@ function bindEvents() {
     state.rotating = false;
     controls.autoRotate = false;
     $('btn-rotate').classList.remove('active');
-    applyOverviewCam(true);
+    applyOverviewCam(true, OV_POSE);   // 全景机位按钮 = 俯视，与重置视角分开
     syncViewBtns('overview');
-    pushLog('已切到全景机位：整条沟道与淹没范围一屏看全', 'info', state.t);
+    pushLog('已切到全景机位：俯视整条沟道与淹没范围', 'info', state.t);
   });
   $('btn-rotate').addEventListener('click', () => {
     state.rotating = !state.rotating;
@@ -2213,7 +2286,6 @@ function bindEvents() {
     refresh();
   });
   $('tl-track').addEventListener('click', e => {
-    introMode = false;
     const rect = $('tl-track').getBoundingClientRect();
     const r = clamp((e.clientX - rect.left) / rect.width, 0, 1);
     state.t = r * computeFrame(0, state.vol).total;
@@ -2335,16 +2407,19 @@ function updateDiag() {
 /* ------------------------------ 主循环 ------------------------------ */
 function refresh() {
   const f = computeFrame(state.t, state.vol);
+  // 洪水实景层：宏观水位取论文表 4 平均流深（口径 B），到达时间沿用既有真实场
+  if (flood) flood.setFrame(f.ratio, f.s.depth);
+  // 前锋位置统一口径：球、灾害体推进带都跟「看得见的水头」，不用剧本 f.path
+  const markerAt = flood ? visibleFrontS(flood, f.ratio, channel.lengthM)
+                         : f.path * channel.lengthM;
+  const markerPath = markerAt / channel.lengthM;
 
   // 三维只「演」论文的时间线，不产出数字
-  hazardMat.uniforms.uFront.value = f.path;
+  hazardMat.uniforms.uFront.value = markerPath;
   hazardMat.uniforms.uGain.value = clamp((f.s.q - 0.31) / 18.5, 0, 1) * 0.22;
   // 到场时间场按 390 s 口径生成；把演示比例映射到该口径，情景只改变演进快慢
   flowUniforms.uTime.value = f.ratio * FIELD_T_SCALE;
-  // 洪水实景层：宏观水位取论文表 4 平均流深（口径 B），到达时间沿用既有真实场
-  if (flood) flood.setFrame(f.ratio, f.s.depth);
-
-  const c = chanAt(f.path * channel.lengthM);
+  const c = cenAt(markerAt);
   frontMarker.position.set(c.x, c.y + 95, c.z);
   frontMarker.visible = state.layers.channel && !cineCam && f.ratio < 0.999;
 
@@ -2364,16 +2439,6 @@ function refresh() {
   impactRing.visible = state.layers.lake && !cineCam && lakeK > 0.01;
   impactFill.visible = state.layers.lake && !cineCam && lakeK > 0.01;
 
-  // OSM 建筑按论文「27 处被夷平」做示意损毁：只做下沉/换色，不改真实轮廓
-  const hitK = clamp((f.ratio - 0.985) / 0.015, 0, 1);
-  buildings.forEach(m => {
-    const u = m.userData;
-    const k = clamp((hitK - u.delay * 0.35) / 0.65, 0, 1);
-    m.position.y = -u.hh * 0.62 * k;         // 几何本身已平移到 baseY
-    m.rotation.z = 0.16 * k * (u.delay > 0.5 ? 1 : -1);
-    // 按材质命名约定整组切换损毁色板；换成 GY_damage 后窗格 shader 自然不再生效
-    applyDamage(m, k);
-  });
 
   if (f.stageIdx !== lastStageIdx) {
     if (lastStageIdx >= 0) onStageChange(f.stageIdx, f);
@@ -2429,12 +2494,10 @@ function loop(now) {
   // 近景（<4 km）改用真实遮挡并淡出，否则几百米宽的叠加层会把口岸建筑与岸边糊住。
   const camDist = camera.position.distanceTo(controls.target);
   const nearK = clamp((9000 - camDist) / 5000, 0, 1);
-  // 文献淹没范围：近景只留描边（填充 4%），拉远到 8 km 才铺到 13%。
-  // 不这么分档，2 km 以内的跟拍会被 19% 的填充糊成一整片蓝膜。
-  if (flood && flood.extentMat) {
-    flood.extentMat.uniforms.uFillA.value =
-      0.04 + 0.09 * clamp((camDist - 2500) / 5500, 0, 1);
-  }
+  // 淹没范围（2026-11-14 用户要求）：只留线框，不要填充色。
+  // 原来按视距给 4%~13% 的蓝色底膜，近景会把整条谷道糊成一片；
+  // 这里每帧把 uFillA 钉为 0，防止别处再把它调回来。
+  if (flood && flood.extentMat) flood.extentMat.uniforms.uFillA.value = 0;
   hazardShared.uWidthBoost.value = clamp((camDist - 9000) / 9000, 0, 1) * 110;
   // applyLayers 只在图层切换时调用，播放开始/结束不会触发，
   // 所以每帧统一同步一次「沉浸式跟拍」的可见性。
@@ -2542,15 +2605,14 @@ function fatal(err) {
 async function boot() {
   await loadAssets();
   initScene();
-  // 程序化资产层：距离场先于地形材质编译，立面窗格注入到色板里的 GY_wall
+  // 程序化资产层：距离场先于地形材质编译
   buildBankField();
-  attachFacade(material('GY_wall'), facadeUniforms);
   buildTerrain();
   buildSkirt();
   await buildFlowField();
+  buildHazardCenter();        // 先把中轴线居中，后面画线 / 定节点 / 烘机位都用它
   buildChannelLine();
   buildHazardStrip();
-  buildOSMBuildings();
   buildGlacier();
   buildIceTrack();
   buildLakeAndImpact();
@@ -2561,7 +2623,6 @@ async function boot() {
     'anchor_terrain', 'anchor_contour', 'anchor_channel', 'anchor_hazard',
     'anchor_front', 'anchor_flow', 'anchor_glacier', 'anchor_lake', 'anchor_nodes',
   ]);
-  buildings.forEach(g => assertAnchors(g, [g.userData.anchorName]));
   buildUI();
   bindEvents();
   cesiumFrame = $('cesium-frame');
@@ -2576,29 +2637,69 @@ async function boot() {
   }
   const initTotal = computeFrame(0, state.vol).total;
   const qT = parseFloat(qs.get('t'));
-  if (Number.isFinite(qT)) { state.t = clamp(qT, 0, initTotal); introMode = false; }
+  if (Number.isFinite(qT)) state.t = clamp(qT, 0, initTotal);
   lastStageIdx = stageIndexAt(state.t / initTotal);
   applyLayers();
   drawSpark();
   refresh();
   // 就绪只报一行：网格尺寸等实现细节已写进「数据与说明」，不再刷满状态行
-  pushLog(`实景三维就绪：真实 DEM + Esri 卫星影像 + OSM 建筑 ${buildings.length} 栋 + 洪水演进层（GPU ${FLOOD_CONSTANTS.SW}×${FLOOD_CONSTANTS.SH}），左键旋转 · 滚轮按光标位置缩放。`, 'info', state.t);
+  pushLog(`实景三维就绪：真实 DEM + Esri 卫星影像 + 洪水演进层（GPU ${FLOOD_CONSTANTS.SW}×${FLOOD_CONSTANTS.SH}），左键旋转 · 滚轮按光标位置缩放。`, 'info', state.t);
   // ?engine=cesium 直接用三维地球视图打开（截图验收 / 分享指定帧）
   if (qs.get('engine') === 'cesium') setEngine('cesium');
-  // 航拍 / 跟拍 / 定点构图都是「已开演」的验收态，顶部直接进阶段播报，
-  // 否则分享出去的帧会出现「标题介绍 + 跟拍画面」的不一致。
-  if (qs.get('cine') === '1' && qs.get('engine') !== 'cesium') { introMode = false; enableCine(true); }
+  if (qs.get('cine') === '1' && qs.get('engine') !== 'cesium') enableCine(true);
   // ?follow=1 静态进入全链条跟拍（不自动播放时间），供多时刻构图验收
   if (qs.get('follow') === '1' && qs.get('engine') !== 'cesium') {
-    introMode = false; state.playing = false; autoFly = true; followSnap = true;
+    state.playing = false; autoFly = true; followSnap = true;
   }
   // ?rig=后退弧长,横向偏移,离水面高度,瞄准前移 —— 构图验收定点入口（不影响默认播放）
   const qRig = (qs.get('rig') || '').split(',').map(Number);
   if (qRig.length === 4 && qRig.every(Number.isFinite) && qs.get('engine') !== 'cesium') {
-    introMode = false; rigStatic = true; rigPending = qRig;   // 延后一帧，等 flood 视距参数随相机稳定
+    rigStatic = true; rigPending = qRig;   // 延后一帧，等 flood 视距参数随相机稳定
   }
   window.__rigPlace = placeRigAt;
   window.__rigPlaceInfo = () => rigPlaceInfo;
+  /* 前锋/水体体检（2026-11-14）：沿**居中中轴线**逐 100 m 采水深，
+     报「真实湿头在哪、湿带纵向多长、落进画面的占多少」——
+     这是「镜头有没有完整框住演进体」的直接判据，不依赖肉眼。
+     同时给前锋球、机位锚点、湿头三者的里程，方便看口径是否对齐。 */
+  window.__frontAudit = () => {
+    const f = flood; if (!f || !f.channel) return null;
+    const L = f.channel.lengthM, pk = Math.max(f.peak || 1, 1e-3);
+    camera.updateMatrixWorld(true);
+    camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+    const pv = new THREE.Vector3();
+    let first = -1, last = -1, wet = 0, n = 0, inView = 0;
+    let y0 = 9, y1 = -9;
+    const rows = [];
+    for (let s = 0; s <= L; s += 100) {
+      const c = cenAt(s), w = f.waterY(c.x, c.z, f.tField);
+      const isWet = w.h / pk > 0.005;
+      n++;
+      if (isWet) {
+        wet++;
+        if (first < 0) first = s;
+        last = s;
+        pv.set(c.x, w.y, c.z).project(camera);
+        const ok = !(pv.z > 1 || Math.abs(pv.x) > 1 || Math.abs(pv.y) > 1);
+        if (ok) { inView++; y0 = Math.min(y0, pv.y); y1 = Math.max(y1, pv.y); }
+        if (s % 500 === 0) {
+          const sr = f.sampleSrc(c.x, c.z);
+          rows.push({ s, T: +sr.T.toFixed(0), pot: +sr.pot.toFixed(2),
+                      h: +(w.h / pk).toFixed(3), p: [Math.round(c.x), Math.round(w.y), Math.round(c.z)],
+                      ndc: [+pv.x.toFixed(2), +pv.y.toFixed(2)], ok });
+        }
+      }
+    }
+    return {
+      t: +state.t.toFixed(1), frontS: Math.round(f.frontS),
+      ballS: Math.round(f.frontPathAt(f.tField / FLOOD_CONSTANTS.T_FIELD) * L),
+      rigS: Math.round(rig.s),
+      wetFirst: first, wetLast: last, wetSamples: wet, of: n,
+      wetInView: inView,
+      screenFill: +(Math.max(0, Math.min(y1, 1) - Math.max(y0, -1)) / 2).toFixed(2),
+      rows,
+    };
+  };
   // 构图诊断：逐点输出 rigFill 的采样结果（相对水深 + 投影 NDC），
   // 用来定位「fill 恒为 0」到底是湿点判定没过、还是投影落到画面外。
   window.__rigFillDiag = (halfW = 90) => {
@@ -2623,11 +2724,100 @@ async function boot() {
     return { s: Math.round(rig.s), halfW, peak: +pk.toFixed(1), fill: rig.fill,
              back: Math.round(rig.back), pts };
   };
+  /* 构图评分（2026-11-14）：把机位沿烘焙轨迹平移 ds，沿沟道 ±2.4 km、横向 ±500 m
+     取 5×24 个采样点，统计「有水且落进画面」的比例与占画高。
+     这是「镜头有没有框住演进体」的可比较量，比肉眼看截图可靠。
+     用法：__frameScore([-1600,-800,0,800]) */
+  window.__frameScore = (dsList = [0]) => {
+    const f = flood; if (!f || !f.channel) return null;
+    const L = f.channel.lengthM, pk = Math.max(f.peak || 1, 1e-3);
+    const cs = v => Math.max(0, Math.min(L, v));
+    const pv = new THREE.Vector3(), out = [];
+    const saveP = camera.position.clone(), saveT = controls.target.clone();
+    for (const ds of dsList) {
+      const s = cs((rig.s || 0) + ds);
+      if (!rigSample(rig.mode || 'follow', s, rig.pos, rig.aim)) continue;
+      camera.position.copy(rig.pos);
+      controls.target.copy(rig.aim);
+      camera.lookAt(controls.target);
+      camera.updateMatrixWorld(true);
+      camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+      let wet = 0, inv = 0;
+      let y0 = 9, y1 = -9, xw0 = 9, xw1 = -9;
+      for (let i = 0; i < 24; i++) {
+        const ss = cs(s - 2400 * i / 23);
+        const c = cenAt(ss), tg = rigTangent(ss, f, L);
+        for (const lat of [-500, -250, 0, 250, 500]) {
+          const x = c.x - tg.z * lat, z = c.z + tg.x * lat;
+          const w = f.waterY(x, z, f.tField);
+          if (w.h / pk < 0.004) continue;
+          wet++;
+          pv.set(x, w.y, z).project(camera);
+          if (pv.z > 1 || Math.abs(pv.x) > 1 || Math.abs(pv.y) > 1) continue;
+          inv++;
+          y0 = Math.min(y0, pv.y); y1 = Math.max(y1, pv.y);
+          xw0 = Math.min(xw0, pv.x); xw1 = Math.max(xw1, pv.x);
+        }
+      }
+      out.push({
+        ds, s: Math.round(s), wet, inView: inv,
+        pct: wet ? +(inv / wet).toFixed(2) : 0,
+        fill: +(Math.max(0, Math.min(y1, 1) - Math.max(y0, -1)) / 2).toFixed(2),
+        xspan: +Math.max(0, xw1 - xw0).toFixed(2),
+      });
+    }
+    camera.position.copy(saveP); controls.target.copy(saveT);
+    camera.lookAt(saveT); camera.updateMatrixWorld(true);
+    return out;
+  };
+  /* 横断面湿边（2026-11-14）：沿沟道每 200 m 取 5 个横向点，报「几个点有水」。
+     为什么不能只看中线：到达时间场是「最近沟道点 + 横向延迟」铺的，中线附近
+     单点会有 ±150 s 的孤岛噪声（实测 s=12 000 m 处 T=290 s，两侧 151/158 s），
+     单点判定会把湿边读偏 1~2 km。断面多数点有水才算湿，稳得多。 */
+  window.__wetEdge = () => {
+    const f = flood; if (!f || !f.channel) return null;
+    const L = f.channel.lengthM, pk = Math.max(f.peak || 1, 1e-3);
+    const cs = v => Math.max(0, Math.min(L, v));
+    const s0 = cs(f.frontS || 0), rows = [];
+    for (let s = cs(s0 - 3200); s <= cs(s0 + 600); s += 200) {
+      const c = cenAt(s), tg = rigTangent(s, f, L);
+      let wet = 0, hmax = 0;
+      for (const lat of [-600, -300, 0, 300, 600]) {
+        const w = f.waterY(c.x - tg.z * lat, c.z + tg.x * lat, f.tField);
+        const hp = w.h / pk;
+        if (hp > 0.004) wet++;
+        hmax = Math.max(hmax, hp);
+      }
+      rows.push({ s: Math.round(s), wet, hmax: +hmax.toFixed(2) });
+    }
+    return { frontS: Math.round(s0), rows };
+  };
+  /* 前锋球体检：按时间顺序走一遍，看球是否单调前进、离可见水头多远。 */
+  window.__ballAudit = () => {
+    const f = window.__flood; if (!f) return null;
+    const L = f.channel.lengthM, pk = Math.max(f.peak || 1, 1e-3), save = f.tField;
+    const rows = [];
+    for (const r of [0.05, 0.15, 0.3, 0.45, 0.6, 0.75, 0.9, 0.99]) {
+      f.setFrame(r, 47.5, false);
+      const s = visibleFrontS(f, r, L);
+      const c = cenAt(s), n = cenAt(Math.min(L, s + 100));
+      const dx = n.x - c.x, dz = n.z - c.z, d = Math.hypot(dx, dz) || 1;
+      let mx = 0;
+      for (const o of [-180, 0, 180]) {
+        mx = Math.max(mx, f.waterY(c.x - dz / d * o, c.z + dx / d * o, f.tField).h / pk);
+      }
+      rows.push({ r, ball: Math.round(s), script: Math.round(f.frontS),
+                  gap: Math.round(f.frontS - s), hAtBall: +mx.toFixed(2) });
+    }
+    f.setFrame(save / FLOOD_CONSTANTS.T_FIELD, 47.5, false);
+    return rows;
+  };
   window.__flood = flood;   // 诊断出口：供无头浏览器做分层性能与水文复算
   // 镜头诊断：验证「用户拖动后不再被抢回」与「相机离地余量恒为正」
   window.__cam = () => {
     const f = computeFrame(state.t, state.vol);
-    const c = chanAt(f.path * channel.lengthM);
+    // 诊断以「球的实际位置」为准，别再用剧本 f.path（球现在跟可见水头）
+    const c = cenAt(markerS >= 0 ? markerS : f.path * channel.lengthM);
     const hz = new THREE.Vector3(c.x, c.y + 100, c.z);
     const wh = flood && flood.frontHint ? flood.frontHint() : null;
     const whv = wh ? new THREE.Vector3(wh.x, wh.y + 40, wh.z) : hz;
@@ -2650,6 +2840,8 @@ async function boot() {
       leftButton: controls.mouseButtons.LEFT,
       ground: +g.toFixed(1),
       clearance: +(camera.position.y - g).toFixed(1),
+      // 机位烘焙状态：step>0 表示走的是查表路径；side 是全程固定的侧向
+      rig: rig.dbg,
       // 灾害体是否在视锥内、以及轨道中心离灾害多远 —— 「看得到灾害」的定量判据
       hazard: { x: +c.x.toFixed(1), y: +c.y.toFixed(1), z: +c.z.toFixed(1),
                 path: +f.path.toFixed(3) },
@@ -2662,8 +2854,9 @@ async function boot() {
       waterHeadInView: fr.containsPoint(whv),
       targetToWaterHead: +controls.target.distanceTo(whv).toFixed(1),
       camToWaterHead: +camera.position.distanceTo(whv).toFixed(1),
-      // 两套前锋口径的水平差距（诚实暴露数据口径不一致）
+      // 球（可见水头）与剖面到达时间等值线的水平差距
       frontGap: wh ? +Math.hypot(c.x - wh.x, c.z - wh.z).toFixed(1) : null,
+      ballS: Math.round(markerS), scriptS: Math.round(f.path * channel.lengthM),
       rig: rig.dbg || null,
     };
   };
@@ -2785,7 +2978,7 @@ async function boot() {
              sWet1: wetS.length ? Math.round(wetS[wetS.length - 1]) : null,
              frontGap: Math.round(sFront - s0), pts: pts.length, wetPts, rows };
   };
-  /* 洪水航拍构图与遮挡审计（2026-11-13 优化前基线）。
+  /* 洪水航拍 / 跟着推演镜头的构图与遮挡审计（2026-11-13 优化前基线）。
      按 RIG[mode] 的公式在多个时刻**复算**机位（不动真实相机、不动播放状态），
      输出俯角、斜距、离地、水头是否入画、视线被山体切断的采样点数、湿带占画高。
      用途：改参数前后各跑一次做 A/B —— 只看截图在 SwiftShader 下既慢又会漏判遮挡。 */
@@ -2852,15 +3045,16 @@ async function boot() {
     return rows;
   };
   /* 航拍机位离线审计（2026-11-13）：不渲染、不依赖帧率 —— 沿烘焙轨迹按 20 m 采样，
-     报「位移曲率 / 俯角 / 斜距 / 离地 / 视线遮挡」。SwiftShader 只有 ~1 fps 时，
-     用连续帧位移测抖动是假指标（4x 速下一帧位移 1.7 km），这套离线量才是直接判据。 */
+     报「位移曲率 / 俯角 / 斜距 / 离地 / 视线遮挡 / 湿区是否在视锥内」。
+     SwiftShader 只有 ~1 fps 时，用连续帧位移测抖动是假指标（4x 速下一帧位移 1.7 km），
+     这套离线量才是「机位本身抖不抖、能不能看到水」的直接判据。 */
   window.__rigAudit = (mode = 'cine') => {
     const f = flood; if (!f || !f.chanAt) return { err: 'no flood' };
     RIG_PATH[mode] = null;
     const pth = bakeRig(mode);
     if (!pth) return { err: 'bake failed' };
     const L = f.channel.lengthM, ds = 20;
-    const P = new THREE.Vector3(), T = new THREE.Vector3();
+    const P = new THREE.Vector3(), T = new THREE.Vector3(), V = new THREE.Vector3();
     const pos = [], tgt = [], rows = [];
     for (let s = 0; s <= L; s += ds) {
       rigSample(mode, s, P, T); pos.push(P.clone()); tgt.push(T.clone());
@@ -2870,23 +3064,32 @@ async function boot() {
     const curv = [];
     for (let i = 1; i < steps.length; i++) curv.push(Math.abs(steps[i] - steps[i - 1]));
     const mean = a => a.reduce((x, y) => x + y, 0) / Math.max(a.length, 1);
-    let blk = 0;
-    const pitch = [], dist = [];
+    camera.updateMatrixWorld(true);
+    camera.matrixWorldInverse.copy(camera.matrixWorld).invert();
+    const fr = new THREE.Frustum().setFromProjectionMatrix(
+      new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    let blk = 0, inViewN = 0;
+    const pitch = [];
     for (let k = 0; k < pos.length; k++) {
+      const s = Math.min(k * ds, L), c = f.chanAt(s);
+      const w = f.waterY(c.x, c.z, f.tField);
       const los = losPenalty(pos[k].x, pos[k].y, pos[k].z, tgt[k].x, tgt[k].y, tgt[k].z);
       if (los > 4) blk++;
+      V.set(c.x, Math.max(w.y, c.y) + 10, c.z);
+      if (fr.containsPoint(V)) inViewN++;
       const hz = Math.hypot(pos[k].x - tgt[k].x, pos[k].z - tgt[k].z);
       const pt = Math.atan2(pos[k].y - tgt[k].y, Math.max(hz, 1)) * 180 / Math.PI;
-      pitch.push(pt); dist.push(pos[k].distanceTo(tgt[k]));
-      if (k % 25 === 0) rows.push({ s: Math.round(k * ds), pitch: +pt.toFixed(1),
-        dist: +dist[k].toFixed(0),
-        clear: +(pos[k].y - groundAt(pos[k].x, pos[k].z)).toFixed(0), los: Math.round(los) });
+      pitch.push(pt);
+      if (k % 25 === 0) rows.push({ s: Math.round(s), pitch: +pt.toFixed(1),
+        dist: +pos[k].distanceTo(tgt[k]).toFixed(0),
+        clear: +(pos[k].y - groundAt(pos[k].x, pos[k].z)).toFixed(0),
+        los: Math.round(los), view: fr.containsPoint(V) ? 1 : 0 });
     }
     return { mode, step: pth.step, side: pth.side, nodes: pth.n,
              d1mean: +mean(steps).toFixed(2), d1max: +Math.max(...steps).toFixed(1),
              curveMean: +mean(curv).toFixed(3), curveMax: +Math.max(...curv).toFixed(2),
              blocked: blk, nodesTot: pos.length,
-             distMin: +Math.min(...dist).toFixed(0), distMax: +Math.max(...dist).toFixed(0),
+             inViewPct: +(100 * inViewN / pos.length).toFixed(0),
              pitchMin: +Math.min(...pitch).toFixed(1), pitchMax: +Math.max(...pitch).toFixed(1),
              pitchMean: +mean(pitch).toFixed(1), rows };
   };
@@ -2898,7 +3101,8 @@ async function boot() {
     return bakeRig('cine') ? { ok: 1, side: RIG_PATH.cine.side, n: RIG_PATH.cine.n } : { ok: 0 };
   };
   /* 真实跑一遍 cine 机位（含遮挡回避）：直接推 updateCineCamera 若干步让 lerp 收敛，
-     不渲染、不动播放状态。用来验证「避让到底有没有把视线打通」。 */
+     不渲染、不动播放状态。用来验证「避让到底有没有把视线打通」——
+     __cineAudit 只算基准机位，测不到换边/抬高/推近之后的结果。 */
   window.__cineRun = (ts = [60, 120, 180, 240, 300, 360, 420, 480]) => {
     const f = flood;
     if (!f || !f.chanAt) return { err: 'no flood' };
@@ -2913,6 +3117,8 @@ async function boot() {
       rig.snap = true; cineSnap = true;
       for (let i = 0; i < 90; i++) {
         updateCineCamera(0.05);
+        // 摇臂过渡按墙钟计时，同步循环里几乎不动 —— 每步强制标记为「已过渡完」，
+        // 否则相机永远停在 intro 起点（上一版就是这个原因，测出来还停在全景位）。
         rig.intro0 = performance.now() - 10000; rig.introT = 1;
       }
       const c = camera.position;
@@ -2933,8 +3139,8 @@ async function boot() {
     cineCam = saveCine; rig.mode = saveMode; rig.snap = true;
     return rows;
   };
-  // 首屏就用全景取景（?rig= 定点验收时不抢相机）
-  if (!rigStatic) applyOverviewCam(false);
+  // 首屏 = 打开系统时的默认斜侧机位（与「重置视角」一致）；俯视全景要点按钮
+  if (!rigStatic) applyOverviewCam(false, DEFAULT_POSE);
   // 沟道端点 / 场景尺寸：给「重置视角」取景与外部验收用（不是给页面用的）
   window.__chan = () => {
     const n = chanPts.length;
@@ -2959,6 +3165,10 @@ async function boot() {
              scale: +glacierGroup.scale.x.toFixed(2), visible: glacierGroup.visible,
              camDist: Math.round(camera.position.distanceTo(v)),
              kids: glacierGroup.children.length,
+             parent: glacierGroup.parent ? glacierGroup.parent.type : 'NONE',
+             inScene: scene.children.includes(glacierGroup),
+             sceneKids: scene.children.length,
+             tris: renderer.info.render.triangles,
              kid0: glacierGroup.children[0] ? (() => {
                const c0 = glacierGroup.children[0];
                const wp = c0.getWorldPosition(new THREE.Vector3());
@@ -3053,16 +3263,22 @@ async function boot() {
     tCesium: +cesiumTime(computeFrame(state.t, state.vol)).toFixed(1),
     cesium: cesiumDiag,
     dem: `${meta.meshSize + 1}²`, imagery: `${texSat.image.width}×${texSat.image.height}`,
-    channelKm: channel.lengthM / 1000, osmBuildings: buildings.length,
+    channelKm: channel.lengthM / 1000,
     grid: GRID, flowGrid: `${FIELD_GX}×${FIELD_GY}`,
     bank: `${bankField.width}×${bankField.height}`, bankOn: bankUniforms.uBankOn.value,
-    facadeOn: facadeUniforms.uFacadeOn.value, sculpts: diagnose(),
-    bldFocus: bldFocus && { count: bldFocus.count, x: Math.round(bldFocus.x), z: Math.round(bldFocus.z) },
+    sculpts: diagnose(),
     widthBoost: +hazardShared.uWidthBoost.value.toFixed(1),
     hazardAlpha: +hazardShared.uAlpha.value.toFixed(3),
     t: Math.round(state.t), path: +computeFrame(state.t, state.vol).path.toFixed(3),
     hazardFront: +hazardMat.uniforms.uFront.value.toFixed(3),
     hazardVisible: hazardMesh.visible,
+    // 前锋符号的实际缩放/距离 —— 「那个橙色大盘子有多大」的定量出口
+    fm: { scale: +frontMarker.scale.x.toFixed(4), visible: frontMarker.visible,
+          dist: Math.round(camera.position.distanceTo(frontMarker.position)),
+          pos: [Math.round(frontMarker.position.x), Math.round(frontMarker.position.y),
+                Math.round(frontMarker.position.z)],
+          camPos: [Math.round(camera.position.x), Math.round(camera.position.y),
+                   Math.round(camera.position.z)] },
     hazardDepthTest: hazardMat.depthTest,
     hazardVerts: hazardMesh.geometry.attributes.position.count,
     hazardYRange: (() => {

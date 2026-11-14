@@ -5,27 +5,31 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>吉隆「8·26」冰岩崩—泥石流灾害链</title>
 <link rel="icon" href="data:," />
-<link rel="stylesheet" href="./styles.css?v=20261111d" />
+<link rel="stylesheet" href="./styles.css?v=20261114r" />
 
 <style id="embedded-mode">
-/* 系统内嵌模式：上方 120px 系统导航已是页面唯一导航条。演示页不再用顶栏横带
-   （横贯全宽 + 独占一行，既压低地图又像第二条导航）。整条 .topbar 内嵌下隐藏，
-   #app 只留一行，地图从视口顶部直接铺满。
-   品牌四要素（方块图标 / 主标题 / 副标题 / 演示级徽章）没有丢——它们移到画面
-   顶部的 HUD 位，作为「未开始推演」的默认态；点播放/选阶段/拖时间轴后，
-   该位置切换为阶段播报。独立预览模式（不带 embedded）完全不受影响。 */
+/* 系统内嵌模式：隐藏演示页顶栏，案例名称框放到左浮层最上面
+   （「推演阶段」卡之上），阶段播报留在画布左上、工具条靠右。
+   标题框不再带「演示级」徽章，副标题只保留河流链。 */
 body.embedded #app { grid-template-rows: minmax(0, 1fr); }
 body.embedded .topbar { display: none; }
 
-/* 默认态：演示介绍占住 stage-top 的 HUD 位，与工具条同行、不压地图 */
-.stage-intro {
-  flex: 0 1 auto; min-width: 0; max-width: 600px;
-  display: flex; align-items: flex-start; gap: 10px;
-  background: rgba(10, 20, 36, .84); border: 1px solid rgba(47, 69, 100, .9);
-  border-left: 3px solid var(--ice); border-radius: 6px; padding: 8px 12px;
-  pointer-events: none; z-index: 3; backdrop-filter: blur(8px);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, .38);
+/* 案例名称框：放在左浮层最上面、「推演阶段」卡之上（2026-11-14 用户要求）。
+   独立预览由 topbar 承担品牌，这里只在内嵌模式显示，避免两块标题重复。 */
+.stage-left {
+  display: flex; flex-direction: column; gap: 6px;
+  flex: 0 1 auto; min-width: 0; max-width: 430px;
 }
+body.embedded .stage-hud { max-width: 430px; }
+
+.stage-intro {
+  display: none; align-items: flex-start; gap: 9px;
+  flex: 0 0 auto; width: 100%; min-width: 0;
+  background: var(--surface); border: 1px solid var(--line-2);
+  border-left: 3px solid var(--ice); border-radius: var(--radius);
+  padding: 9px 10px; box-shadow: 0 8px 30px rgba(0, 0, 0, .38);
+}
+body.embedded .stage-intro { display: flex; }
 .intro-mark {
   width: 26px; height: 26px; border-radius: 7px; flex: 0 0 auto; margin-top: 1px; position: relative;
   background: rgba(59, 130, 246, .18); border: 1px solid rgba(125, 211, 252, .45);
@@ -41,12 +45,11 @@ body.embedded .topbar { display: none; }
   margin: 0; display: flex; align-items: center; gap: 7px; letter-spacing: 0;
   font-size: 13px; font-weight: 500; color: #eaf3ff; text-shadow: none;
 }
-.intro-text h1 .badge { display: inline-block; vertical-align: middle; font-size: 9px; padding: 1px 6px; }
 .intro-text p {
   margin: 4px 0 0; font-size: 10.5px; line-height: 1.45; color: var(--ink-3);
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
 }
-@media (max-width: 1180px) { .stage-intro { max-width: 340px; } .intro-text p { display: none; } }
+@media (max-width: 1180px) { .intro-text p { display: none; } }
 </style>
 <script>
 if (new URLSearchParams(location.search).get('embedded') === '1') {
@@ -63,8 +66,8 @@ if (new URLSearchParams(location.search).get('embedded') === '1') {
     <div class="brand">
       <span class="brand-mark"></span>
       <div class="brand-text">
-        <h1>吉隆「8·26」冰岩崩—泥石流灾害链 · 数字孪生推演<em class="badge">演示级</em></h1>
-        <p>错坚河 → 普热普强藏布 → 东林藏布 → 吉隆口岸　·　真实 DEM + 卫星影像实景三维</p>
+        <h1>吉隆「8·26」冰岩崩—泥石流灾害链 · 数字孪生推演</h1>
+        <p>错坚河 → 普热普强藏布 → 东林藏布 → 吉隆口岸</p>
       </div>
     </div>
     <div class="topbar-right">
@@ -79,6 +82,13 @@ if (new URLSearchParams(location.search).get('embedded') === '1') {
   <div class="main">
     <div class="pane left">
       <aside class="panel">
+        <div class="stage-intro" id="stage-intro">
+          <span class="intro-mark"></span>
+          <div class="intro-text">
+            <h1>吉隆「8·26」冰岩崩—泥石流灾害链</h1>
+            <p>错坚河 → 普热普强藏布 → 东林藏布 → 吉隆口岸</p>
+          </div>
+        </div>
         <section class="card">
           <h2>推演阶段</h2>
           <div id="stage-list" class="stage-list"></div>
@@ -104,25 +114,19 @@ if (new URLSearchParams(location.search).get('embedded') === '1') {
       <div id="labels" class="labels"></div>
 
       <div class="stage-top">
-        <!-- 默认态：演示介绍占住 HUD 位；点播放 / 选阶段 / 拖时间轴后切到下方阶段播报 -->
-        <div class="stage-intro hidden" id="stage-intro">
-          <span class="intro-mark"></span>
-          <div class="intro-text">
-            <h1>吉隆「8·26」冰岩崩—泥石流灾害链</h1>
-            <p>错坚河 → 普热普强藏布 → 东林藏布 → 吉隆口岸</p>
+        <!-- 阶段播报留在画布左上，工具条靠右 -->
+        <div class="stage-left">
+          <div class="stage-hud" id="stage-hud">
+            <div class="hud-head">
+              <span class="hud-idx" id="hud-idx">1/8</span>
+              <span class="hud-name" id="hud-stage">高位冰岩体失稳</span>
+            </div>
+            <p class="hud-desc" id="hud-desc">源区约 5150 m 高位冰岩体整体失稳</p>
           </div>
-        </div>
-        <div class="stage-hud hidden" id="stage-hud">
-          <div class="hud-head">
-            <span class="hud-idx" id="hud-idx">1/8</span>
-            <span class="hud-name" id="hud-stage">高位冰岩体失稳</span>
-          </div>
-          <p class="hud-desc" id="hud-desc">源区约 5150 m 高位冰岩体整体失稳</p>
         </div>
         <div class="stage-tools">
-          <button id="btn-reset" class="tool">重置视角</button>
           <button id="btn-rotate" class="tool">自动旋转</button>
-          <button id="btn-port" class="tool">口岸聚落</button>
+          <button id="btn-reset" class="tool">重置视角</button>
           <button id="btn-ov" class="tool">全景机位</button>
           <button id="btn-flood" class="tool">洪水航拍</button>
           <button id="btn-autocam" class="tool cesium-only">自动运镜</button>
@@ -234,26 +238,26 @@ if (new URLSearchParams(location.search).get('embedded') === '1') {
       <li><b>影像</b>：<code>data/texture.jpg</code>，8192×4617 Esri World Imagery 离线拼图，直接披在真实地形上；关闭「卫星影像」图层可切到同区域的 DEM 山体晕渲图。</li>
       <li><b>沟道</b>：<code>data/channel.json</code>，DEM 受限最小代价路径（严格限制爬升、沿谷底单调下降）算出的 22 km 真实谷底线，5197 m → 1789 m。灾害体、节点标记、前锋位置全部沿这条真实沟道定位。</li>
       <li><b>淹没场</b>：<code>arrival.bin / depth.bin</code>，512×289 的到达时间与最大流深场（项目既有的一维沿程模型按横向衰减铺成，<b>非二维数值解</b>）。沿程到达时间 0→390 s 来自 <code>model.json</code> 一维剖面，横向按 6 m/s 漫流延迟；全幅仅约 1.57% 格点会湿（沿沟道 340 m 窄带）。实景洪水层复用同一份数据做宏观约束，不改动这两个文件。</li>
-      <li><b>建筑</b>：<code>osm_buildings.geojson</code>，OSM 实测建筑轮廓按真实经纬度挤出体块，不是随机布点，也不是倾斜摄影模型（没有立面纹理）。</li>
+      <li><b>建筑轮廓（只作阻力场）</b>：<code>osm_buildings.geojson</code> 仍作为 OSM 实测轮廓读入，用于洪水层的语义粗糙度与阻力分区；<b>本页不再生成三维建筑体块</b>，画布工具条也不再提供聚落近景入口。</li>
       <li><b>水面法线</b>：<code>lib/water/Water_1_M_Normal.jpg</code> / <code>Water_2_M_Normal.jpg</code>，取自 three.js r160 官方示例素材（MIT），各 512×512，<b>本地存放、运行时不联网</b>；法线是数据贴图，按 <code>NoColorSpace</code> 加载，不做 sRGB 解码。</li>
       <li>以上 DEM / 影像 / 沟道 / 建筑数据均从项目已有的 <code>webgis_frontend/terrain3d/</code> 只读复制一份到本目录 <code>data/</code>，源文件未改动；水面法线贴图是唯一外部新增素材。</li>
     </ul>
 
     <h3>两种实景视图</h3>
     <ul>
-      <li><b>本地实景沙盘（Three.js r160，默认视图）</b>：把 1001² DEM 直接生成网格，8192×4617 Esri 影像披在地形上；灾害带沿 22 km 实测沟道推进；建筑为 OSM 真实轮廓挤出并有程序化立面，岸边细节由着色器按沟道距离生成。适合快速俯瞰全链条与展示相态演进。</li>
+      <li><b>本地实景沙盘（Three.js r160，默认视图）</b>：把 1001² DEM 直接生成网格，8192×4617 Esri 影像披在地形上；灾害带沿 22 km 实测沟道推进；岸边细节由着色器按沟道距离生成。适合快速俯瞰全链条与展示相态演进。</li>
       <li><b>三维地球 · Cesium</b>：复用项目已有的 <code>gyirong_cesium.html</code> 实景推演（本目录生成 <code>cesium_embed.html</code>）。按<b>真实经纬度</b>加载 DEM 高度图地形、z11–z16 离线 Esri 影像金字塔、63 帧泥石流场次、11 个 glTF 建筑模型；含冰崩碎屑、粉尘、建筑冲毁倾倒、口岸泥流堆积体、0.7 km² 受灾范围、普热普强藏布堰塞湖与自动运镜。适合看真实地理关系与口岸近景。</li>
       <li>两个视图共用同一条时间轴、同一套论文表 2 / 表 4 数值、8 阶段剧本与情景滑块。时间映射：演示进度比例 × 505 s（Cesium 页基准到达历时 500 s），因此基准工况 1.8 亿 m³ 下两视图时刻严格对齐；改变物源规模时，Cesium 侧按总历时等比缩放，<b>空间场不重算</b>。</li>
-      <li>图层开关中「卫星影像 / 演进沟道 / 灾害体推进 / 洪水淹没场 / OSM 建筑 / 冰川源区 / 堰塞水体 / 地名标签」同步作用于 Cesium 视图；「等高线 / 节点标记 / 立面窗格 / 岸边细节 / 碎冰 / 飞溅」为本地沙盘专有，切换到三维地球时置灰。</li>
+      <li>图层开关中「卫星影像 / 演进沟道 / 灾害体推进 / 洪水淹没场 / 冰川源区 / 堰塞水体 / 地名标签」同步作用于 Cesium 视图；「等高线 / 节点标记 / 岸边细节 / 碎冰 / 飞溅」为本地沙盘专有；Cesium 视图的 glTF 建筑仍由三维地球页自身控制，切换到三维地球时置灰。</li>
       <li>Cesium 视图默认 <b>22 km 全景俯视</b>；点画布右上「自动运镜」切换为跟随前锋的分段近景（源区俯瞰 → 沿沟跟拍 → 口岸冲击），画布右上的「重置视角」先停掉运镜再回全景。近景需加载 z15/z16 影像瓦片，低配或软件渲染环境下收敛较慢，全景可最快呈现完整彩色实景。</li>
       <li>Cesium 视图为懒加载：首次切换才创建 WebGL 上下文，切回本地沙盘会暂停其渲染，避免两个上下文同时抢 GPU。嵌入视图相对原页另外关掉了天空雾与谷雾 sprite、放宽了瓦片屏幕误差，以免白幕盖住卫星影像。</li>
     </ul>
 
     <h3>程序化建模：这次沿用了什么</h3>
     <ul>
-      <li><b>输出契约</b>（学习材料 ① img2threejs 的思路）：<code>proc.js</code> 让灾害要素由一份 <code>spec</code> 生成<b>可编辑的 <code>THREE.Group</code></b>，组内挂 <code>userData.sculptRuntime</code> 与 <code>anchor_</code> 空物体；材质按命名约定从色板取，损毁整组切色板，锚点缺失直接抛错。目前 OSM 建筑与源区冰岩块两类资产共用这一工厂。<b>说明</b>：这里沿用其方法与输出契约，<b>并未运行 img2threejs 工具本身</b>。</li>
-      <li><b>着色器画细节，而不是堆贴图</b>（材料 ② 防汛白模沙盘 + ④ GPU 高度场）：<code>buildDistanceField()</code> 把「到 22 km 实测沟道的最短距离」烤成 768×432 距离场，地形片元着色器按距离合成常水位河面、岸线泡沫带、砾石滩、河岸植被色带与流向 V 形箭头，全由 <code>uBankOn / uBankTime</code> 控制，<b>不新增几何体、不下载贴图</b>。建筑窗格同理，用挤出几何侧面 UV 在 GLSL 里画楼层线与窗格。</li>
-      <li><b>轮廓与可读性</b>：屋顶 / 墙面靠 <code>ExtrudeGeometry</code> 自带的 cap / side 材质分组分开，另加基座薄台与 <code>EdgesGeometry</code> 勾边；点画布右上<b>「口岸聚落」</b>可飞到 OSM 建筑最密集的一簇看立面。灾害带在顶点着色器里按相机距离沿横向法向自适应加宽，片元里加流向箭头、两侧亮描边与脉冲前锋。</li>
+      <li><b>输出契约</b>（学习材料 ① img2threejs 的思路）：<code>proc.js</code> 让灾害要素由一份 <code>spec</code> 生成<b>可编辑的 <code>THREE.Group</code></b>，组内挂 <code>userData.sculptRuntime</code> 与 <code>anchor_</code> 空物体；材质按命名约定从色板取，损毁整组切色板，锚点缺失直接抛错。本页已不再生成三维建筑体块，该工厂的输出契约保留给独立建模实验室与后续资产。<b>说明</b>：这里沿用其方法与输出契约，<b>并未运行 img2threejs 工具本身</b>。</li>
+      <li><b>着色器画细节，而不是堆贴图</b>（材料 ② 防汛白模沙盘 + ④ GPU 高度场）：<code>buildDistanceField()</code> 把「到 22 km 实测沟道的最短距离」烤成 768×432 距离场，地形片元着色器按距离合成常水位河面、岸线泡沫带、砾石滩、河岸植被色带与流向 V 形箭头，全由 <code>uBankOn / uBankTime</code> 控制，<b>不新增几何体、不下载贴图</b>。</li>
+      <li><b>轮廓与可读性</b>：灾害带在顶点着色器里按相机距离沿横向法向自适应加宽，片元里加流向箭头、两侧亮描边与脉冲前锋。</li>
     </ul>
 
     <h3>洪水演进实景层：按资料里的方法做，不是画示意图</h3>
@@ -268,15 +272,16 @@ if (new URLSearchParams(location.search).get('embedded') === '1') {
       <li><b>真实水法线贴图 + 流向扭曲 + 近景泥浆分支</b>（②）：水面细节主来自 three.js r160 官方两张 512×512 水法线贴图，按 Valve《Portal 2》Flow 法用 <b>half-cycle 双相位混合</b>，并让第二层用 <b>1.73× 不同缩放</b>叠加打散重复；采样 uv 按<b>真实流向场</b>偏移，弯道处水纹顺着沟道走。程序化波纹只留 25% 作大尺度基底，配 <code>fwidth</code> 屏幕空间抗锯齿；噪声哈希改用<b>无三角函数</b>版本（大坐标下 <code>sin</code> 精度丢失会织出规则直角纹），相位扰动用<b>世界坐标</b>而非网格 uv。<b>近景按视距切到泥浆材质</b>：高频法线坡度衰减 78%、高光衰减 85%，改用低频悬浮泥沙斑驳表现高浓度颗粒流；远景仍是清水波光，中间连续过渡。<b>贴图缺失时自动全量回退</b>。浅水按法线偏移<b>折射采样真实 Esri 影像</b>，能透出被淹的阶地、农田与道路。</li>
       <li><b>水头泡沫 / 浪花 / 飞溅 / 扬尘</b>（②⑤）：前锋由 <code>t−T≈0</code> 自动形成一条动态带，叠加 GPU 平流泡沫、波峰破碎与湿边薄水；1 320 个 <code>THREE.Points</code> 粒子<b>只在已淹没的水头湿区</b>生成，抛物运动、落到水面或飘到干山坡即消亡（上抛高度与寿命按近景尺度收窄）。</li>
       <li><b>碎冰与冰碛物真的在翻滚、碰撞、被推着走</b>（①⑤⑥）：<code>makeSculpt(spec)</code> 生成可编辑 <code>THREE.Group</code>，480 个 <code>InstancedMesh</code> 实例。CPU 侧按到达时间梯度得到的流向场平流，速度用<b>松弛而不是赋值</b>产生惯性；浅水搁浅增摩擦、前锋湍流加大角速度；空间哈希做两两碰撞并交换角动量。块体<b>半沉</b>在水面下，高度按块体<b>移动后</b>的位置实时重采水面并做上限钳制，干区 / 出界实例直接隐藏，因此不会出现悬在半空的碎石。</li>
-      <li><b>语义粗糙度</b>（⑥）：由 OSM 建筑轮廓、地形坡度、距沟道距离烘焙分区阻力，驱动波浪注入、泡沫生成与湍流强度，不是全城一个系数。</li>
+      <li><b>语义粗糙度</b>（⑥）：由 OSM 建筑轮廓（只作阻力场、不生成体块）、地形坡度、距沟道距离烘焙分区阻力，驱动波浪注入、泡沫生成与湍流强度，不是全城一个系数。</li>
     </ul>
 
     <h3>本页做了什么，没做什么</h3>
     <ul>
-      <li><b>做了</b>：真实 DEM 起伏 + 真实卫星影像的实景三维；等高线（每 200 m 首曲线 / 1000 m 计曲线）、22 km 沟道、灾害体沿沟推进并做「冰岩屑流 → 碎屑流 → 泥石流」相态渐变、OSM 建筑（程序化立面 / 基座 / 勾边）、岸边细节、堰塞水体与受灾范围；时间轴、图层、镜头飞行、情景滑块。</li>
-      <li><b>没做</b>：不求解完整二维浅水方程 / 宾汉流体阻力，不反演物源，不计算洪峰流量与流速。洪水层的 GPU 解的是<b>线性化小振幅波方程</b>（只负责表面波动与泡沫观感），宏观淹没范围与到达时间来自既有场数据、水位包络来自论文表 4；<b>它不产出任何预测数字，也不替代工程水动力计算</b>。地形约束漫延包络、垂直放大系数、波幅、碎冰数量与粒子数量均为视觉合成参数；没有倾斜摄影 / 3D Tiles 实景模型。本地沙盘建筑是 <b>OSM 实测轮廓挤出 + 程序化立面着色</b>（这批 OSM 数据没有 <code>height / levels</code> 字段，楼高按示意层高估算并做 <b>2× 视觉放大</b>，<b>不代表真实楼高</b>），Cesium 建筑为<b>按口岸功能类型程序化重建的 glTF 示意模型</b>。<b>统一 ACES 色调映射 / SSAO / 全局距离雾本轮未做</b>：自定义 <code>ShaderMaterial</code> 不参与 three.js 的 tone mapping 与 fog chunk，直接开会让水面与山体色调不一致；SSAO 需引入后处理链，在当前软件渲染环境下代价过高。<b>二维数值解求解器原型已就绪但未接入页面</b>（<code>tools/anuga_field.py</code>，ANUGA 4.1.0）：当前网格过粗、用一次性溃决水体代替流量过程线、四壁封闭，结果未率定，<b>不可用于演示或工程判断</b>。</li>
-      <li><b>可视化约定</b>：真实高山峡谷的谷底会被山脊完全挡住，因此灾害带、沟道线、前锋标记做成不参与深度测试的「态势叠加层」，宽度为 22 km 全景下可辨而放大，<b>不代表真实淹没宽度</b>。贴地要素统一采样 321 格显示网格高度。<b>实景洪水水面相反</b>：它参与真实深度测试，会被山体与建筑正确遮挡；22 km 全景下仅按视距放大水深的<b>视觉高度</b>，KPI 数值与真实流深不变。「洪水航拍」模式会自动压低态势叠加层，并隐藏堰塞湖蓝饼、受灾范围圈、节点小球与地名标签。水面网格与地形显示网格按<b>同一条三角形对角线</b>分片线性采样，保证两层严格共面。</li>
+      <li><b>做了</b>：真实 DEM 起伏 + 真实卫星影像的实景三维；等高线（每 200 m 首曲线 / 1000 m 计曲线）、22 km 沟道、灾害体沿沟推进并做「冰岩屑流 → 碎屑流 → 泥石流」相态渐变、岸边细节、堰塞水体与受灾范围；时间轴、图层、镜头飞行、情景滑块。</li>
+      <li><b>没做</b>：不求解完整二维浅水方程 / 宾汉流体阻力，不反演物源，不计算洪峰流量与流速。洪水层的 GPU 解的是<b>线性化小振幅波方程</b>（只负责表面波动与泡沫观感），宏观淹没范围与到达时间来自既有场数据、水位包络来自论文表 4；<b>它不产出任何预测数字，也不替代工程水动力计算</b>。地形约束漫延包络、垂直放大系数、波幅、碎冰数量与粒子数量均为视觉合成参数；没有倾斜摄影 / 3D Tiles 实景模型。本地沙盘已不绘制三维建筑（OSM 轮廓仅用于阻力场），Cesium 建筑为<b>按口岸功能类型程序化重建的 glTF 示意模型</b>。<b>统一 ACES 色调映射 / SSAO / 全局距离雾本轮未做</b>：自定义 <code>ShaderMaterial</code> 不参与 three.js 的 tone mapping 与 fog chunk，直接开会让水面与山体色调不一致；SSAO 需引入后处理链，在当前软件渲染环境下代价过高。<b>二维数值解求解器原型已就绪但未接入页面</b>（<code>tools/anuga_field.py</code>，ANUGA 4.1.0）：当前网格过粗、用一次性溃决水体代替流量过程线、四壁封闭，结果未率定，<b>不可用于演示或工程判断</b>。</li>
+      <li><b>可视化约定</b>：真实高山峡谷的谷底会被山脊完全挡住，因此灾害带、沟道线、前锋标记做成不参与深度测试的「态势叠加层」，宽度为 22 km 全景下可辨而放大，<b>不代表真实淹没宽度</b>。贴地要素统一采样 321 格显示网格高度。<b>实景洪水水面相反</b>：它参与真实深度测试，会被山体正确遮挡；22 km 全景下仅按视距放大水深的<b>视觉高度</b>，KPI 数值与真实流深不变。「洪水航拍」模式会自动压低态势叠加层，并隐藏堰塞湖蓝饼、受灾范围圈、节点小球与地名标签。水面网格与地形显示网格按<b>同一条三角形对角线</b>分片线性采样，保证两层严格共面。</li>
       <li><b>水面视觉口径（演示夸张，此处显式标注）</b>：真实窄谷的湿区仅约 180 m 宽，为让它在近景跟拍里可辨，淹没势场在烘焙阶段做幂次抬升（<code>γ = 0.60</code>），<b>横向视觉展宽约 1.6×</b>；近景（视距 &lt; 900 m）同时切到<b>泥浆材质</b>——高频法线坡度衰减 78%、高光衰减 85%，改用低频悬浮泥沙斑驳表现高浓度颗粒流，远景（&gt; 2600 m）仍保留清水式波光，中间连续过渡。这两项<b>只改观感，不改空间场、水深剖面、到达时间与 KPI</b>；<b>画面里的水面宽度与泥色都不代表实测淹没边界或实测流深</b>。碎冰、飞溅粒子与刚体碰撞采样的是同一份展宽后的场，保证贴水一致。</li>
+      <li><b>口岸下游外延（演示补白，显式标注）</b>：论文图 7 的淹没包络到吉隆口岸就截止，水面会在口岸处一刀切断。为让「洪水冲出峡谷继续下泄」这件事看得见，本页沿<b>真实 DEM 谷底</b>从口岸向两侧各追一条谷底线（自动选「走得最远、且彼此差 ≥70°」的两支，实测东南向约 <b>1.65 km</b>、西向约 <b>0.54 km</b>，受台地限制），沿线补窄带水面（中段最宽约 ±380 m、末端淡出），并把这两圈一并写进「淹没范围」的描边，使其不漫出框线。<b>朝来水方向的分支被排除</b>（不往上游倒灌）；西支两侧是斜坡而非平地，为让它看得见，允许水面贴到比口岸高约 <b>150 m</b> 的坎脚（<code>?tailclimb=0</code> 可收回严格值 92 m），因此西支是「短而摊开的扇形」而非对称长支。<b>这一段不在论文图 7 的淹没范围内，属视觉外延</b>；<code>?tail=0</code> 可整段关闭。跟拍镜头仍在口岸收束，不跟随外延。</li>
       <li>页面上所有流量、流速、流深、到达时间数字均<b>引自论文表格或由其线性插值</b>，不是本页模拟产生的结果；「累计传播」按 22 km 沟道弧长比例计算，「当前高程」为真实 DEM 采样。</li>
       <li>情景推演滑块改变时间轴总历时、KPI 与演进快慢，并按表 4 平均流深<b>缩放洪水层的水位包络</b>（因此淹没范围会随物源变化）；但<b>到达时间场与二维水动力都不重算</b>，这是演示级最重要的边界。</li>
       <li>正文写「8 min 20 s 到达」，表 4 写「8 min 25 s」，存在 5 s 口径差。本页统一采用表 4 的 8 min 25 s，以保证 8 组情景系列自洽。</li>
@@ -291,7 +296,7 @@ if (new URLSearchParams(location.search).get('embedded') === '1') {
 </div>
 
 <script src="./lib/echarts.min.js"></script>
-<script type="module" src="./app.js?v=20261114e"></script>
+<script type="module" src="./app.js?v=20261114r"></script>
 <script>
 /* 面板收起 / 展开：地图全屏，左右浮层各自独立，交互不依赖 app.js 的模块加载。 */
 (function () {
