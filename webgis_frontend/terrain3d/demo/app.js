@@ -1,10 +1,9 @@
-import * as THREE from './lib/three.module.js?v=20261114u';
-import { OrbitControls } from './lib/OrbitControls.js?v=20261114u';
+import * as THREE from './lib/three.module.js?v=20261114z';
+import { OrbitControls } from './lib/OrbitControls.js?v=20261114z';
 // 程序化建模骨架：spec → 可编辑 THREE.Group + 材质色板 + 着色器画岸边/立面
-import { PALETTE, material, makeSculpt, assertAnchors, applyDamage,
-         diagnose, attachFacade, attachBank, buildDistanceField } from './proc.js?v=20261114u';
+import { material, assertAnchors, diagnose, attachBank, buildDistanceField } from './proc.js?v=20261114z';
 // 洪水演进实景层：④ GPU 高度场 + 亚网格连续曲面 + 碎冰 / 飞溅粒子（④②⑤①⑥）
-import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261114u';
+import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261114z';
 
 /* ==========================================================================
    吉隆「8·26」冰岩崩—泥石流灾害链 · 实景三维数字孪生推演（演示级）
@@ -369,7 +368,9 @@ let cenPts = [];
    按里程均匀重采样 → 滑动平均 → 端点渐变 → 再顺一遍，得到一条从头到尾
    单调前进的线。实测转角 p90 < 10°、最大步长 < 100 m。 */
 function buildHazardCenter() {
-  if (new URLSearchParams(location.search).get('center') === '0') return;
+  const qC = new URLSearchParams(location.search);
+  // 旧名 ?center=0 保留兼容：居中逻辑已删，这个开关现在只控制「是否生成平滑沟道线」
+  if (qC.get('smooth') === '0' || qC.get('center') === '0') return;
   const L = channel.lengthM, DS = 60;
   const n = Math.floor(L / DS) + 1;
   const S = new Float32Array(n), X = new Float32Array(n), Z = new Float32Array(n);
@@ -406,7 +407,8 @@ function buildHazardCenter() {
   cenPts = Array.from({ length: n }, (_, k) => ({
     lon: P.lon(cx[k]), lat: P.lat(cz[k]), x: cx[k], y: cy[k], z: cz[k],
   }));
-  // 自检出口：转角与步长，防止以后又把线改回打结状态
+  // 自检出口：转角与步长，防止以后又把线改回打结状态。
+  // 注：__hazCenter 是历史名（CDP 验收脚本在用），现已不居中，只输出平滑线指标。
   let maxTurn = 0, maxStep = 0;
   for (let k = 1; k < n - 1; k++) {
     const ax = cx[k] - cx[k - 1], az = cz[k] - cz[k - 1];
@@ -464,6 +466,10 @@ const pointer = new THREE.Vector2();
 let pointerOrigin = null;
 let flight = null;
 let autoFly = false;
+// 推演终点（2026-11-14 最终口径）：就地退出航拍、开始自动旋转，不再飞全景机位。
+// 只有「终点那一刻恰有飞行动画在跑」才用它兜一下，等 flight 结束再开旋转
+// （SwiftShader 下 950 ms 飞行动画按渲染帧推进，按墙钟估会提前开旋转、两套运镜抢相机）。
+let pendingAutoRotate = false;
 let lastStageIdx = -1;
 let avgFrame = 1 / 60, dpr = Math.min(window.devicePixelRatio || 1, 1.5);
 const MAX_DPR = 1.5;
@@ -849,14 +855,14 @@ function buildChannelLine() {
   frontMarker = new THREE.Group();
   const ball = new THREE.Mesh(
     new THREE.SphereGeometry(190, 16, 12),
-    new THREE.MeshBasicMaterial({ color: 0xffc16a, depthTest: false, depthWrite: false })
+    new THREE.MeshBasicMaterial({ color: 0x38bdf8, depthTest: false, depthWrite: false })
   );
   ball.renderOrder = 4;
   frontMarker.add(ball);
   const halo = new THREE.Mesh(
     new THREE.RingGeometry(260, 380, 32),
     new THREE.MeshBasicMaterial({
-      color: 0xffd08a, transparent: true, opacity: 0.8,
+      color: 0x9be3ff, transparent: true, opacity: 0.8,
       side: THREE.DoubleSide, depthTest: false, depthWrite: false,
     })
   );
@@ -1215,6 +1221,8 @@ function enforceCameraClearance() {
 /* 用户一旦在画布上操作就立即接管视角：取消飞行、停自动推演/旋转、退出跟拍。
    OrbitControls 的 start 事件只在真实指针 / 滚轮输入时触发，程序 update 不会触发。 */
 function onUserTakeover() {
+  // 用户一接管就取消「飞行后自动旋转」，绝不抢相机
+  pendingAutoRotate = false;
   let changed = false;
   if (flight) { flight = null; changed = true; }
   if (autoFly) { autoFly = false; changed = true; }
@@ -2462,18 +2470,44 @@ function loop(now) {
     const f = computeFrame(state.t, state.vol);
     state.t = Math.min(f.total, state.t + dt * SIM_SECONDS_PER_REAL_SECOND * state.speed);
     if (state.t >= f.total) {
-      // 只停时间推进，不清 autoFly：它同时是 immersiveCam() 的判据，清掉会让
-      // 全景的橙色态势带 / 节点球在末帧突然恢复（此时 uFront 已到 1，整条带全亮）。
-      // 用户拖画布 / 滚轮 / 重置视角仍会清 autoFly，退出路径不变。
+      // 一、只停时间推进，**不清 autoFly**：它同时是 immersiveCam() 的判据，
+      //     清掉会让橙色态势带 / 节点球在末帧突然恢复（此时 uFront 已到 1）。
+      //     例外：下面「终点开始自动旋转」那一步必须清 autoFly，否则
+      //     updateDisasterFollow 每帧继续驱动镜头，旋转会被覆盖。清理后该视距
+      //     （约 1.4 km，nearK≈1）态势带 uAlpha 只剩 0.01 量级，肉眼看不到。
+      // 二、用户拖画布 / 滚轮 / 重置视角仍会清 autoFly，退出路径不变。
       state.playing = false;
       $('btn-play').textContent = '播放';
       pushLog('推演结束：灾害体到达吉隆口岸', 'crit', state.t);
+      // 2026-11-14 用户最终口径：到达终点**只做一件事 —— 开始自动旋转**。
+      // 不飞全景机位、不切机位，之后没有任何镜头动作；相机就停在终点
+      // （水头）当前这个视角上原地环绕（OrbitControls 绕 controls.target）。
+      // 必须做的一步是退出航拍：否则 updateCineCamera 每帧还在往 rig.aim 上写相机，
+      // autoRotate 会被它覆盖，表现为按钮亮了但画面不动。
+      // 只在 cineCam 仍为真且是 Three.js 视图时做 —— 用户中途拖画布 / 手动切过视角时
+      // onUserTakeover 已退出航拍，这时不该把相机抢回来。
+      if (cineCam && state.engine === 'three') {
+        enableCine(false);                 // 内部已 syncViewBtns(null)，两个视角按钮同步熄灭
+        autoFly = false; followSnap = false;
+        if (flight) {
+          pendingAutoRotate = true;        // 真有飞行动画在跑就等它走完，避免两套运镜抢相机
+        } else {
+          state.rotating = true;
+          controls.autoRotate = true;
+          $('btn-rotate').classList.add('active');
+        }
+        pushLog('推演结束，镜头开始自动旋转', 'info', state.t);
+      }
     }
     refresh();
   }
 
-  // 三维地球视图：暂停本地 WebGL 渲染与标签投影，避免两个上下文抢 GPU
-  if (state.engine === 'cesium') return;
+  // 三维地球视图：暂停本地 WebGL 渲染与标签投影，避免两个上下文抢 GPU。
+  // 终点镜头序列只属于 Three.js，这里清掉待旋转状态，免得切回来时误触发。
+  if (state.engine === 'cesium') {
+    pendingAutoRotate = false;
+    return;
+  }
 
   // 洪水航拍优先；播放时默认走战术俯视机位（逐帧连续跟随，不再按阶段跳飞）
   if (cineCam) updateCineCamera(dt);
@@ -2545,6 +2579,13 @@ function loop(now) {
     frontMarker.scale.setScalar(clamp(dFm / 2500, 0.08, 9) * 0.24);
   }
   updateFlight(now);
+  // 终点那一刻若恰有飞行动画在跑，等它真正走完再开旋转（避免两套运镜抢相机）
+  if (pendingAutoRotate && !flight) {
+    pendingAutoRotate = false;
+    state.rotating = true;
+    controls.autoRotate = true;
+    $('btn-rotate').classList.add('active');
+  }
   // 必须把 dt 传给 update()：r160 才按真实时间算自动旋转角速度，
   // 否则 autoRotate 走「每帧固定角」分支，低帧率下慢到几乎不动（表现为按钮没用）。
   controls.update(dt);

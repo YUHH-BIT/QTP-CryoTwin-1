@@ -434,11 +434,10 @@ body.cesium #btn-rotate { display: none; }
 .tl-controls { display: flex; align-items: center; gap: 5px; flex: 0 0 auto; }
 .tl-controls .btn { padding: 6px 9px; font-size: 11px; }
 #btn-play { min-width: 54px; }
-/* 快进/快退/倍速演示里用不上，还把播控条撑得很长。元素保留，
-   app.js 仍直接取得到并绑事件（删 DOM 会抛 TypeError 中断整个交互脚本）。 */
+/* 快进/快退演示里用不上（元素保留，app.js 仍绑定事件，删 DOM 会抛 TypeError）。
+   倍速按钮放出：默认 1.5×，可在 1× / 1.5× / 2× / 4× / 8× 间自行切换。 */
 .tl-controls #btn-prev,
-.tl-controls #btn-next,
-.tl-controls .speeds { display: none; }
+.tl-controls #btn-next { display: none; }
 .speeds { display: flex; gap: 2px; margin-left: 3px; }
 .speed {
   font-size: 10px; padding: 5px 6px; border-radius: 5px;

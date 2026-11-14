@@ -30,8 +30,8 @@
                  垂直放大系数——只影响观感，不产出流量/流速/到达时间
    ========================================================================== */
 
-import * as THREE from './lib/three.module.js?v=20261114u';
-import { makeSculpt } from './proc.js?v=20261114u';
+import * as THREE from './lib/three.module.js?v=20261114z';
+import { makeSculpt } from './proc.js?v=20261114z';
 
 /* ------------------------------ 可调常量 ------------------------------ */
 const SW = 192, SH = 108;          // GPU 状态 / 淹没源网格
@@ -629,7 +629,6 @@ void main() {
 const EXTENT_FRAG = `
 uniform sampler2D uMask;
 uniform float uSpan;      // 纹理编码覆盖的距离跨度（纹素），与 buildMaskSdf 一致
-uniform vec3  uFill;
 uniform vec3  uRim;
 uniform float uOpacity;
 uniform float uFillA;     // 恒为 0（2026-11-14）：只留线框，不要填充色
@@ -645,10 +644,10 @@ void main() {
   float rim = 1.0 - smoothstep(0.0, w, abs(d));
   float inside = smoothstep(0.0, 1.2, d);
   // 原来按视距铺 4%~13% 的蓝色底膜，近景会把整条谷道糊成一片；
-  // 现在 uFillA 恒 0，只剩 rim（鲜艳橙线框）。
+  // 现在 uFillA 恒 0，只剩 rim（暖米白线框）。
   float a = inside * uFillA + rim * 0.92;
   if (a < 0.006) discard;
-  gl_FragColor = vec4(mix(uFill, uRim, rim), a * uOpacity);
+  gl_FragColor = vec4(uRim, a * uOpacity);
 }`;
 
 /* ------------------------------ 粒子 ------------------------------ */
@@ -1098,8 +1097,7 @@ export class FloodSystem {
       uniforms: {
         uMask: { value: this.maskTex },
         uSpan: { value: EXTENT_SDF_SPAN },
-        uFill: { value: new THREE.Color(1.00, 0.48, 0.02) },   // 与线框同色，边缘渐变不泛杂色
-        uRim: { value: new THREE.Color(1.00, 0.48, 0.02) },   // 鲜艳橙 #FF7A05（用户 2026-11-14）
+        uRim: { value: new THREE.Color(0.96, 0.90, 0.78) },   // 暖米白 #F5E6C8（用户 2026-11-14）
         uOpacity: { value: 1.0 },
         uFillA:   { value: 0.0 },     // 只留线框，无填充
       },
