@@ -466,7 +466,7 @@ const pointer = new THREE.Vector2();
 let pointerOrigin = null;
 let flight = null;
 let autoFly = false;
-// 推演终点（2026-11-14 最终口径）：就地退出航拍、开始自动旋转，不再飞全景机位。
+// 推演终点（2026-11-14 最终口径）：就地退出航拍、开始自动旋转，不再切到全景俯拍。
 // 只有「终点那一刻恰有飞行动画在跑」才用它兜一下，等 flight 结束再开旋转
 // （SwiftShader 下 950 ms 飞行动画按渲染帧推进，按墙钟估会提前开旋转、两套运镜抢相机）。
 let pendingAutoRotate = false;
@@ -1237,7 +1237,7 @@ function onUserTakeover() {
     postCesium({ type: 'setAutoCam', value: false });
     changed = true;
   }
-  // 用户一旦手动动镜头，就不再是「全景机位」这个成片视角了：无条件灭掉高亮，
+  // 用户一旦手动动镜头，就不再是「全景俯拍」这个成片视角了：无条件灭掉高亮，
   // 但不动时间轴与图层（那是 resetView 的活）。
   syncViewBtns(null);
   if (changed) {
@@ -1299,15 +1299,17 @@ function updateFlight(now) {
   controls.target.lerpVectors(flight.fromTgt, flight.toTgt, e);
   if (k >= 1) flight = null;
 }
-/* 两套固定机位，互不干扰（2026-11-14 用户强调：「全景机位」≠「重置视角」）。
+/* 两套固定机位，互不干扰（2026-11-14 用户强调：「全景俯拍」≠「重置视角」）。
    ① DEFAULT_POSE = 打开系统时的斜侧沙盘机位，俯角 34.8°、斜距 22.5 km、
       cam(−8200,15000,16500)→tgt(0,2200,0)。首屏、重置视角、重播都用它，
       **逐字保持原样**，不受这次俯视改动影响。
-   ② OV_POSE = 画布工具条「全景机位」按钮专用，按用户要求改成近正上方俯视：
+   ② OV_POSE = 画布工具条「全景俯拍」按钮专用（2026-11-14 23:28 用户把按钮名从
+      「全景机位」改为「全景俯拍」，内部标识仍是 OV_POSE / `#btn-ov`，改的只是文案），
+      按用户要求做成近正上方俯视：
       俯角 78°（留 12° 倾角，别变成正交平面图）、斜距 19.5 km、方位角 0，
       按 fov 46° 反算竖向覆盖 ≈16.2 km，装得下 14.9 km 南北 / 21.6 km 东西；
       沟谷长轴在画面里横着展开（东→西），符合看地图习惯。
-   调参：?opitch= / ?oyaw= 只作用于全景机位；?dpitch= / ?dyaw= 只作用于默认机位。 */
+   调参：?opitch= / ?oyaw= 只作用于全景俯拍；?dpitch= / ?dyaw= 只作用于默认机位。 */
 const DEFAULT_POSE = {
   tgt: [0, 2200, 0],
   baseAz: -26.4,
@@ -1344,7 +1346,7 @@ function overviewCamera(pose) {
   const py = Math.max(ty + vy, groundAt(px, pz) + CAM_AUTO_CLEAR);
   return { cam: new THREE.Vector3(px, py, pz), tgt: new THREE.Vector3(tx, ty, tz) };
 }
-/* pose 不传 = 默认（重置）机位；只有「全景机位」按钮显式传 OV_POSE。 */
+/* pose 不传 = 默认（重置）机位；只有「全景俯拍」按钮显式传 OV_POSE。 */
 function applyOverviewCam(anim, pose) {
   const o = overviewCamera(pose);
   if (!o) return null;
@@ -1359,7 +1361,7 @@ function applyOverviewCam(anim, pose) {
 }
 
 /* 重置视角：回到**打开系统时那台斜侧沙盘机位**（DEFAULT_POSE），不是俯视全景。
-   2026-11-14 用户明确：全景机位按钮与重置视角是两个机位，不能混。
+   2026-11-14 用户明确：全景俯拍按钮与重置视角是两个机位，不能混。
    必须先把跟拍 / 自动运镜 / 自动旋转停掉——否则下一帧 updateDisasterFollow
    会把相机又拉回水头，用户看到的就是「点了没反应」。 */
 function resetView() {
@@ -1373,7 +1375,7 @@ function resetView() {
   applyLayers();
   markFloodJump();
   applyOverviewCam(true, DEFAULT_POSE);
-  // 重置后是默认机位，不是俯视全景 —— 别把「全景机位」按钮点亮
+  // 重置后是默认机位，不是俯视全景 —— 别把「全景俯拍」按钮点亮
   syncViewBtns(null);
 }
 
@@ -1951,7 +1953,7 @@ function updateCineCamera(dt) {
   updateRigBaked(dt, 'cine');
 }
 /* 视角按钮互斥高亮（2026-11-13）：工具条现在有两个"成片视角"——
-   「全景机位」（整条沟谷一屏）+「洪水航拍」（贴水跟拍），只可能有一个生效；
+   「全景俯拍」（整条沟谷一屏）+「洪水航拍」（贴水跟拍），只可能有一个生效；
    用户拖画布接管后两个都要灭掉，否则会以为还在自动运镜。 */
 function syncViewBtns(which) {
   $('btn-ov').classList.toggle('active', which === 'overview');
@@ -2263,7 +2265,7 @@ function bindEvents() {
   });
   $('btn-reset').addEventListener('click', resetView);
   $('btn-flood').addEventListener('click', () => enableCine(!cineCam));
-  /* 全景机位（2026-11-13 用户要求）：与「洪水航拍」并列的第二个成片视角。
+  /* 全景俯拍（2026-11-13 用户要求）：与「洪水航拍」并列的第二个成片视角。
      只做视角切换 —— 不重置时间轴、不重播水面，推演播到一半也能随时切回全景看全局。 */
   $('btn-ov').addEventListener('click', () => {
     if (state.engine !== 'three') setEngine('three');
@@ -2272,9 +2274,9 @@ function bindEvents() {
     state.rotating = false;
     controls.autoRotate = false;
     $('btn-rotate').classList.remove('active');
-    applyOverviewCam(true, OV_POSE);   // 全景机位按钮 = 俯视，与重置视角分开
+    applyOverviewCam(true, OV_POSE);   // 全景俯拍按钮 = 俯视，与重置视角分开
     syncViewBtns('overview');
-    pushLog('已切到全景机位：俯视整条沟道与淹没范围', 'info', state.t);
+    pushLog('已切到全景俯拍：俯视整条沟道与淹没范围', 'info', state.t);
   });
   $('btn-rotate').addEventListener('click', () => {
     const next = !state.rotating;
@@ -2480,7 +2482,7 @@ function loop(now) {
       $('btn-play').textContent = '播放';
       pushLog('推演结束：灾害体到达吉隆口岸', 'crit', state.t);
       // 2026-11-14 用户最终口径：到达终点**只做一件事 —— 开始自动旋转**。
-      // 不飞全景机位、不切机位，之后没有任何镜头动作；相机就停在终点
+      // 不切全景俯拍、不切机位，之后没有任何镜头动作；相机就停在终点
       // （水头）当前这个视角上原地环绕（OrbitControls 绕 controls.target）。
       // 必须做的一步是退出航拍：否则 updateCineCamera 每帧还在往 rig.aim 上写相机，
       // autoRotate 会被它覆盖，表现为按钮亮了但画面不动。

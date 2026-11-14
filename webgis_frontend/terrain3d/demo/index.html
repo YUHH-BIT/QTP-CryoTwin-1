@@ -128,7 +128,7 @@ if (new URLSearchParams(location.search).get('embedded') === '1') {
         <div class="stage-tools">
           <button id="btn-rotate" class="tool">自动旋转</button>
           <button id="btn-reset" class="tool">重置视角</button>
-          <button id="btn-ov" class="tool">全景机位</button>
+          <button id="btn-ov" class="tool">全景俯拍</button>
           <button id="btn-flood" class="tool">洪水航拍</button>
           <button id="btn-autocam" class="tool cesium-only">自动运镜</button>
         </div>
@@ -291,14 +291,14 @@ if (new URLSearchParams(location.search).get('embedded') === '1') {
 
     <h3>运行方式</h3>
     <p>本页作为主系统 <code>/terrain3d.html</code> 的 <b>iframe 内嵌页</b>运行（<code>?embedded=1</code>），由 Flask 的 <code>/terrain3d/&lt;path&gt;</code>、<code>/tiles/</code>、<code>/models/</code>、<code>/cesium_lib/</code> 路由提供资源。Three.js r160、OrbitControls、Cesium 与全部实景数据均本地托管、<b>运行时不联网</b>，本目录约 23 MB。也可对本目录单独起静态服务打开（需多线程；单线程 <code>python -m http.server</code> 会因并发拉取 DEM / 影像 / 库文件而拒绝连接，表现为贴图加载失败或图表空白），此时 Cesium 的根路径资源需另行放置。</p>
-    <p><b>交互默认</b>：进入系统自动旋转（拖动画布立即停止）、「全链条自动推演」走洪水航拍视角、播放默认 <b>1.5×</b> 倍速（可在时间轴切换 1× / 1.5× / 2× / 4× / 8×）；推演跑完立即退出航拍、就地停在终点视角开始自动旋转（不飞全景机位，若中途手动拖过画布则不抢相机）。</p>
+    <p><b>交互默认</b>：进入系统自动旋转（拖动画布立即停止）、「全链条自动推演」走洪水航拍视角、播放默认 <b>1.5×</b> 倍速（可在时间轴切换 1× / 1.5× / 2× / 4× / 8×）；推演跑完立即退出航拍、就地停在终点视角开始自动旋转（不切到全景俯拍，若中途手动拖过画布则不抢相机）。</p>
     <p>可用 <code>?t=300&amp;vol=0.90</code> 直接定位到指定时刻（秒）与物源规模（亿 m³）；加 <code>&amp;cine=1</code> 直接以洪水航拍跟拍视角打开；加 <code>&amp;engine=cesium</code> 直接用三维地球视图打开；<code>?diag=1</code> 输出运行时诊断。便于分享某一帧或截图验收。推荐组合：<code>?t=260&amp;cine=1&amp;diag=1</code>。</p>
     <p>附带的 <a href="./sculpt_lab.html">单图 → 程序化 Three.js 模型实验室</a> 是<b>独立开发页</b>：按 img2threejs 2.0.1 的方法论，把一张参考图分 8 个 pass 重建为可编辑的 <code>THREE.Group</code>。它不加载本页任何 DEM / 影像 / OSM 数据，也不改动主沙盘，因此不在主界面顶栏占位。</p>
   </div>
 </div>
 
 <script src="./lib/echarts.min.js"></script>
-<script type="module" src="./app.js?v=20261114z1"></script>
+<script type="module" src="./app.js?v=20261114z2"></script>
 <script>
 /* 面板收起 / 展开：地图全屏，左右浮层各自独立，交互不依赖 app.js 的模块加载。 */
 (function () {
