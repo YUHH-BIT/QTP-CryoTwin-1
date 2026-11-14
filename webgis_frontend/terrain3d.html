@@ -35,6 +35,16 @@
   </style>
 </head>
 <body>
+  <!-- 加载遮罩层：与系统其余页面（index / query / decision / simulate / admin 等）同款，
+       直接用 css/styles.css 里的 .loading-overlay / .loading-spinner / .loading-text，
+       不另写一套样式，保证转圈双环、深蓝毛玻璃、呼吸文字完全一致。
+       本页不加载 main.js，所以这里直接把 active 写进 class：
+       首屏立刻盖上，等内嵌三维场景真正就绪再移除（见页尾脚本）。 -->
+  <div class="loading-overlay active" id="loading-overlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text" id="loading-text">系统正在加载中，请稍候...</div>
+  </div>
+
   <!-- 顶部导航：与 index/decision 等页面逐字一致（本页不加载 main.js，故末尾内联一份下拉交互） -->
   <div class="topbar">
     <div class="topbar-row1">
@@ -165,21 +175,66 @@
 (function () {
   var f = document.getElementById('demo-frame');
   var box = document.getElementById('demo-error');
-  var done = false;
+  var ov = document.getElementById('loading-overlay');
+  var shown = false;        // 错误条只显示一次
+  var frameLoaded = false;  // iframe 的 load 是否已触发（给 12 s 探活用）
   function fail(msg) {
-    if (done || !box) return;
+    if (shown || !box) return;
+    shown = true;
     box.textContent = msg;
     box.style.display = 'block';
   }
-  f.addEventListener('load', function () { done = true; });
+  function hideOverlay() {
+    if (ov) ov.classList.remove('active');
+  }
+  f.addEventListener('load', function () { frameLoaded = true; });
   f.addEventListener('error', function () {
     fail('三维演示页加载失败，请确认已启动 Flask（http://127.0.0.1:5000/terrain3d.html）。');
+    hideOverlay();
   });
   setTimeout(function () {
     try {
-      if (!f.contentWindow || !f.contentWindow.document) fail('三维演示页未响应。');
+      if (!f.contentWindow || !f.contentWindow.document) {
+        fail('三维演示页未响应。');
+        hideOverlay();
+      }
     } catch (e) { /* 跨域时无法检查，正常同源不会走到这里 */ }
   }, 12000);
+
+  /* 加载动效的收尾：等内嵌场景**真的就绪**才撤遮罩。
+     不能用 iframe 的 load 事件 —— 那只是 index.html 的 DOM 到了，
+     之后还要下 DEM 高度场、21 MB 卫星影像、沟道/场数据并建好 Three.js 场景；
+     也不能按固定秒数硬等（机器快慢差好几倍）。
+     demo/app.js 的 boot() 结尾会置 window.__ready = true，这里轮询它，
+     同源读取，不依赖任何后端改造。 */
+  var t0 = Date.now();
+  var hideTimer = null;
+  (function waitReady() {
+    if (hideTimer) return;
+    var win = null;
+    try { win = f.contentWindow; } catch (e) { win = null; }
+    if (win && win.__err) {
+      // 场景真跑挂了：别让遮罩一直盖着，露出错误条
+      fail('三维场景初始化失败：' + String(win.__err));
+      hideOverlay();
+      return;
+    }
+    if (win && win.__ready) {
+      // __ready 是在 requestAnimationFrame(loop) 之前置的，等一帧再加一点余量，
+      // 让首帧真正画出来再淡出，避免"遮罩撤了看到一块黑"。
+      hideTimer = setTimeout(hideOverlay, 260);
+      return;
+    }
+    var el = Date.now() - t0;
+    if (!frameLoaded && el > 20000) {
+      // 20 s 连 index.html 的 load 都没触发：基本是后端/路由没起
+      fail('三维演示页加载失败，请确认已启动 Flask（http://127.0.0.1:5000/terrain3d.html）。');
+      hideOverlay();
+      return;
+    }
+    if (el > 90000) { hideOverlay(); return; }  // 兜底：软件渲染等极慢情况也不无限挂着
+    setTimeout(waitReady, 150);
+  })();
 })();
 </script>
 </body>
