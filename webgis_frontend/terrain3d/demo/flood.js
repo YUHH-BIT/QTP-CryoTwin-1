@@ -47,7 +47,11 @@ const REF_RISE = 240.0;            // 地形约束漫延的参考抬升（场景
 const POT_WIDEN_GAMMA = 0.60;
 const RISE_TAU = 52.0;             // 涨水惯性时间常数（场秒）
 const C2 = 0.22;                   // (c·dt/dx)²，二维 5 点拉普拉斯稳定域内
-const N_ICE = 260, N_ROCK = 220;   // 碎冰 / 冰碛物实例数
+// 碎冰 / 冰碛物实例数（2026-11-15 用户：「主要是碎石块，没有泥石流的冲击感」）。
+// 原来 260 + 220 = 480 块、半径 4~23 m，近景里等于一片漂在表面的乱石滩，
+// 把「流体」的主体性全抢走了。压到 90 + 80、半径 3.5~13 m，并整体下沉，
+// 让它们成为泥浆里露头的大块，而不是主角。
+const N_ICE = 90, N_ROCK = 80;     // 碎冰 / 冰碛物实例数
 const N_SPRAY = 900, N_DUST = 420; // 浪花飞溅 / 扬尘粒子数
 // 「图 7 淹没范围」图层：阈值取 0.06（约 15/255）—— shape.bin 里 pot>0 的格点占
 // 7.28%，其中只有 3.82% 达到 0.5 以上，用 0.5 做阈值会把整条主流裁掉一半。
@@ -393,7 +397,7 @@ void main() {
 const WATER_VERT = GLSL_COMMON + GLSL_BICUBIC + `
 uniform sampler2D uSource, uState;
 uniform vec2  uSrcTexel;
-uniform float uTField, uPeak, uClock, uExagToMeters;
+uniform float uTField, uPeak, uClock, uExagToMeters, uSurge;
 varying vec3  vWorld;
 varying vec2  vUv, vFlow;
 varying float vH, vEta, vFoam, vFront, vRough, vCore;
@@ -425,7 +429,13 @@ void main() {
   vec4 st = texture2D(uState, uv);
   float eta  = (st.r - 0.5) * 2.0 * ETA_MAX;
   vH = h; vEta = eta; vFoam = st.b; vRough = src.b; vCore = src.a;
-  vFront = (dSim > 0.0 && dSim < FRONT_W) ? (1.0 - smoothstep(0.0, FRONT_W, dSim)) * wet : 0.0;
+  /* 2026-11-15：vFront 不再乘 wet。wet = smoothstep(0,1.1,h) 在流头恰好趋 0
+     （那儿 h 最小），乘上去等于「流头一出现就自己消失」—— 结果是水面永远是一张
+     厚薄均匀的平板，看不出推进方向。改用淹没势 potB 兜住沟道范围：
+     只要在沟道内、且刚被淹到，就给出完整的前锋权重。 */
+  vFront = (dSim > 0.0 && dSim < FRONT_W)
+    ? (1.0 - smoothstep(0.0, FRONT_W, dSim)) * smoothstep(0.14, 0.62, potB)
+    : 0.0;
 
   vec3 p = position;
   // 高频波面：顺流向拉长的解析波纹，补足状态网格分辨率以下的细节
@@ -438,6 +448,16 @@ void main() {
   float ripple = sin(ph)*0.62 + sin(ph*1.83 + 1.1)*0.28
                + sin(dot(w, vec2(-vFlow.y, vFlow.x))*0.11 + uClock*1.4 + warp*0.7)*0.34;
   p.y += (h + (eta*0.72 + ripple*0.60) * (0.35 + 0.65*min(h/18.0, 1.0))) * wet;
+  /* 前锋涌浪（2026-11-15）：把流头抬成一道「墙」，后面再接一段回落 —— 这是
+     「泥石流冲击感」最核心的一条形态线索（真实泥石流流头是隆起、陡立、向下游
+     翻卷的，不是和后面一样厚的一层水）。
+     包络用 dSim（到达后的场秒）而不是 h：流头正是 h 最小的位置，用 h 做权重
+     会把涌浪自己乘没。potB 只用来把涌浪限制在沟道内，不爬到干坡上。
+     幅度按场景单位给，与水深口径无关，仅改观感。 */
+  float fw = (dSim > 0.0) ? (1.0 - smoothstep(0.0, FRONT_W * 2.8, dSim)) : 0.0;
+  float fwBack = (dSim > 0.0) ? (1.0 - smoothstep(0.0, FRONT_W * 7.0, dSim)) : 0.0;
+  float surge = uSurge * (fw * 1.0 + fwBack * 0.42) * smoothstep(0.14, 0.62, potB);
+  p.y += surge;
   vWorld = (modelMatrix * vec4(p, 1.0)).xyz;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
 }
@@ -447,7 +467,7 @@ const WATER_FRAG = GLSL_COMMON + `
 uniform sampler2D uSat;       // Esri 真实影像：浅水折射透出阶地 / 农田 / 道路
 uniform sampler2D uNormal0, uNormal1;  // three.js r160 官方真实水法线贴图（双相位）
 uniform vec2  uNormalScale;   // 贴图在世界范围内的重复次数（等比例，避免拉伸）
-uniform float uHasNormals, uNormalStrength, uFlowSpeed, uMuddy;
+uniform float uHasNormals, uNormalStrength, uFlowSpeed, uMuddy, uStreakK;
 uniform vec3  uSun, uSky;
 uniform float uClock, uAlpha, uExagToMeters, uPeak;
 varying vec3  vWorld;
@@ -573,6 +593,21 @@ void main() {
   float mudFlow = 0.60 * fbm(vWorld.xz * 0.012 + f * uClock * 0.85)
                 + 0.40 * fbm(vWorld.xz * 0.026 - f * uClock * 0.55 + 11.7);
   body *= 1.0 - (0.45 + 0.55 * uMuddy) * (0.20 - 0.30 * sediment - 0.18 * mudFlow);
+  /* 流速条纹（2026-11-15）：沿流向拉长的「泥沙流线」，是「这团东西在高速流动」
+     最便宜的线索。11-14 曾直接做「沿流向低频 × 横向高频」的 fbm，结果是一组
+     平行条带（等于把搓衣板换个方向）。这次的差别是先做**域扭曲**：
+     世界坐标先被低频 fbm 推开 ±160 m，再去沿/横分解，条纹就顺着沟道拐弯、
+     在弯道与汇流处自然断开。权重压在 0.85 以内，不改变水体基色。
+     参考：各向异性泡沫 / 域扭曲（catlikecoding「Directional Flow」、
+     three.js 海面分层做法）；这里只用它的坐标构造，不用它的波谱。 */
+  vec2 dwarp = vec2(mudFlow - 0.5, sediment - 0.5) * 320.0;
+  vec2 wpos = vWorld.xz + dwarp;
+  float streak = fbm(vec2(dot(wpos, f) * 0.042 - uClock * 0.85, dot(wpos, fc) * 0.30));
+  float streakK = smoothstep(0.34, 0.76, streak) * (0.18 + 0.82 * vFront) * uStreakK;
+  body += body * (1.00 * streakK) + vec3(0.055, 0.046, 0.033) * streakK;
+  /* 流头湿趾：最前沿压暗一道，读成「推土机铲刀」的湿泥边 —— 泥石流推进时
+     最靠前的永远是最湿、最暗的那一条，后面才是翻起来的白沫。 */
+  body *= 1.0 - 0.34 * smoothstep(0.45, 1.0, vFront);
   // 天空反射：泥浆从 2% 提到 7% —— 哪怕浑浊，湿面也总有掠射角的天空反光，
   // 这是「一眼认出是水」最便宜的线索，且只在边缘掠射角生效，不会洗白水体。
   vec3 col = body * diff + uSky * fres * mix(0.10, 0.07, uMuddy)
@@ -590,11 +625,26 @@ void main() {
   float edge  = 1.0 - smoothstep(0.0, 1.8, vH);
   // 湿边泡沫 0.20 → 0.34：水面本身只有几十米宽，远景里全靠这道水线交代
   // 「水铺到哪里」；只靠颜色填充，很容易被棕色底图吃掉。
-  float foamK = clamp(vFoam*0.78 + vFront*0.88 + crest*vFront*0.55 + edge*0.34, 0.0, 1.0);
+  // 2026-11-15：vFront 不再乘 wet（见顶点着色器），前锋权重终于能在流头满值，
+  // 这里再叠一项 vFront² 的「破碎冠」——流头顶上那一圈翻卷的白浪。
+  // vFront² 的作用是把白沫压在最前沿十几米内，不会向前锋后方蔓延成白饼。
+  float foamK = clamp(vFoam*0.78 + vFront*0.88 + crest*vFront*0.55 + edge*0.34
+                      + vFront*vFront*0.92, 0.0, 1.0);
+  /* 主槽翻涌白沫（2026-11-15）：泥石流最显眼的视觉特征是「中间一条沸腾的白水带」——
+     高浓度颗粒在槽心剧烈掺混、破碎起泡。这里用淹没势做槽心掩膜、再乘一层大尺度
+     噪声控制断续，只在主流带上加白沫，漫流边不加。这是给 1~2 km 视距看的对比度：
+     泥色与两侧岩坡同色系，没有这条白带，整条沟道在水里也会「消失」。 */
+  float coreMask = smoothstep(0.40, 0.85, vCore);   // vCore = depth.bin 归一化真实流深
+  // 频率必须压在 0.012 量级（≈ 80 m 一团）：0.055（18 m）在 1 km 视距下会碎成
+  // 一排「白芝麻」，看着像噪点而不是沸腾的泥浆。
+  float churn = smoothstep(0.46, 0.78, fbm(vWorld.xz * 0.012 - f * uClock * 0.55));
+  foamK = clamp(foamK + coreMask * churn * (0.26 + 0.22 * uMuddy), 0.0, 1.0);
   foamK *= 0.28 + 0.82*fn;
-  // 泥流的泡沫不是纯白，而是夹着细颗粒的暖白
-  vec3 foamCol = mix(vec3(0.66, 0.63, 0.54), vec3(0.99, 0.96, 0.88), fn);
-  col = mix(col, foamCol, clamp(foamK, 0.0, 0.78));
+  // 泥流的泡沫不是纯白，而是夹着细颗粒的暖白（2026-11-15 再压一档：
+  // 近景整片被白沫洗成「浅米色盐斑」是之前最像「干涸泥壳」的原因，
+  // 沫色压暗、混入上限从 0.78 降到 0.66，让泥浆仍是主体、白沫只是点缀）
+  vec3 foamCol = mix(vec3(0.58, 0.55, 0.48), vec3(0.95, 0.92, 0.85), fn);
+  col = mix(col, foamCol, clamp(foamK, 0.0, 0.66));
   // 湿边压暗形成水线，泡沫边缘的高光碎点模拟《后天》式溃坝浪花颗粒
   col *= 1.0 - 0.26 * edge;
   // 水线外侧补一道很淡的冷色反光（天空掠射的残影）：泥色与棕色山坡同色系，
@@ -1044,12 +1094,29 @@ export class FloodSystem {
         uTField: { value: 0 }, uPeak: { value: 0 }, uClock: { value: 0 },
         uExagToMeters: { value: 1 / (this.exag * 1.0) },
         uAlpha: { value: 0.93 },
+        // 前锋涌浪高度（场景单位）。26 ≈ 20 m 实际高度：在 1.3 km 的近景里
+        // 约等于流头凸起 1.5 个像素高度差，配合白冠即可看出「一道墙在推」；
+        // 22 km 全景里被视距夸张系数放大后仍不突兀。?surge= 可调，0 = 关闭。
+        uSurge: { value: 46 },
+        // 流速条纹强度。1 = 开（默认），0 = 关；?streak=0 可关掉做 A/B 验收。
+        uStreakK: { value: 1 },
         uSun: { value: sunDir }, uSky: { value: new THREE.Color(0.62, 0.74, 0.86) },
       },
       transparent: true, depthWrite: true, depthTest: true,
       side: THREE.DoubleSide, extensions: { derivatives: true },
       polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
     });
+    // ?surge=<场景单位> 调前锋涌浪高度，?surge=0 关闭（A/B 对比与截图验收用）
+    if (typeof location !== 'undefined') {
+      const qs = new URLSearchParams(location.search).get('surge');
+      if (qs !== null && Number.isFinite(+qs)) {
+        this.waterMat.uniforms.uSurge.value = clamp(+qs, 0, 90);
+      }
+      const qk = new URLSearchParams(location.search).get('streak');
+      if (qk !== null && Number.isFinite(+qk)) {
+        this.waterMat.uniforms.uStreakK.value = clamp(+qk, 0, 2);
+      }
+    }
     this.waterMesh = new THREE.Mesh(g, this.waterMat);
     this.waterMesh.name = 'anchor_flood_water';
     this.waterMesh.renderOrder = 3.2;
@@ -1158,7 +1225,7 @@ export class FloodSystem {
       this.bodies.push({
         id: n, isIce, idx: isIce ? n : n - N_ICE,
         x: 0, y: 0, z: 0, vx: 0, vz: 0,
-        r: isIce ? 7 + rn() * 16 : 6 + rn() * 12,
+        r: isIce ? 4 + rn() * 9 : 3.5 + rn() * 7,   // 2026-11-15：原 7~23 m 太大，抢主体
         q: new THREE.Quaternion().setFromEuler(new THREE.Euler(rn() * 6, rn() * 6, rn() * 6)),
         av: new THREE.Vector3((rn() - 0.5) * 3, (rn() - 0.5) * 3, (rn() - 0.5) * 3),
         seed: rn(), active: false, grounded: 0,
@@ -1186,7 +1253,7 @@ export class FloodSystem {
       b.x = c.x - t.z * lat; b.z = c.z + t.x * lat;
       const w = this.waterY(b.x, b.z, this.tField);
       b.vx = 0; b.vz = 0;
-      b.y = w.h > 1 ? w.y - b.r * 0.2 : c.y;
+      b.y = w.h > 1 ? w.y - b.r * 0.30 : c.y;
       b.active = true; b.show = w.h > 1; b.grounded = 0;
       b.q.setFromEuler(new THREE.Euler(rn() * 6, rn() * 6, rn() * 6));
     }
@@ -1201,6 +1268,58 @@ export class FloodSystem {
     this.group.add(this.spray.points, this.dust.points);
     for (const c of [this.spray, this.dust]) {
       for (const p of c.parts) p.life = 0;   // 首帧统一由 update 生成
+    }
+    this.buildImpactRing();
+  }
+
+  /* ---------- 冲击事件（2026-11-15）----------
+     到达口岸的那一刻给一次「砸上去」的反应：一圈加法混合的冲击波环 +
+     一次性爆散的浪花与扬尘。纯观感合成（口径 C），不参与任何水文量。
+     环用 RingGeometry 贴在水面高度上，半径按 0→780 场景单位扩张、透明度衰减，
+     1.3 s 内结束；不是「受灾范围圈」（那是 app.js 里的 impactRing，别混）。 */
+  buildImpactRing() {
+    const g = new THREE.RingGeometry(0.90, 1.0, 96, 1);
+    const m = new THREE.MeshBasicMaterial({
+      color: 0xe8f1ff, transparent: true, opacity: 0,
+      side: THREE.DoubleSide, depthWrite: false, depthTest: true,
+      blending: THREE.AdditiveBlending, fog: false,
+    });
+    this.impactWave = new THREE.Mesh(g, m);
+    this.impactWave.name = 'anchor_flood_impact_wave';
+    this.impactWave.rotation.x = -Math.PI / 2;
+    this.impactWave.visible = false;
+    this.impactWave.renderOrder = 3.6;
+    this.impactWave.frustumCulled = false;
+    this.group.add(this.impactWave);
+  }
+
+  triggerImpact() {
+    if (!this.channel) return;
+    const L = this.channel.lengthM;
+    const c = (this.cenAtFn || this.chanAt)(L);
+    this.impact = { age: 0, on: true, x: c.x, y: c.y, z: c.z };
+    this.impactBurst = 240;                       // 一次性爆散粒子数
+    if (this.impactWave) {
+      const w = this.waterY(c.x, c.z, this.tField);
+      this.impactWave.position.set(c.x, w.y + 8, c.z);
+      this.impactWave.scale.setScalar(60);
+      this.impactWave.material.opacity = 0.55;
+      this.impactWave.visible = true;
+    }
+  }
+
+  updateImpact(dt) {
+    const im = this.impact;
+    if (!im || !im.on) return;
+    im.age += dt;
+    const k = clamp(im.age / 1.3, 0, 1);
+    if (this.impactWave) {
+      this.impactWave.scale.setScalar(60 + 740 * Math.pow(k, 0.62));
+      this.impactWave.material.opacity = 0.55 * Math.pow(1 - k, 1.7);
+    }
+    if (k >= 1) {
+      im.on = false;
+      if (this.impactWave) { this.impactWave.visible = false; this.impactWave.material.opacity = 0; }
     }
   }
 
@@ -1249,6 +1368,9 @@ export class FloodSystem {
     this.waterMat.uniforms.uExagToMeters.value = 1 / (this.exag * this.depthVisual);
   }
   setViewDistance(camDist) {
+    // 记下来给碎冰用：远景把块体整体缩小（它们在 3 km 外只剩几个像素，
+    // 留着只会把水面打成麻点）。
+    this.camDist = camDist;
     /* 视距 → 视觉参数。只改观感，KPI 与水文数值不动。
        1) 水深夸张：22 km 全景里几十米水位看不见，必须放大；但近景（<2 km）不需要，
           1.8 倍在这里等于 111 m 水深，会把整条沟谷糊成一块平板 —— 所以近景降到 ~0.5 倍。
@@ -1350,6 +1472,7 @@ export class FloodSystem {
     const dt = Math.min(dtReal, 0.05);
     if (this.layers.water) this.stepGPU(dt);
     this.waterMat.uniforms.uClock.value = this.clock;
+    this.updateImpact(dt);                  // 冲击波环按真实帧推进，先于早退
     if (this.tField <= 1.0) return;         // 失稳前没有洪水，不生成碎冰与飞溅
     if (this.layers.debris) this.updateDebris(dt);
     if (this.layers.spray) this.updateParticles(dt);
@@ -1383,7 +1506,7 @@ export class FloodSystem {
         }
         if (!found) { b.active = false; b.show = false; continue; }
         b.x = found.x; b.z = found.z;
-        b.y = found.y - b.r * 0.2;
+        b.y = found.y - b.r * 0.30;
         b.vx = found.t.x * flowSpeed * 0.55; b.vz = found.t.z * flowSpeed * 0.55;
         b.q.setFromEuler(new THREE.Euler(rn() * 6, rn() * 6, rn() * 6));
         b.active = true; b.show = true; b.grounded = 0;
@@ -1408,11 +1531,13 @@ export class FloodSystem {
       const w2 = this.waterY(b.x, b.z, this.tField);
       if (w2.h < b.r * 0.22) { b.active = false; b.show = false; continue; }
 
-      // 翻滚：角速度随流速 / 剪切 / 前锋湍流变化，碰撞再叠脉冲
+      // 翻滚：角速度随流速 / 剪切 / 前锋湍流变化，碰撞再叠脉冲。
+      // 2026-11-15：整体乘 0.45 —— 泥石流里的大块是被泥浆「裹着走」的，
+      // 不是在空中疯狂翻跟头；之前的高速自转让每块石头都像独立的飞石。
       const spd = Math.hypot(b.vx, b.vz);
       const shear = clamp(spd / (flowSpeed + 1), 0, 2);
       const frontBoost = 1 + 2.4 * clamp(1 - Math.abs(this.tField - s.T) / 90, 0, 1);
-      const targetAV = (0.7 + 2.6 * shear) * frontBoost * (1 - 0.8 * b.grounded);
+      const targetAV = (0.7 + 2.6 * shear) * frontBoost * (1 - 0.8 * b.grounded) * 0.45;
       b.av.x += (targetAV * (0.6 + b.seed) - b.av.x) * Math.min(dt * 3, 1);
       b.av.y += (targetAV * (0.4 + rn() * 0.5) - b.av.y) * Math.min(dt * 3, 1);
       b.av.z += (targetAV * (0.5 + b.seed * 0.7) - b.av.z) * Math.min(dt * 3, 1);
@@ -1420,12 +1545,14 @@ export class FloodSystem {
       this._dq.setFromEuler(this._eu);
       b.q.multiply(this._dq).normalize();
 
-      // 半沉：中心略低于水面，只露出上半块，像被泥流裹挟而不是浮在空气里。
+      // 半沉：中心低于水面，只露出上半块，像被泥流裹挟而不是浮在空气里。
+      // 2026-11-15 加深（冰 0.34 / 岩 0.52）：露出水面 1/3 左右才像「泥浆里翻上来的
+      // 大块」，之前露出 70% 看着就是一堆搁浅的石头。
       // 再对高度做硬上限，防止 CPU 双线性 / GPU 三次采样在陡边界给出不同水深。
       const baseY = (this.terrainY || this.displayY)(b.x, b.z) + 14;
       const bob = Math.sin(this.clock * 3.1 + b.seed * 27) *
                   Math.min(w2.h * 0.06, b.r * 0.18);
-      b.y = Math.min(w2.y - b.r * (b.isIce ? 0.12 : 0.28) + bob,
+      b.y = Math.min(w2.y - b.r * (b.isIce ? 0.34 : 0.52) + bob,
                      baseY + w2.h + b.r * 0.5);
       b.show = true;
       const kk = key(b.x, b.z);
@@ -1477,15 +1604,18 @@ export class FloodSystem {
         // 重算水面高度。这是最后一道保险：无论前面怎么平流、推挤、重置，
         // 块体中心永远贴着本地水面，不会留在半空。
         const wf = this.waterY(b.x, b.z, this.tField);
-        b.y = wf.y - b.r * (b.isIce ? 0.12 : 0.28)
+        b.y = wf.y - b.r * (b.isIce ? 0.34 : 0.52)
             + Math.sin(this.clock * 3.1 + b.seed * 27) *
               Math.min(wf.h * 0.06, b.r * 0.18);
         shown++;
         if (b.y - wf.y > b.r * 1.2) floating++;
       }
-      // 压扁成扁平碎块：半沉后只露出薄薄一层，不像立着的球
-      sc.set(b.r * k, b.r * (b.isIce ? 0.48 : 0.62) * k,
-             b.r * (b.isIce ? 1.05 : 0.90) * k);
+      // 压扁成扁平碎块：半沉后只露出薄薄一层，不像立着的球。
+      // 2026-11-15 再压薄（0.48/0.62 → 0.38/0.50），并让远景整体缩小：
+      // 3 km 外块体只剩几个像素，留着只会把水面打成麻点，反而不像流体。
+      const far = 1 - 0.5 * smoothstep(2500, 8000, this.camDist || 0);
+      sc.set(b.r * k * far, b.r * (b.isIce ? 0.38 : 0.50) * k * far,
+             b.r * (b.isIce ? 1.00 : 0.88) * k * far);
       m.compose(this._v3.set(b.x, b.y, b.z), b.q, sc);
       (b.isIce ? this.ice : this.rock).setMatrixAt(b.idx, m);
     }
@@ -1537,6 +1667,33 @@ export class FloodSystem {
     };
     spawnCloud(this.spray, false);
     spawnCloud(this.dust, true);
+    /* 冲击爆散（2026-11-15）：到达口岸时一次性甩出一批高速浪花与扬尘。
+       与上面「水头附近持续冒泡」是两件事：这里是有方向的爆发，速度高一倍、
+       寿命短、径向散开，读起来才是「砸上去」。 */
+    if (this.impactBurst > 0 && this.impact) {
+      const rn = this.rng, im = this.impact;
+      const throwOut = (c, cnt, dust) => {
+        for (const p of c.parts) {
+          if (cnt <= 0) break;
+          if (p.life > 0) continue;
+          const a = rn() * Math.PI * 2, rr = rn();
+          p.x = im.x + Math.cos(a) * rr * 46;
+          p.z = im.z + Math.sin(a) * rr * 46;
+          p.y = im.y + 4 + rn() * 12;
+          const sp = dust ? 26 + rn() * 58 : 55 + rn() * 125;
+          p.vx = Math.cos(a) * sp;
+          p.vz = Math.sin(a) * sp;
+          p.vy = (dust ? 18 : 46) + rn() * (dust ? 42 : 72);
+          p.life = dust ? 1.3 + rn() * 1.5 : 0.55 + rn() * 0.85;
+          p.age = 0;
+          p.size = dust ? 6 + rn() * 9 : 2.4 + rn() * 4.4;
+          cnt--;
+        }
+      };
+      throwOut(this.spray, 240, false);
+      throwOut(this.dust, 120, true);
+      this.impactBurst = 0;
+    }
     let alive = 0;
     for (const c of [this.spray, this.dust]) {
       const pos = c.geom.attributes.position.array;

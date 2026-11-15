@@ -3,7 +3,7 @@ import { OrbitControls } from './lib/OrbitControls.js?v=20261114z';
 // 程序化建模骨架：spec → 可编辑 THREE.Group + 材质色板 + 着色器画岸边/立面
 import { material, assertAnchors, diagnose, attachBank, buildDistanceField } from './proc.js?v=20261114z';
 // 洪水演进实景层：④ GPU 高度场 + 亚网格连续曲面 + 碎冰 / 飞溅粒子（④②⑤①⑥）
-import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261114z';
+import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261115a';
 
 /* ==========================================================================
    吉隆「8·26」冰岩崩—泥石流灾害链 · 实景三维数字孪生推演（演示级）
@@ -43,6 +43,13 @@ const SCENARIOS = [
   { v: 1.80, arrival:  8 * 60 + 25, depth: 47.50, vmax: 33.19, q: 18.83 },
 ];
 const BASE_TOTAL = SCENARIOS[SCENARIOS.length - 1].arrival; // 505 s
+
+/* 情景滑块与两张响应曲线图的横轴范围（2026-11-15 用户指出）：
+   默认案例的物源规模改成 1.20 亿之后，滑块进度条的全长与图的横轴却还留到 1.80,
+   看上去像「只改了数字没改范围」。这里统一收到 0.10~1.20：
+   滑块手柄落在最右端、两张图的曲线也画到右端，横轴端点标 0.1 / 1.2。
+   SCENARIOS 仍保留论文表 4 的 8 组工况（含 1.30 / 1.60 / 1.80），只是 UI 不再展示这一段。 */
+const VOL_UI_MIN = 0.10, VOL_UI_MAX = 1.20;
 
 // 节点沿真实沟道按弧长比例定位（0 = 源区，1 = 吉隆口岸）
 const NODES = [
@@ -470,12 +477,24 @@ let autoFly = false;
 // 只有「终点那一刻恰有飞行动画在跑」才用它兜一下，等 flight 结束再开旋转
 // （SwiftShader 下 950 ms 飞行动画按渲染帧推进，按墙钟估会提前开旋转、两套运镜抢相机）。
 let pendingAutoRotate = false;
+/* 口岸冲击（2026-11-15 用户：「没有泥石流的冲击感」）：
+   前锋首次抵达口岸时触发一次 —— flood.triggerImpact() 甩出冲击波环 + 爆散浪花，
+   同时给 0.45 s 的轻微机震。只在推演播放中触发；时间轴回拨到 0.9 之前自动复位，
+   重播时能再砸一次。机震是**叠加在相机位置上的瞬时偏移**，不改变视线朝向、
+   不接管控制，衰减到 0 即完全消失。 */
+let impactFired = false;
+let shakeT = 0;
+const SHAKE_DUR = 0.45;
 let lastStageIdx = -1;
 let avgFrame = 1 / 60, dpr = Math.min(window.devicePixelRatio || 1, 1.5);
 const MAX_DPR = 1.5;
 
 const state = {
-  t: 0, playing: false, speed: 1.5, vol: 1.80,
+  // 默认物源规模 1.20 亿 m³（2026-11-15 用户指定，原为 1.80 = 论文基准工况）。
+  // 表 4 只有 0.90 / 1.30 两个相邻工况，1.20 走线性插值：
+  // 到达 585 s（9:45）、平均流深 37.78 m、最大流速 28.02 m/s、洪峰 11.02 万 m³/s。
+  // 注意：8 阶段剧本与详情文案里写的仍是论文 1.8 亿基准口径数字，未随之改动。
+  t: 0, playing: false, speed: 1.5, vol: 1.20,
   rotating: false,
   engine: 'three', autoCam: false,   // Cesium 视图默认 22 km 全景；点「自动运镜」才切近景跟拍
   // field 不再单独做成开关（本地已被 flood 取代），但 Cesium 侧仍用它控制泥流帧场
@@ -1986,12 +2005,23 @@ function enableCine(on) {
 const markFloodJump = () => { if (flood) flood.markJump(); };
 
 /* ------------------------------ UI ------------------------------ */
+/* 阶段刻度上的时刻必须跟**当前情景总历时**走（2026-11-15）。
+   原来写死 `s.r * BASE_TOTAL`（1.8 亿基准的 505 s），只要滑块不是 1.8 亿，
+   刻度上印的时刻就和指针 / 时钟对不上（如 1.2 亿时总历时 585 s，
+   第 6 阶段实际发生在 10:58，刻度却还印 10:55）。 */
+function syncStageTimes() {
+  const total = interpScenario(state.vol).arrival;
+  document.querySelectorAll('#stage-list .stage-time').forEach((el, i) => {
+    el.textContent = fmtClock(STAGES[i].r * total);
+  });
+}
 function buildUI() {
+  const total0 = interpScenario(state.vol).arrival;
   $('stage-list').innerHTML = STAGES.map((s, i) => `
     <div class="stage-item" data-idx="${i}">
       <span class="stage-num">${i + 1}</span>
       <span class="stage-txt"><b>${s.name}</b></span>
-      <small class="stage-time">${fmtClock(s.r * BASE_TOTAL)}</small>
+      <small class="stage-time">${fmtClock(s.r * total0)}</small>
     </div>`).join('');
   $('stage-list').querySelectorAll('.stage-item').forEach(el => {
     el.addEventListener('click', () => jumpToStage(+el.dataset.idx));
@@ -2051,7 +2081,15 @@ const rgbaOf = (hex, a) => {
 };
 
 function sparkOption(name, unit, color, key, now, digits) {
-  const data = SCENARIOS.map(x => [x.v, +key(x).toFixed(digits)]);
+  // 只画到当前案例规模（VOL_UI_MAX）为止：横轴收到 1.20 后若仍塞 8 个点，
+  // 1.30 / 1.60 / 1.80 会被裁到画外、右侧留一片空白。
+  // 上界若落在两个工况点之间，补一个插值点，让曲线真正走到右端。
+  const data = SCENARIOS.filter(x => x.v <= VOL_UI_MAX + 1e-9)
+    .map(x => [x.v, +key(x).toFixed(digits)]);
+  const lastV = data.length ? data[data.length - 1][0] : VOL_UI_MIN;
+  if (VOL_UI_MAX - lastV > 1e-6) {
+    data.push([VOL_UI_MAX, +key(interpScenario(VOL_UI_MAX)).toFixed(digits)]);
+  }
   const legendName = `${name} / ${unit}`;
   return {
     animationDuration: 280,
@@ -2069,11 +2107,12 @@ function sparkOption(name, unit, color, key, now, digits) {
       formatter: p => `${p[0].data[0].toFixed(2)} 亿 m³<br/>${name} ${p[0].data[1].toFixed(digits)} ${unit}`,
     },
     xAxis: {
-      type: 'value', min: 0.1, max: 1.8, splitLine: { show: false },
+      type: 'value', min: VOL_UI_MIN, max: VOL_UI_MAX, splitLine: { show: false },
       axisLine: { lineStyle: { color: '#2f4564' } }, axisTick: { show: false },
       axisLabel: {
         fontSize: 8, color: '#8496b0', margin: 5,
-        formatter: v => (Math.abs(v - 0.1) < 1e-6 || Math.abs(v - 1.8) < 1e-6) ? v.toFixed(1) : '',
+        formatter: v => (Math.abs(v - VOL_UI_MIN) < 1e-6 || Math.abs(v - VOL_UI_MAX) < 1e-6)
+          ? v.toFixed(1) : '',
       },
     },
     yAxis: {
@@ -2294,6 +2333,7 @@ function bindEvents() {
     const f = computeFrame(0, state.vol);
     state.t = Math.min(state.t, f.total);
     markFloodJump();
+    syncStageTimes();   // 总历时变了，阶段刻度上的时刻跟着重算
     drawSpark();
     refresh();
   });
@@ -2471,6 +2511,14 @@ function loop(now) {
   if (state.playing) {
     const f = computeFrame(state.t, state.vol);
     state.t = Math.min(f.total, state.t + dt * SIM_SECONDS_PER_REAL_SECOND * state.speed);
+    // 口岸冲击：前锋首次压到口岸（ratio ≥ 0.985）时触发一次
+    if (!impactFired && f.ratio >= 0.985 && flood && flood.enabled) {
+      impactFired = true;
+      flood.triggerImpact();
+      shakeT = SHAKE_DUR;
+    }
+    // 时间轴回拨（重播 / 拖回开头）后重新武装，下次到口岸还能再砸一次
+    if (impactFired && f.ratio < 0.90) impactFired = false;
     if (state.t >= f.total) {
       // 一、只停时间推进，**不清 autoFly**：它同时是 immersiveCam() 的判据，
       //     清掉会让橙色态势带 / 节点球在末帧突然恢复（此时 uFront 已到 1）。
@@ -2591,6 +2639,17 @@ function loop(now) {
   // 必须把 dt 传给 update()：r160 才按真实时间算自动旋转角速度，
   // 否则 autoRotate 走「每帧固定角」分支，低帧率下慢到几乎不动（表现为按钮没用）。
   controls.update(dt);
+  /* 冲击机震（2026-11-15）：叠加在相机位置上的瞬时抖动，幅度按 18 场景单位
+     （1.3 km 视距下约 6~8 px）随 (t/0.45)² 衰减，0.45 s 内归零。
+     只加位置偏移、不动 controls.target，所以视线朝向与用户接管都不受影响；
+     放在 controls.update 之后、地形钳制之前，最后那道防穿地照样生效。 */
+  if (shakeT > 0) {
+    shakeT = Math.max(0, shakeT - dt);
+    const k = shakeT / SHAKE_DUR, amp = 18 * k * k;
+    camera.position.x += Math.sin(now * 0.093) * amp * 0.65;
+    camera.position.y += Math.sin(now * 0.117 + 1.3) * amp;
+    camera.position.z += Math.cos(now * 0.087 + 0.7) * amp * 0.65;
+  }
   // 所有运镜算完之后再做地形安全钳制，这是防穿模的最后一道保险
   enforceCameraClearance();
 
@@ -2677,8 +2736,9 @@ async function boot() {
   const qs = new URLSearchParams(location.search);
   const qVol = parseFloat(qs.get('vol'));
   if (Number.isFinite(qVol)) {
-    state.vol = clamp(qVol, 0.10, 1.80);
+    state.vol = clamp(qVol, VOL_UI_MIN, VOL_UI_MAX);
     $('vol-slider').value = String(state.vol);
+    syncStageTimes();   // 用 URL 指定情景时，阶段刻度的时刻也要按该情景总历时重算
   }
   const initTotal = computeFrame(0, state.vol).total;
   const qT = parseFloat(qs.get('t'));
