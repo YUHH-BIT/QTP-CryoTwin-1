@@ -151,36 +151,68 @@ function frontPath(ratio) {
   const r = clamp(ratio, 0, 1);
   return r <= rSeq ? 0.72 * (r / rSeq) : 0.72 + 0.28 * ((r - rSeq) / (1 - rSeq));
 }
-/* 橙色前锋球的位置（2026-11-14）：球原本钉在「到达时间等值线」frontS 上，
-   实测 field T 与球位置只差 ≤5 s，位置是对的；但水到了之后要 riseFn 十几秒
-   才涨到看得见的深度 —— 可见泥石流前缘比球落后 100~600 m（深水前缘 400~1300 m），
-   观感就是「球自己先跑，水没跟上」。
-   这里让球改跟「实际有水的下游端点」：从 frontS 向上游按 80 m 扫，
-   横断面取 3 点（±180 m）避免单格场噪声，h/peak > 0.12 才算看得见的水。
+/* 橙色前锋球的位置（2026-11-15 重做）。
+   旧实现的致命问题：球从 f.frontS 起步 —— 那是用**论文剖面**（model.json profile）
+   反查出来的里程；而水面是**到达时间场**（arrival.bin）逐像素画的。两套数据在峡谷段
+   差得很远，实测（tField 对应 ratio=0.3 / 0.6 / 0.9）：
+     frontS = 3.9 / 10.4 / 17.9 km，而场里真正有水的下游端点是 11.4 / 16.0 / 20.4 km，
+     差 7.4 / 5.6 / 2.4 km。
+   也就是说球不是「慢半拍」，而是停在泥石流后方几公里处：球在水的下游端上游几公里，
+   画面里自然追不上。根因不是阈值（旧代码调过 0.005 / 0.12 两个值），是**取错了数据源**。
+   现在直接在渲染用的同一个场上、沿居中中轴线从下游往回找湿边的下游端点，
+   球与水面天生同源，不再需要两套数据互相换算。
+   阈值 1.0 场景单位对齐水面着色器的 wet = smoothstep(0.0, 1.1, h)：
+   水一显形就是前锋，不做「深到看得见」的额外打折（那会让球又退回水里）。
    只增不减 + 时间轴回拨时重置，保证球不抖、不倒退。 */
-let markerS = -1, markerRatio = -1;
-function visibleFrontS(f, ratio, L) {
+let markerS = -1, markerRatio = -1, markerT = NaN;
+let uiFrontM = 0;                 // 面板「累计传播」用的里程（= markerS），0 表示未就绪
+const FRONT_H_VIS = 1.0;          // 与 WATER_VERT 的 wet 起亮阈值同口径
+/* 沿中轴线取「连续水体的下游端」。粗扫 150 m、再 30 m 精修；
+   必须连续 —— 口岸扇区那片水与主水体之间实测隔着 1 km 干沟（tField=423 时
+   19.4~20.2 km 全干、20.3 km 又有 60 单位深水），取「最下游湿点」会让球
+   提前跳到口岸。所以连续 900 m 没有湿点就判定前锋到头，球跟着主水体走。
+   起点从上一次前锋回退 2 km 开始 —— 前锋只前进，不必每帧从 0 扫起。 */
+const FRONT_STEP = 150, FRONT_GAP = 900;
+function fieldFrontS(f, L) {
   const cs = v => Math.max(0, Math.min(L, v));
-  const pk = Math.max(f.peak || 1, 1e-3);
-  const s0 = cs(f.frontS || 0);
   const wet = s => {
-    const c = cenAt(s), n = cenAt(cs(s + 100));
+    const c = cenAt(cs(s)), n = cenAt(cs(s + 80));
     const dx = n.x - c.x, dz = n.z - c.z, d = Math.hypot(dx, dz) || 1;
     const nx = -dz / d, nz = dx / d;
-    for (const o of [-180, 0, 180]) {
-      if (f.waterY(c.x + nx * o, c.z + nz * o, f.tField).h / pk > 0.12) return true;
+    if (f.waterY(c.x, c.z, f.tField).h >= FRONT_H_VIS) return true;
+    // 弯道 / 辫状段中轴线可能落在干坡上，横向 ±150 m 兜一层
+    for (const o of [-150, 150]) {
+      if (f.waterY(c.x + nx * o, c.z + nz * o, f.tField).h >= FRONT_H_VIS) return true;
     }
     return false;
   };
-  let found = -1;
-  for (let d = 0; d <= 1800; d += 80) {
-    const s = cs(s0 - d);
-    if (wet(s)) { found = s; break; }
-  }
-  if (found < 0) found = s0;
-  if (ratio < markerRatio - 0.01) markerS = -1;   // 拖动时间轴往回，允许球退回
+  const scan = from => {
+    let last = -1, dry = 0;
+    for (let s = from; s <= L; s += FRONT_STEP) {
+      if (wet(s)) { last = s; dry = 0; }
+      else if ((dry += FRONT_STEP) > FRONT_GAP) break;
+    }
+    return last;
+  };
+  const start = markerS > 0 ? cs(markerS - 2000) : 0;
+  let hit = scan(start);
+  if (hit < 0 && start > 0) hit = scan(0);   // 拖时间轴回拨后起点可能已在干区
+  if (hit < 0) return 0;                     // 场里一滴水都没有（t=0 / 洪水层关闭）
+  let best = hit;
+  const end = cs(hit + FRONT_STEP);
+  for (let s = hit + 30; s <= end; s += 30) if (wet(s)) best = s;
+  return cs(best);
+}
+function visibleFrontS(f, ratio, L) {
+  const cs = v => Math.max(0, Math.min(L, v));
+  if (ratio < markerRatio - 0.01) { markerS = -1; markerT = NaN; }  // 拖时间轴往回，允许球退回
   markerRatio = ratio;
-  markerS = markerS < 0 ? found : Math.max(markerS, found);
+  // 湿边只随 tField 变：暂停 / 自动旋转时不必每帧重扫沟道
+  if (markerS < 0 || !(Math.abs((f.tField || 0) - markerT) < 0.25)) {
+    const found = fieldFrontS(f, L);
+    markerT = f.tField || 0;
+    markerS = markerS < 0 ? found : Math.max(markerS, found);
+  }
   return cs(markerS);
 }
 function stageIndexAt(ratio) {
@@ -1473,17 +1505,21 @@ const RIG = {
   // 用绝对高度 alt（相对瞄准点水面）而不是俯角反解 —— 俯角反解在 back 变大时
   // 会把相机抬到 2 km 以上，反而不是「谷上方」。离地由 CAM_AUTO_CLEAR 兜底。
   // back 区间收窄：fill 反馈只做 ±15% 微调，别让它一路顶到上下限把机位拉走。
-  /* 2026-11-14 改：站位从「水头后 2.1 km、瞄水头前 400 m」改成「水头后 3.0 km、
-     瞄水头上游 600 m」。理由是可量的，不是口味：
-       __frameScore 在 t=180/330 两处扫「机位沿轨迹平移 ds」，
-       原参数（ds=0）湿水点入画只有 35~53%、占画高 0.49~0.59；
-       退到 ds=−1600 后入画 88%、占画高 0.72（t=330），画面主体变成洪水本身。
-     根因是瞄点落在水头**前方**：水头是前锋尖端，往前 400 m 已是干沟道，
-     镜头自然对着空谷。现在瞄点落在水头上游，水体正好铺满中景。
-     高度同步抬到 1500（俯角约 27°）—— 退远后仍保持斜俯拍，不变成拍地图。 */
-  follow: { back: 3000, lat: -520, alt: 1500, pitch: 0, fill: 0.26,
-            pitchMin: 18, pitchMax: 46, backMin: 2700, backMax: 3300,
-            sRate: 2.0, posRate: 1.9, tgtRate: 2.1, intro: 2.4, ahead: -600, avoid: true },
+  /* 2026-11-15 v2（用户原话：「视角要跟着泥石流最前方的泥石流一直在动……
+     从泥石流到泥石流没有到的地方那个过程，我要看到那个」）：
+     上一版是「水头后 3.0 km、瞄水头上游 600 m」—— 那是**退远了看整段沟谷**的构图：
+     3 km 外 35 m 高的水头在 900 px 画面上只有约 10~20 px，画面主体其实是
+     「已经淹过的后方」，用户在 1.1 km 内看不到前缘在推进，就是「看不到泥石流」。
+     现在改成**前缘跟拍**：机位在前缘后 1.2 km、抬高 620 m、瞄前缘偏下游 120 m，
+     斜距约 1.8 km、俯角约 40°（__rigSearch 在 t=250 / t=430 两处实测：
+     前缘落在画面中心 headY≈0、湿水点 100% 入画、视线无遮挡 headBlk=0、
+     湿带占画高 26~33%）。于是画面下半是已到的泥浆、上半是还没到的干沟道，
+     交界（前缘）就在画面中部随它往前推 —— 这才是「看到它吞进未到达区域」的过程。
+     同时把锚点换成球的位置（见 rigHead），并加 v/k 滞后补偿（见 updateRigBaked），
+     否则前缘 850 m/s 时镜头会稳定落后 400 多米，球照样跑出画面。 */
+  follow: { back: 1200, lat: -430, alt: 620, pitch: 0, fill: 0.26,
+            pitchMin: 18, pitchMax: 46, backMin: 1000, backMax: 1500,
+            sRate: 3.0, posRate: 2.4, tgtRate: 2.6, intro: 2.4, ahead: 120, avoid: true },
   // 贴水面近景（?cam=near 切换）：取 __rigSearch 在 t=300 实测的最优区
   // （H 160~250、湿带占画高 45~50%、水头居中、零遮挡）。俯角只有约 10°，
   // 是「贴着水面看推进」的第一视角，与上面的俯瞰是两种观察方式，不互相替代。
@@ -1525,6 +1561,7 @@ const CAM_PRESET = new URLSearchParams(location.search).get('cam') === 'near' ? 
 // 末段推进到口岸（?endpush=0 关闭，见 updateRigBaked）
 const END_PUSH = new URLSearchParams(location.search).get('endpush') !== '0';
 const rig = { mode: null, s: 0, headS: -1, back: 600, fill: 0, snap: true, introT: 1,
+              vel: 0, prevHd: -1,          // 前缘推进速度（m/墙钟秒）与上一帧锚点，供滞后补偿
               cam0: new THREE.Vector3(), tgt0: new THREE.Vector3(),
               pos: new THREE.Vector3(), aim: new THREE.Vector3(), dbg: null };
 const rigTmp = new THREE.Vector3();
@@ -1541,6 +1578,14 @@ function rigTangent(s, f, L) {
 // depthVisual 而漂移（实测 t=300 机位因此向上游退了 500 m）；
 // h/peak = pot×riseFn，与视觉放大系数无关。
 function rigHead(f, L) {
+  /* 2026-11-15 用户口径（原话：「视角要跟着泥石流最前方的泥石流一直在动」）：
+     机位锚点**直接取前锋球的位置**。原来这里用 h/peak > 0.005（沾一点湿就算）
+     向上游找，而球用的是 0.12（深到看得见）—— 两个判据差 24 倍，球与镜头锚点
+     能差几百米到 1 km（11-14 记录里 frontGap 最大 4660 m），表现就是「球跑到
+     前面去了，镜头还在后面看，画面里看不到泥石流」。
+     现在锚点 = markerS（visibleFrontS 的返回值，球就画在那里），球恒在瞄准点上。
+     markerS 未就绪（洪水层关闭 / 首帧）时才回退下面的旧扫描。 */
+  if (markerS >= 0) return Math.max(0, Math.min(L, markerS));
   const cs = v => Math.max(0, Math.min(L, v));
   const pk = Math.max(f.peak || 1, 1e-3);
   const s0 = cs(f.frontS || 0);
@@ -1669,17 +1714,15 @@ function bakeRig(mode) {
   const pos = new Float32Array(n * 3), tgt = new Float32Array(n * 3);
   for (let k = 0; k < n; k++) {
     const s = Math.min(k * RIG_STEP, L);
-    /* 末段压近（2026-11-15 用户要更猛的冲击感）：最后 9% 里程把跟随机位从
-       「3 km 外俯瞰」平滑压到「斜距约 1.25 km、俯角约 20°」，冲击那一下才有
-       压迫感。依据是可量的：斜距 3.4 km 时 46 单位（≈35 m）的水墙在 900 px
-       画面上只有约 20 px 高 —— 冲击感不是被着色器吃掉的，是被视距吃掉的。
-       没有压到 near 机位的 1.1 km / 10°：那个景别是「贴着水面跑」，
-       用户 11-12 明确否过「怼在谷里看不出洪流位置」，冲击瞬间取两者之间。
+    /* 末段微压（2026-11-15，随 v2 前缘跟拍调整）：基准视距已从 3.4 km 改成
+       约 1.8 km（见 RIG.follow 注释），末段只需再收 18% / 降 32% 就够——
+       原来 -45%/-72% 是给 3 km 外俯瞰补的，套到新基准会变成 985 m / 422 m，
+       贴近 near 机位，反而容易怼进谷里。
        只对 follow 生效，cine / near 各有自己的取景口径，不跟着联动。
        值仍在同一条烘焙轨迹里算完，运行时只查表，不新增抖动来源。 */
     const nearK = mode === 'follow' ? smoothstep01(((s / L) - 0.91) / 0.09) : 0;
-    const backK = cfg.back * (1 - 0.45 * nearK);   // 3000 → 1650
-    const altK = cfg.alt * (1 - 0.72 * nearK);     // 1500 → 420
+    const backK = cfg.back * (1 - 0.18 * nearK);   // 1200 → 985（基准已贴近，只再微压）
+    const altK = cfg.alt * (1 - 0.32 * nearK);     // 620 → 422
     /* 机位里程 s − back；落后于起点时沿切线**反向外推**，而不是把里程钳到 0。
        钳到 0 会让相机与瞄准点重合、斜距只剩侧偏量 —— 就是「一开场怼在冰面上」。
        反向外推还能让水头刚起步那几秒保持同一景别。 */
@@ -1778,14 +1821,27 @@ function updateRigBaked(dt, mode) {
   const hd = rigHead(f, L);
   if (snap) {
     rig.mode = mode; rig.snap = false; rig.headS = hd;
+    rig.vel = 0; rig.prevHd = hd;
     rig.cam0.copy(camera.position); rig.tgt0.copy(controls.target);
     rig.introT = 0; rig.intro0 = performance.now();
   }
-  /* 锚点只增不减：水头物理上不会倒退，但 rigHead「向上游回看第一个有水处」
-     会在阈值边界跳几十米；旧实现直接喂给 rig.s，镜头就会往回退一下 ——
-     这是「镜头又往后退」的残留原因。现在记历史最大值，只允许前进。 */
+  /* 前缘推进速度（m/墙钟秒）：markerS 是 80 m 步进的，直接差分有台阶，用 EMA 压平。
+     1.5× 播放时前缘约 800~900 m/s，速度只在播放/回拨/换情景时阶跃。 */
+  if (!snap && rig.prevHd >= 0 && dt > 1e-4) {
+    const v = Math.max(0, Math.min((hd - rig.prevHd) / dt, 6000));
+    rig.vel += (v - rig.vel) * (1 - Math.exp(-dt * 6));
+  }
+  rig.prevHd = hd;
+  /* 锚点只增不减：水头物理上不会倒退，但 markerS 在湿区端点切换时会跳几十米；
+     旧实现直接喂给 rig.s，镜头就会往回退一下 —— 现在记历史最大值，只允许前进。 */
   if (!(rig.headS >= 0) || hd > rig.headS) rig.headS = hd;
-  rig.s = snap ? rig.headS : rig.s + (rig.headS - rig.s) * (1 - Math.exp(-dt * cfg.sRate));
+  /* 滞后补偿（2026-11-15）：指数平滑的稳态误差是 v/k，k=2 时前缘 850 m/s 会让
+     镜头永远落后 400 多米 —— 这是「镜头一直在后面」的第二个来源，只调大 k 治不了
+     （k 太大反而跟着 markerS 的 80 m 台阶抖）。把目标点前移 v/k，稳态误差归零，
+     平滑仍在，不引入跳变。回拨 / 暂停时 v→0，补偿自动消失。 */
+  const lead = Math.max(0, Math.min(rig.vel / Math.max(cfg.sRate, 0.6), 700));
+  const tgtS = Math.min(L, rig.headS + lead);
+  rig.s = snap ? tgtS : rig.s + (tgtS - rig.s) * (1 - Math.exp(-dt * cfg.sRate));
   if (DS) rig.s = Math.max(0, Math.min(L, rig.s + DS));
   if (!rigSample(mode, rig.s, rig.pos, rig.aim)) return;
   /* 收尾推进（2026-11-14，用户：「镜头就到吉隆口岸就行了」）：
@@ -2205,7 +2261,7 @@ function applyLayers() {
   // 实景洪水水面开时，旧的「示意流深场」自动让位，避免两层水叠在一起
   flowMesh.visible = L.field && !L.flood;
   if (flood) flood.setLayers(L);
-  frontMarker.visible = L.channel && !immersiveCam();
+  frontMarker.visible = L.channel && !cineCam && !rigStatic;   // 跟拍里保留，见主循环注释
   channelLine.visible = L.channel && !immersiveCam();
   glacierGroup.visible = L.glacier;
   if (iceTrackMesh) iceTrackMesh.visible = L.glacier;
@@ -2233,9 +2289,16 @@ function updatePanels(f) {
   $('focus-sub').textContent = node.sub;
   // 前缘行程三项：累计传播 / 当前高程 / 距口岸。
   // 已删：当前时刻（=时间轴）、当前断面名（=上方标题）、口岸洪峰（=右侧情景卡洪峰流量）
+  /* 2026-11-15：「累计传播 / 当前高程」改成跟球走（球 = 水面可见前缘）。
+     原来这两项用论文剖面 frontPath(ratio)，而球跟排列时间场 —— 两者实测差 2~7 km，
+     会出现「球在 17.6 km、卡片写 13.9 km」这种自相矛盾。以画面为准。
+     「距口岸」是剩余时间（表 4 插值），仍按论文口径，不参与换算。 */
+  const uiM = uiFrontM > 0 ? uiFrontM : f.path * channel.lengthM;
+  const uiC = chanAt(uiM);
+  const uiElev = heights ? trueHeight(uiC.lon, uiC.lat) : f.elev;
   $('kpi-grid').innerHTML = [
-    { k: '累计传播', v: f.dist.toFixed(1), u: 'km', e: '沟道弧长' },
-    { k: '当前高程', v: Math.round(f.elev), u: 'm', e: 'DEM 采样' },
+    { k: '累计传播', v: (uiM / 1000).toFixed(1), u: 'km', e: '沟道弧长' },
+    { k: '当前高程', v: Math.round(uiElev), u: 'm', e: 'DEM 采样' },
     { k: '距口岸', v: fmtDur(f.remain).replace(' min ', ':').replace(' s', ''), u: '', e: '表 4 插值' },
   ].map(x => `<div class="kpi"><span>${x.k}</span><b>${x.v}<small>${x.u}</small></b><em>${x.e}</em></div>`).join('');
   $('scenario-kpi').innerHTML = [
@@ -2304,9 +2367,15 @@ function bindEvents() {
   // 用户手动拖画布由 onUserTakeover 接管，随时能停掉自动运镜/旋转。
   $('btn-play').addEventListener('click', () => {
     state.playing = !state.playing;
-    autoFly = false;
+    /* 2026-11-15 改：普通播放也跟拍前缘。
+       旧版这里写的是 autoFly = false（「普通播放不抢机位」），后果是球一路往前跑、
+       镜头原地不动 —— 用户原话「球跑走了，你还在看后面，我看不到这个泥石流」。
+       现在开始播放就接管镜头，按 RIG.follow 沿着「泥石流最前缘」连续推。
+       暂停时**不清** autoFly：镜头停在原位，再点播放从同一处接着跟，不会跳回去。
+       用户随时可拖画布（onUserTakeover）或点重置视角 / 全景俯拍退出跟拍。 */
+    if (state.playing) autoFly = true;
     flight = null; followSnap = false;
-    // 播放不改机位：若当前在洪水航拍就保留航拍高亮，否则不高亮任何视角按钮
+    // 播放不改视角按钮高亮：跟拍不算「洪水航拍」，也没有对应按钮
     if (state.playing) syncViewBtns(cineCam ? 'cine' : null);
     $('btn-play').textContent = state.playing ? '暂停' : '播放';
     if (state.playing && state.t >= computeFrame(0, state.vol).total - 1) state.t = 0;
@@ -2490,6 +2559,13 @@ function refresh() {
   const markerAt = flood ? visibleFrontS(flood, f.ratio, channel.lengthM)
                          : f.path * channel.lengthM;
   const markerPath = markerAt / channel.lengthM;
+  /* 球的里程同时就是洪水系统的前锋里程（2026-11-15）：碎冰 / 浪花的生成带、
+     冲击环的落点、frontHint() 全都读 flood.frontS，而它原本由 inverseT（论文剖面）
+     给出 —— 和球现在跟的水面前缘差 2~7 km，不定时会把碎屑撒在下游空沟道上。
+     这里用球的里程覆盖它，让「球 / 水面 / 碎屑 / 冲击点」四处同一个前锋。
+     refresh() 在主循环里先于 flood.update() 执行，同帧生效。 */
+  if (flood && flood.enabled) flood.frontS = markerAt;
+  uiFrontM = markerAt;
 
   // 三维只「演」论文的时间线，不产出数字
   hazardMat.uniforms.uFront.value = markerPath;
@@ -2537,16 +2613,22 @@ function loop(now) {
     const f = computeFrame(state.t, state.vol);
     /* 子弹时间（2026-11-15：用户要更猛的冲击感）。
        真实泥石流推倒口岸只有零点几秒，常速放（1.5× = 21 场秒/秒）一闪就过去了，
-       观众根本来不及看清涌浪、白冠与碎屑飞散。这里在最后 8% 历时把推进速度
+       观众根本来不及看清涌浪、白冠与碎屑飞散。这里在末段（0.84 起到结尾）把推进速度
        压到 0.26×：场时间走得慢，镜头跟着水头也慢，冲击瞬间被拉长约 4 倍。
        用 smoothstep 过渡而不是硬切，否则时间轴会「一顿」。 */
     const rNow = state.t / Math.max(1, f.total);
-    const slow = 1 - 0.74 * smoothstep01((rNow - 0.92) / 0.08);
+    // 2026-11-15：窗口从 (0.92,0.08) 前移到 (0.84,0.06) —— 实测水面前锋在
+    // ratio 0.86~0.88 之间跨过口岸那片扇区，冲击事件就发生在 0.87 左右；
+    // 原窗口 0.92 起才减速，等于「砸完了才开始慢放」。
+    const slow = 1 - 0.74 * smoothstep01((rNow - 0.84) / 0.06);
     state.t = Math.min(f.total, state.t + dt * SIM_SECONDS_PER_REAL_SECOND * state.speed * slow);
-    // 口岸冲击：前锋首次压到口岸（ratio ≥ 0.985）时触发一次。
+    // 口岸冲击：前锋（橙色球 = 水面可见前缘）首次压到口岸时触发一次。
+    // 2026-11-15：判据从「ratio ≥ 0.985」改成「球到口岸」—— 场里的水在 ratio≈0.95
+    // 就铺到口岸了，按比例判会晚十几秒，画面看起来是「水都到了半天才震一下」。
     // 只在本地沙盘（three）触发：Cesium 视图下 canvas 被 iframe 盖住，
     // 暗角会浮在一个黑框上，冲击环与机震也看不到。
-    if (!impactFired && f.ratio >= 0.985 && flood && flood.enabled && state.engine === 'three') {
+    if (!impactFired && markerS >= channel.lengthM * 0.99
+        && flood && flood.enabled && state.engine === 'three') {
       impactFired = true;
       flood.triggerImpact();
       shakeT = SHAKE_DUR;
@@ -2632,7 +2714,10 @@ function loop(now) {
   hazardGlow.visible = state.layers.hazard && !imm;
   channelLine.visible = state.layers.channel && !imm;
   nodeGroup.visible = state.layers.nodes && !imm;
-  frontMarker.visible = state.layers.channel && !imm && fNow.ratio < 0.999;
+  // 前锋球在「跟拍」里保留（2026-11-15）：镜头现在就是跟着它走的，球是用户
+  // 判断「前缘在哪」的参照物；只有洪水航拍（cine）与 ?rig= 定点验收才收起，
+  // 因为那两种景别里它会被当成穿帮的浮点。
+  frontMarker.visible = state.layers.channel && !cineCam && !rigStatic && fNow.ratio < 0.999;
   lakeMesh.visible = state.layers.lake && !imm && lakeKVal > 0.01;
   impactRing.visible = state.layers.lake && !imm && lakeKVal > 0.01;
   impactFill.visible = state.layers.lake && !imm && lakeKVal > 0.01 && nearK < 0.55;
