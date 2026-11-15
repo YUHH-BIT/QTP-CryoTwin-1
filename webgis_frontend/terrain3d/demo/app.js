@@ -3,7 +3,7 @@ import { OrbitControls } from './lib/OrbitControls.js?v=20261114z';
 // 程序化建模骨架：spec → 可编辑 THREE.Group + 材质色板 + 着色器画岸边/立面
 import { material, assertAnchors, diagnose, attachBank, buildDistanceField } from './proc.js?v=20261114z';
 // 洪水演进实景层：④ GPU 高度场 + 亚网格连续曲面 + 碎冰 / 飞溅粒子（④②⑤①⑥）
-import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261115a';
+import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261115c';
 
 /* ==========================================================================
    吉隆「8·26」冰岩崩—泥石流灾害链 · 实景三维数字孪生推演（演示级）
@@ -484,10 +484,16 @@ let pendingAutoRotate = false;
    不接管控制，衰减到 0 即完全消失。 */
 let impactFired = false;
 let shakeT = 0;
-const SHAKE_DUR = 0.45;
+const SHAKE_DUR = 0.95;   // 2026-11-15：0.45 → 0.95，冲击那一下要够长才像「震了一下」
 let lastStageIdx = -1;
 let avgFrame = 1 / 60, dpr = Math.min(window.devicePixelRatio || 1, 1.5);
 const MAX_DPR = 1.5;
+/* 0→1 的 smoothstep（app.js 里原本只有 THREE 的 smooth，没有独立的这个）。
+   子弹时间与末段压近都用它做平滑过渡，避免速度 / 机位出现阶跃。 */
+const smoothstep01 = t => {
+  const x = clamp(t, 0, 1);
+  return x * x * (3 - 2 * x);
+};
 
 const state = {
   // 默认物源规模 1.20 亿 m³（2026-11-15 用户指定，原为 1.80 = 论文基准工况）。
@@ -1663,10 +1669,21 @@ function bakeRig(mode) {
   const pos = new Float32Array(n * 3), tgt = new Float32Array(n * 3);
   for (let k = 0; k < n; k++) {
     const s = Math.min(k * RIG_STEP, L);
+    /* 末段压近（2026-11-15 用户要更猛的冲击感）：最后 9% 里程把跟随机位从
+       「3 km 外俯瞰」平滑压到「斜距约 1.25 km、俯角约 20°」，冲击那一下才有
+       压迫感。依据是可量的：斜距 3.4 km 时 46 单位（≈35 m）的水墙在 900 px
+       画面上只有约 20 px 高 —— 冲击感不是被着色器吃掉的，是被视距吃掉的。
+       没有压到 near 机位的 1.1 km / 10°：那个景别是「贴着水面跑」，
+       用户 11-12 明确否过「怼在谷里看不出洪流位置」，冲击瞬间取两者之间。
+       只对 follow 生效，cine / near 各有自己的取景口径，不跟着联动。
+       值仍在同一条烘焙轨迹里算完，运行时只查表，不新增抖动来源。 */
+    const nearK = mode === 'follow' ? smoothstep01(((s / L) - 0.91) / 0.09) : 0;
+    const backK = cfg.back * (1 - 0.45 * nearK);   // 3000 → 1650
+    const altK = cfg.alt * (1 - 0.72 * nearK);     // 1500 → 420
     /* 机位里程 s − back；落后于起点时沿切线**反向外推**，而不是把里程钳到 0。
        钳到 0 会让相机与瞄准点重合、斜距只剩侧偏量 —— 就是「一开场怼在冰面上」。
        反向外推还能让水头刚起步那几秒保持同一景别。 */
-    const spRaw = s - cfg.back, sp = cs(spRaw);
+    const spRaw = s - backK, sp = cs(spRaw);
     const t = rigTangent(sp, f, L);
     const c = cenAt(sp), c0 = cenAt(0), over = Math.max(0, -spRaw);
     const ts = cs(s + cfg.ahead), ac = cenAt(ts);
@@ -1690,7 +1707,7 @@ function bakeRig(mode) {
       const ang = a * Math.PI / 4;
       lmax = Math.max(lmax, terrainTriY(p0.x + Math.cos(ang) * 420, p0.z + Math.sin(ang) * 420));
     }
-    const yLo = bedT + cfg.alt, yHi = bedT + cfg.alt * 1.9;
+    const yLo = bedT + altK, yHi = bedT + altK * 1.9;
     const py0 = Math.max(yLo, lmax + 140, groundAt(p0.x, p0.z) + CAM_AUTO_CLEAR);
     let px = p0.x, pz = p0.z, py = py0, bestLos = 1e9;
     for (let k2 = 0; k2 <= 3; k2++) {
@@ -2242,6 +2259,14 @@ function updatePanels(f) {
 /* 播控条下方的「各时刻发生了什么」小字行已按用户要求整块删除。
    保留函数签名作为空实现，调用点不必逐个删（异常另有 #fatal 与 Cesium 加载框）。 */
 function pushLog() {}
+
+/* 冲击暗角（2026-11-15）：冲击瞬间把画面四周压暗，视线被收拢到口岸那一点，
+   让爆散的浪花与机震更「聚焦」。纯 CSS 叠加层，零渲染开销；
+   由冲击触发点设为 1、1.1 s 后落回 0.45，时间轴回拨到 0.9 之前复位为 0。 */
+function setVignette(a) {
+  const el = $('vignette');
+  if (el) el.style.opacity = String(a);
+}
 function onStageChange(idx, f) {
   // 阶段切换不再写一行日志：阶段名已经在画面左上 HUD 和左侧列表高亮里出现，
   // 再往状态行塞一遍就是同一句话出现三次。状态行只留给「操作 / 异常 / 就绪」。
@@ -2510,15 +2535,29 @@ function loop(now) {
 
   if (state.playing) {
     const f = computeFrame(state.t, state.vol);
-    state.t = Math.min(f.total, state.t + dt * SIM_SECONDS_PER_REAL_SECOND * state.speed);
-    // 口岸冲击：前锋首次压到口岸（ratio ≥ 0.985）时触发一次
-    if (!impactFired && f.ratio >= 0.985 && flood && flood.enabled) {
+    /* 子弹时间（2026-11-15：用户要更猛的冲击感）。
+       真实泥石流推倒口岸只有零点几秒，常速放（1.5× = 21 场秒/秒）一闪就过去了，
+       观众根本来不及看清涌浪、白冠与碎屑飞散。这里在最后 8% 历时把推进速度
+       压到 0.26×：场时间走得慢，镜头跟着水头也慢，冲击瞬间被拉长约 4 倍。
+       用 smoothstep 过渡而不是硬切，否则时间轴会「一顿」。 */
+    const rNow = state.t / Math.max(1, f.total);
+    const slow = 1 - 0.74 * smoothstep01((rNow - 0.92) / 0.08);
+    state.t = Math.min(f.total, state.t + dt * SIM_SECONDS_PER_REAL_SECOND * state.speed * slow);
+    // 口岸冲击：前锋首次压到口岸（ratio ≥ 0.985）时触发一次。
+    // 只在本地沙盘（three）触发：Cesium 视图下 canvas 被 iframe 盖住，
+    // 暗角会浮在一个黑框上，冲击环与机震也看不到。
+    if (!impactFired && f.ratio >= 0.985 && flood && flood.enabled && state.engine === 'three') {
       impactFired = true;
       flood.triggerImpact();
       shakeT = SHAKE_DUR;
+      setVignette(1);                                       // 冲击瞬间压暗四周
+      setTimeout(() => setVignette(0.45), 1100);            // 落回轻度暗角，别一直黑着
     }
     // 时间轴回拨（重播 / 拖回开头）后重新武装，下次到口岸还能再砸一次
-    if (impactFired && f.ratio < 0.90) impactFired = false;
+    if (impactFired && f.ratio < 0.90) {
+      impactFired = false;
+      setVignette(0);
+    }
     if (state.t >= f.total) {
       // 一、只停时间推进，**不清 autoFly**：它同时是 immersiveCam() 的判据，
       //     清掉会让橙色态势带 / 节点球在末帧突然恢复（此时 uFront 已到 1）。
@@ -2639,13 +2678,14 @@ function loop(now) {
   // 必须把 dt 传给 update()：r160 才按真实时间算自动旋转角速度，
   // 否则 autoRotate 走「每帧固定角」分支，低帧率下慢到几乎不动（表现为按钮没用）。
   controls.update(dt);
-  /* 冲击机震（2026-11-15）：叠加在相机位置上的瞬时抖动，幅度按 18 场景单位
-     （1.3 km 视距下约 6~8 px）随 (t/0.45)² 衰减，0.45 s 内归零。
+  /* 冲击机震（2026-11-15 v2）：幅度 18 → 46 场景单位、时长 0.45 → 0.95 s，
+     并按 (t/0.95)^1.6 衰减 —— 比平方衰减稍慢，尾巴更明显，「震感」才留得住。
+     1.1 km 冲击视距下 46 单位约 18~22 px，是「镜头被撞了一下」而不是「画面在发抖」。
      只加位置偏移、不动 controls.target，所以视线朝向与用户接管都不受影响；
      放在 controls.update 之后、地形钳制之前，最后那道防穿地照样生效。 */
   if (shakeT > 0) {
     shakeT = Math.max(0, shakeT - dt);
-    const k = shakeT / SHAKE_DUR, amp = 18 * k * k;
+    const k = shakeT / SHAKE_DUR, amp = 46 * Math.pow(k, 1.6);
     camera.position.x += Math.sin(now * 0.093) * amp * 0.65;
     camera.position.y += Math.sin(now * 0.117 + 1.3) * amp;
     camera.position.z += Math.cos(now * 0.087 + 0.7) * amp * 0.65;

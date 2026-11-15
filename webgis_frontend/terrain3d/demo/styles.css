@@ -398,6 +398,18 @@ body.hide-right .stage-top { right: calc(var(--pane-pad) + var(--tab-w) + 8px); 
   border: 0; display: none; z-index: 1; background: #050c16;
 }
 #cesium-frame.on { display: block; }
+
+/* 冲击暗角（2026-11-15）：纯 CSS 叠加层，默认透明，冲击瞬间由 app.js 推 opacity。
+   pointer-events:none 保证不吃鼠标事件（整屏铺开，绝不能被它挡住拖动）。
+   z-index 2 与 Cesium 加载框同层 —— 冲击只在本地沙盘触发，两者不会同时出现。 */
+#vignette {
+  position: absolute; inset: 0; z-index: 2;
+  pointer-events: none; opacity: 0;
+  transition: opacity .4s ease;
+  background: radial-gradient(ellipse 62% 58% at 50% 52%,
+    rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0) 46%,
+    rgba(6, 10, 18, .42) 72%, rgba(4, 7, 13, .78) 100%);
+}
 .cesium-loading {
   position: absolute; inset: 0; z-index: 2; display: none;
   flex-direction: column; align-items: center; justify-content: center; gap: 9px;

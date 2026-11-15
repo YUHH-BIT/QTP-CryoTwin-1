@@ -453,10 +453,26 @@ void main() {
      翻卷的，不是和后面一样厚的一层水）。
      包络用 dSim（到达后的场秒）而不是 h：流头正是 h 最小的位置，用 h 做权重
      会把涌浪自己乘没。potB 只用来把涌浪限制在沟道内，不爬到干坡上。
-     幅度按场景单位给，与水深口径无关，仅改观感。 */
+     幅度按场景单位给，与水深口径无关，仅改观感。
+     2026-11-15 v2（用户「还是差点意思」）：v1 是一个平滑包络，在 76 m 一格的
+     显示网格上只能插值出一段缓坡，近景读起来是「水面整体拱起」而不是「墙在推」。
+     v2 加三件事，都不依赖网格密度：
+       ① 包络取 0.55 次幂 —— 升到满高所需的水平距离从约 200 m 压到 40 m，
+          插值后仍读成一道坎；
+       ② 横向舌状 —— 沟心 potB≈1、岸侧≈0.3，前沿成为弧形舌而不是一条平直的坎；
+       ③ 顶部翻卷 —— 沿流向的褶皱（波长约 74 m）叠横向起伏，墙顶不再是一条光边；
+          再让墙顶沿流向略微前压，剖面「下陡上卷」，像正在往下游扑的水墙。 */
   float fw = (dSim > 0.0) ? (1.0 - smoothstep(0.0, FRONT_W * 2.8, dSim)) : 0.0;
   float fwBack = (dSim > 0.0) ? (1.0 - smoothstep(0.0, FRONT_W * 7.0, dSim)) : 0.0;
-  float surge = uSurge * (fw * 1.0 + fwBack * 0.42) * smoothstep(0.14, 0.62, potB);
+  float chan = smoothstep(0.14, 0.62, potB);
+  float wall = pow(fw, 0.55);
+  float tongue = 0.62 + 0.38 * smoothstep(0.30, 0.92, potB);
+  float roll = sin(dot(w, vFlow) * 0.085 - uClock * 3.1)
+             * cos(dot(w, vec2(-vFlow.y, vFlow.x)) * 0.045 + uClock * 0.7);
+  float surge = uSurge * (wall + fwBack * 0.40) * chan * tongue
+              + uSurge * 0.18 * roll * wall * chan;
+  p.x -= vFlow.x * surge * 0.20;
+  p.z -= vFlow.y * surge * 0.20;
   p.y += surge;
   vWorld = (modelMatrix * vec4(p, 1.0)).xyz;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
@@ -608,6 +624,10 @@ void main() {
   /* 流头湿趾：最前沿压暗一道，读成「推土机铲刀」的湿泥边 —— 泥石流推进时
      最靠前的永远是最湿、最暗的那一条，后面才是翻起来的白沫。 */
   body *= 1.0 - 0.34 * smoothstep(0.45, 1.0, vFront);
+  /* 立面阴影（2026-11-15）：墙脚（vFront 0.20~0.55）压暗、墙顶白冠提亮，
+     一暗一亮画面才「立」得起来 —— 只给一个亮的包络时，水墙读起来仍是平面。 */
+  float face = smoothstep(0.20, 0.55, vFront) * (1.0 - smoothstep(0.62, 0.95, vFront));
+  body *= 1.0 - 0.22 * face;
   // 天空反射：泥浆从 2% 提到 7% —— 哪怕浑浊，湿面也总有掠射角的天空反光，
   // 这是「一眼认出是水」最便宜的线索，且只在边缘掠射角生效，不会洗白水体。
   vec3 col = body * diff + uSky * fres * mix(0.10, 0.07, uMuddy)
@@ -645,6 +665,19 @@ void main() {
   // 沫色压暗、混入上限从 0.78 降到 0.66，让泥浆仍是主体、白沫只是点缀）
   vec3 foamCol = mix(vec3(0.58, 0.55, 0.48), vec3(0.95, 0.92, 0.85), fn);
   col = mix(col, foamCol, clamp(foamK, 0.0, 0.66));
+  /* 前锋白冠（2026-11-15 v2）：真实泥石流最前沿是几乎纯白的翻卷泡沫，与中后段
+     暗褐泥浆形成强反差 —— 这是「一眼看出有冲击力」最直接的来源。
+     只取 vFront 0.62 以上（最前沿十几米），不会向后蔓延成白饼；强度乘 fn，
+     冠面因此是断断续续的浪花而不是一条均匀的白边。 */
+  float crown = smoothstep(0.62, 1.0, vFront) * (0.55 + 0.45 * fn);
+  col = mix(col, vec3(0.95, 0.93, 0.87), crown * 0.60);
+  /* 白沫拉丝（2026-11-15）：真实泥石流表面是一张「撕开又连上」的白色网 ——
+     顺流向拉长的细丝，而不是均匀的白点。复用上面域扭曲后的 wpos，把沿流向的
+     采样频率压到横向的 1/5（等价于沿流向拉长 5 倍），只在已有泡沫处显形，
+     权重压在 0.35 以内，不会把泥浆洗白。 */
+  float lace = smoothstep(0.52, 0.86, fbm(vec2(dot(wpos, f) * 0.016 - uClock * 1.6,
+                                              dot(wpos, fc) * 0.075)));
+  col = mix(col, vec3(0.90, 0.89, 0.84), lace * foamK * 0.35);
   // 湿边压暗形成水线，泡沫边缘的高光碎点模拟《后天》式溃坝浪花颗粒
   col *= 1.0 - 0.26 * edge;
   // 水线外侧补一道很淡的冷色反光（天空掠射的残影）：泥色与棕色山坡同色系，
@@ -1097,7 +1130,10 @@ export class FloodSystem {
         // 前锋涌浪高度（场景单位）。26 ≈ 20 m 实际高度：在 1.3 km 的近景里
         // 约等于流头凸起 1.5 个像素高度差，配合白冠即可看出「一道墙在推」；
         // 22 km 全景里被视距夸张系数放大后仍不突兀。?surge= 可调，0 = 关闭。
-        uSurge: { value: 46 },
+        // 前锋涌浪高度（场景单位）。46 ≈ 35 m 实际高度，2026-11-15 提到 58：
+        // 末段机位压到 1.25 km 后，水墙在画面里被放大 2.7 倍，这个高度才够「挡视线」。
+        // ?surge= 可调，0 = 关闭。
+        uSurge: { value: 58 },
         // 流速条纹强度。1 = 开（默认），0 = 关；?streak=0 可关掉做 A/B 验收。
         uStreakK: { value: 1 },
         uSun: { value: sunDir }, uSky: { value: new THREE.Color(0.62, 0.74, 0.86) },
@@ -1643,25 +1679,30 @@ export class FloodSystem {
         if (p.life <= 0) {
           // 只在水头「已经湿了」的位置生成：此前 900/900 个浪花、415/420 个扬尘
           // 都生成在干区，等于往山坡上抛一层白点褐点，是「碎石飘在空中」的主因之一。
+          /* 2026-11-15 v2（用户「没有冲击感」）：浪花原来撒在 ±230 m 宽的带上，
+             900 颗摊平后是一层薄雾，看不出「水在砸」。现在收窄到 ±85 m 的沟心
+             （h 最大、也是白冠所在处），沿流向反而拉长到 ±210 m 跟住水头；
+             初速与生成高度都提上去、寿命压短 —— 读起来是持续的喷溅幕而不是飘浮颗粒。
+             扬尘仍保持宽域（尘本来就是弥散的），不动。 */
           let w = null;
           for (let k = 0; k < 8; k++) {
-            const lat = (rn() - 0.5) * (dust ? 700 : 460);
-            const along = (rn() - 0.5) * (dust ? 520 : 300);
+            const lat = (rn() - 0.5) * (dust ? 700 : 170);
+            const along = (rn() - 0.5) * (dust ? 520 : 420);
             const x = front.x + t.x * along - t.z * lat;
             const z = front.z + t.z * along + t.x * lat;
             const ww = this.waterY(x, z, this.tField);
             if (ww.h > (dust ? 2.0 : 2.5)) { p.x = x; p.z = z; w = ww; break; }
           }
           if (!w) { p.life = 0; p.size = 0; continue; }
-          p.y = w.y + 1 + rn() * 5;
-          const up = dust ? 8 + rn() * 18 : 20 + rn() * 52;
-          const push = dust ? 6 + rn() * 16 : 16 + rn() * 48;
-          p.vx = t.x * push + (rn() - 0.5) * (dust ? 20 : 44);
-          p.vz = t.z * push + (rn() - 0.5) * (dust ? 20 : 44);
+          p.y = w.y + 2 + rn() * 7;
+          const up = dust ? 8 + rn() * 18 : 34 + rn() * 86;
+          const push = dust ? 6 + rn() * 16 : 30 + rn() * 95;
+          p.vx = t.x * push + (rn() - 0.5) * (dust ? 20 : 58);
+          p.vz = t.z * push + (rn() - 0.5) * (dust ? 20 : 58);
           p.vy = up;
-          p.life = dust ? 0.8 + rn() * 1.2 : 0.32 + rn() * 0.58;
+          p.life = dust ? 0.8 + rn() * 1.2 : 0.26 + rn() * 0.44;
           p.age = 0;
-          p.size = dust ? 4 + rn() * 7 : 1.8 + rn() * 3.4;
+          p.size = dust ? 4 + rn() * 7 : 1.6 + rn() * 3.0;
         }
       }
     };

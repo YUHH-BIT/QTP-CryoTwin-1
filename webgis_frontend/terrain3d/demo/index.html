@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>吉隆「8·26」冰岩崩—泥石流</title>
 <link rel="icon" href="data:," />
-<link rel="stylesheet" href="./styles.css?v=20261114z" />
+<link rel="stylesheet" href="./styles.css?v=20261115c" />
 
 <style id="embedded-mode">
 /* 系统内嵌模式：隐藏演示页顶栏，案例名称框放到左浮层最上面
@@ -107,6 +107,9 @@ if (new URLSearchParams(location.search).get('embedded') === '1') {
     <section class="stage" id="stage">
       <canvas id="scene"></canvas>
       <iframe id="cesium-frame"></iframe>
+      <!-- 冲击暗角（2026-11-15）：默认透明，前锋压到口岸时由 app.js 把 opacity 推到 1，
+           1.1 s 后落回 0.45，时间轴回拨即归零。纯叠加层，不参与渲染。 -->
+      <div id="vignette"></div>
       <div id="cesium-loading" class="cesium-loading">
         <span class="sp"></span>
         <b>正在加载 Cesium 三维地球</b>
@@ -299,7 +302,7 @@ if (new URLSearchParams(location.search).get('embedded') === '1') {
 </div>
 
 <script src="./lib/echarts.min.js"></script>
-<script type="module" src="./app.js?v=20261115b"></script>
+<script type="module" src="./app.js?v=20261115c"></script>
 <script>
 /* 面板收起 / 展开：地图全屏，左右浮层各自独立，交互不依赖 app.js 的模块加载。 */
 (function () {
