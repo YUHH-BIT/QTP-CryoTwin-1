@@ -163,8 +163,13 @@ function buildPortTails(fs) {
   return a2 ? [a1.pts, a2.pts] : [a1.pts];
 }
 
-/* 某点到外延中线的距离 → 淹没势 / 到达时间。返回 null 表示不在外延内。 */
-function tailProbe(tails, x, z) {
+/* 某点到外延中线的距离 → 淹没势 / 到达时间。返回 null 表示不在外延内。
+   baseT / spread（2026-11-15）：外延水的到达时间**必须从口岸自身的到达时刻起算**。
+   原来写死 T = 392 + 72u，而口岸中轴实测约 451 s —— 扇区比口岸本体早 60 s 就
+   有了一片水，蓝球（按可见水面取位）于是提前跳到口岸、冲击环也在那儿炸开，
+   但上游 300~500 m 还是干沟，观感就是「球到了终点、路线还没到」。
+   现在 baseT = 口岸中轴的单调到达时间，spread 取「到演示末尾还剩多少」的预算。 */
+function tailProbe(tails, x, z, baseT, spread) {
   let bestPot = 0, bestU = 0;
   for (const line of tails) {
     const segs = line.length - 1;
@@ -194,7 +199,7 @@ function tailProbe(tails, x, z) {
     if (pot > bestPot) { bestPot = pot; bestU = u0; }
   }
   if (bestPot < 0.02) return null;
-  return { u: bestU, pot: bestPot, T: 392 + 72 * bestU };
+  return { u: bestU, pot: bestPot, T: baseT + spread * bestU };
 }
 
 /* ---------------- 前缘速度台阶（2026-11-14，默认不做平滑） ----------------
@@ -903,6 +908,11 @@ export class FloodSystem {
                   new URLSearchParams(location.search).get('tail') === '0')
       ? null : buildPortTails(this);
     this.portTail = tail;
+    /* 外延水的起算时刻 = 口岸中轴的单调到达时间；spread 用「到演示末尾还剩多少」
+       的预算（截到 72 s）。口岸本身约 451 s 到水，留给扇区铺开的时间不多，
+       所以扇形几乎是口岸一到水就跟着铺出去 —— 这正是真实里水撞到坎脚的样子。 */
+    const tailBase = chanT[nK - 1];
+    const tailSpread = Math.max(6, Math.min(72, T_FIELD - 10 - tailBase));
     for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
       const q = j * W + i, p4 = q * 4;
       const u = (i + 0.5) / W, v = (j + 0.5) / H;
@@ -910,13 +920,13 @@ export class FloodSystem {
       const D = sampleU8(dep, nx, ny, u, v) * field.depthScale;
       const k = bestK[q];
       const x = -sx / 2 + (i + 0.5) * cx, z = -sz / 2 + (j + 0.5) * cz;
-      const tp = tail ? tailProbe(tail, x, z) : null;
+      const tp = tail ? tailProbe(tail, x, z, tailBase, tailSpread) : null;
       if (k < 0) { this.srcT[q] = T; srcBytes[p4] = clamp(T / T_SCALE, 0, 1) * 255; continue; }
       const dist = Math.sqrt(best[q]);
       // 包络外的格子：改为继承最近中轴点的到达时间（横向略晚），
       // 这样中轴走廊的水不会因为「一格在包络外」而永远不来。
       if (T >= T_BAD) {
-        T = tp ? tp.T : Math.min(chanT[k] + dist / 25, T_BAD + 40);
+        T = tp ? Math.max(tp.T, tailBase) : Math.min(chanT[k] + dist / 25, T_BAD + 40);
       } else T = Math.max(0, T + this.dTk[k]);
       const bedN = chanPts[k].y;
       const bed = displayY(x, z);

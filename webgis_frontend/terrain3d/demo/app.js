@@ -3,7 +3,7 @@ import { OrbitControls } from './lib/OrbitControls.js?v=20261114z';
 // 程序化建模骨架：spec → 可编辑 THREE.Group + 材质色板 + 着色器画岸边/立面
 import { material, assertAnchors, diagnose, attachBank, buildDistanceField } from './proc.js?v=20261114z';
 // 洪水演进实景层：④ GPU 高度场 + 亚网格连续曲面 + 碎冰 / 飞溅粒子（④②⑤①⑥）
-import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261115c';
+import { FloodSystem, FLOOD_CONSTANTS } from './flood.js?v=20261115i';
 
 /* ==========================================================================
    吉隆「8·26」冰岩崩—泥石流灾害链 · 实景三维数字孪生推演（演示级）
@@ -60,7 +60,7 @@ const NODES = [
   { id: 'barrier',    name: '普热普强堰塞湖',   sub: '坝高约 60 m · 库容 220 万 m³',  t: 0.60, kind: 'lake' },
   { id: 'seqiong',    name: '色琼断面',         sub: '10:55 前缘到达',                t: 0.72, kind: 'section' },
   { id: 'donglin',    name: '东林藏布',         sub: '下游坡降 6.08%',                t: 0.86, kind: 'process' },
-  { id: 'port',       name: '吉隆口岸',         sub: '约 1800 m · 受冲击',            t: 1.00, kind: 'port' },
+  { id: 'port',       name: '吉隆口岸',         sub: '约 1800 m · 待抵达',            t: 1.00, kind: 'port' },
 ];
 
 // 论文 §3.2 的 8 阶段动力演化链；r 为总历时比例（10:55 到色琼 ≈ 180/505 ≈ 0.356）
@@ -103,8 +103,10 @@ const LAYERS = [
 
 // 默认 1.5×（2026-11-14 用户「速度再稍快一点」）：只改演示播放倍率，
 // 论文 505 s 的仿真总时长与所有 KPI 口径不变。1.5 纳入选项，倍速按钮高亮才不会错位。
+// 2026-11-15 用户「这是洪水啊，全面提速」：14 → 18 场秒/秒（默认 1.5× 下约 27 场秒/秒），
+// 1.2 亿工况 585 s 全程从约 37 s 收到约 22 s。仍然只动播放倍率，不动论文时间口径。
 const SPEEDS = [1, 1.5, 2, 4, 8];
-const SIM_SECONDS_PER_REAL_SECOND = 14;
+const SIM_SECONDS_PER_REAL_SECOND = 18;
 
 /* ------------------------------ 工具函数 ------------------------------ */
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
@@ -500,6 +502,9 @@ const hazardShared = {
 };
 let lakeKVal = 0, overlayDepth = false;
 let nodeMarks = [], labelEls = [], pickables = [];
+/* 口岸节点标签的状态文案（2026-11-15）：`sub` 原来写死「受冲击」，水没到就挂着
+   「受冲击」，和「球到了、路线还没到」是同一类误导。改成随前锋到口岸翻转。 */
+let portSubEl = null, portHitShown = false;
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let pointerOrigin = null;
@@ -1207,6 +1212,7 @@ function buildNodes() {
     el.innerHTML = `<i></i>${n.name}<small>${n.sub}</small>`;
     labelHost.appendChild(el);
     labelEls.push(el);
+    if (n.kind === 'port') portSubEl = el.querySelector('small');
   });
   scene.add(nodeGroup);
 
@@ -1826,7 +1832,8 @@ function updateRigBaked(dt, mode) {
     rig.introT = 0; rig.intro0 = performance.now();
   }
   /* 前缘推进速度（m/墙钟秒）：markerS 是 80 m 步进的，直接差分有台阶，用 EMA 压平。
-     1.5× 播放时前缘约 800~900 m/s，速度只在播放/回拨/换情景时阶跃。 */
+     默认 1.5× 播放时前缘约 1100~1200 m/s（2026-11-15 全面提速前是 800~900），
+     速度只在播放/回拨/换情景时阶跃。 */
   if (!snap && rig.prevHd >= 0 && dt > 1e-4) {
     const v = Math.max(0, Math.min((hd - rig.prevHd) / dt, 6000));
     rig.vel += (v - rig.vel) * (1 - Math.exp(-dt * 6));
@@ -2566,6 +2573,14 @@ function refresh() {
      refresh() 在主循环里先于 flood.update() 执行，同帧生效。 */
   if (flood && flood.enabled) flood.frontS = markerAt;
   uiFrontM = markerAt;
+  // 口岸标签状态随前锋翻转，别在水还差一公里时就写「受冲击」
+  if (portSubEl) {
+    const hit = impactFired;      // 与冲击事件同一个判据，避免「标签说已冲击、水还没到」
+    if (hit !== portHitShown) {
+      portHitShown = hit;
+      portSubEl.textContent = hit ? '约 1800 m · 受冲击' : '约 1800 m · 待抵达';
+    }
+  }
 
   // 三维只「演」论文的时间线，不产出数字
   hazardMat.uniforms.uFront.value = markerPath;
@@ -2613,14 +2628,18 @@ function loop(now) {
     const f = computeFrame(state.t, state.vol);
     /* 子弹时间（2026-11-15：用户要更猛的冲击感）。
        真实泥石流推倒口岸只有零点几秒，常速放（1.5× = 21 场秒/秒）一闪就过去了，
-       观众根本来不及看清涌浪、白冠与碎屑飞散。这里在末段（0.84 起到结尾）把推进速度
-       压到 0.26×：场时间走得慢，镜头跟着水头也慢，冲击瞬间被拉长约 4 倍。
-       用 smoothstep 过渡而不是硬切，否则时间轴会「一顿」。 */
+       观众根本来不及看清涌浪、白冠与碎屑飞散。这里在末段把推进速度压一档，
+       冲击瞬间被拉长，镜头也跟着水头慢下来。
+       用 smoothstep 过渡而不是硬切，否则时间轴会「一顿」。
+       2026-11-15 晚（用户：「最后一段的速度实在是太慢了，这是洪水啊，全面提速」）：
+       原参数 (0.84 起, 宽 0.06, 压到 0.26×) 把最后 16% 的时长放大了 4 倍 ——
+       实测末段推进速度只有中段的 1/4（228 vs 900 m/s 真实时间），看上去像水爬到
+       口岸前突然走不动。改为 (0.86 起, 宽 0.06, 压到 0.70×)：只保留「到口岸一顿」的
+       节奏感（仍能看清涌浪与白冠），不再拖时间；末段速度回到中段的七八成。
+       口径不变：只改播放速率，tField、时钟、球位置、冲击判据全部同步。 */
     const rNow = state.t / Math.max(1, f.total);
-    // 2026-11-15：窗口从 (0.92,0.08) 前移到 (0.84,0.06) —— 实测水面前锋在
-    // ratio 0.86~0.88 之间跨过口岸那片扇区，冲击事件就发生在 0.87 左右；
-    // 原窗口 0.92 起才减速，等于「砸完了才开始慢放」。
-    const slow = 1 - 0.74 * smoothstep01((rNow - 0.84) / 0.06);
+    // 0.86 起因：实测水面前锋在 ratio 0.86~0.88 之间跨过口岸那片扇区。
+    const slow = 1 - 0.30 * smoothstep01((rNow - 0.86) / 0.06);
     state.t = Math.min(f.total, state.t + dt * SIM_SECONDS_PER_REAL_SECOND * state.speed * slow);
     // 口岸冲击：前锋（橙色球 = 水面可见前缘）首次压到口岸时触发一次。
     // 2026-11-15：判据从「ratio ≥ 0.985」改成「球到口岸」—— 场里的水在 ratio≈0.95
