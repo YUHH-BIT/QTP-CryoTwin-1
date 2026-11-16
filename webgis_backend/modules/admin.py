@@ -569,7 +569,7 @@ def api_delete_data_file():
         return _err(f'删除失败: {e}')
     return _ok(message='已删除')
 
-# ---------------- 智能体配置（决策智能体系统提示词） ----------------
+# ---------------- 大模型配置（冰冻圈灾害大模型系统提示词） ----------------
 AGENT_PROMPT_KEY = 'agent_system_prompt'
 
 
@@ -593,7 +593,7 @@ def api_update_agent_config():
     if not prompt:
         return _err('系统提示词不能为空')
     admin_db.set_setting(_base(), AGENT_PROMPT_KEY, prompt)
-    _log('修改智能体配置', '更新决策智能体系统提示词')
+    _log('修改大模型配置', '更新冰冻圈灾害大模型系统提示词')
     return _ok(message='已保存')
 
 
@@ -602,5 +602,5 @@ def api_update_agent_config():
 @permission_required('setting:edit')
 def api_reset_agent_config():
     admin_db.delete_setting(_base(), AGENT_PROMPT_KEY)
-    _log('修改智能体配置', '恢复默认系统提示词')
+    _log('修改大模型配置', '恢复默认系统提示词')
     return _ok(message='已恢复默认')

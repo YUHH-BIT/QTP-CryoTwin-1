@@ -8,7 +8,7 @@
   <!-- 使用多个CDN源确保OpenLayers加载成功 -->
   <link rel="stylesheet" href="css/lib/ol.css" />
   <!-- 移除高德地图API引用 -->
-  <link rel="stylesheet" href="css/styles.css?v=20261111nav" />
+  <link rel="stylesheet" href="css/styles.css?v=20261116a" />
   <style>
     /* ============ 系统管理面板 ============ */
     .admin-overlay { position: fixed; inset: 0; background: rgba(10, 25, 47, 0.55); z-index: 9000; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -148,7 +148,7 @@
           <a href="#" class="dropdown-toggle" data-page="decision">决策支持</a>
           <div class="dropdown-menu" id="decision-dropdown">
             <a href="terrain3d.html" class="dropdown-item">孪生示范</a>
-            <a href="decision.html?cat=llm" class="dropdown-item" data-category="llm">决策支持智能体</a>
+            <a href="decision.html?cat=llm" class="dropdown-item" data-category="llm">冰冻圈灾害大模型</a>
             <a href="decision.html?cat=expert" class="dropdown-item" data-category="expert">专家咨询</a>
             <a href="decision.html?cat=prevention-example" class="dropdown-item" data-category="prevention-example">防灾实例</a>
             <a href="decision.html?cat=non-engineering" class="dropdown-item" data-category="non-engineering">非工程措施</a>
@@ -163,7 +163,7 @@
             <a href="admin.html?cat=permission" class="dropdown-item" data-category="permission">权限管理</a>
             <a href="admin.html?cat=log" class="dropdown-item" data-category="log">系统日志</a>
             <a href="admin.html?cat=data" class="dropdown-item" data-category="data">数据管理</a>
-            <a href="admin.html?cat=agent" class="dropdown-item" data-category="agent">智能体设置</a>
+            <a href="admin.html?cat=agent" class="dropdown-item" data-category="agent">大模型设置</a>
             <a href="admin.html?cat=setting" class="dropdown-item" data-category="setting">系统设置</a>
             <a href="admin.html?cat=status" class="dropdown-item" data-category="status">系统状态</a>
           </div>
@@ -391,7 +391,7 @@
           <a class="admin-nav-item" data-cat="permission"><i class="fa fa-key"></i>权限管理</a>
           <a class="admin-nav-item" data-cat="log"><i class="fa fa-history"></i>系统日志</a>
           <a class="admin-nav-item" data-cat="data"><i class="fa fa-database"></i>数据管理</a>
-          <a class="admin-nav-item" data-cat="agent"><i class="fa fa-comments"></i>智能体设置</a>
+          <a class="admin-nav-item" data-cat="agent"><i class="fa fa-comments"></i>大模型设置</a>
           <a class="admin-nav-item" data-cat="setting"><i class="fa fa-cog"></i>系统设置</a>
           <a class="admin-nav-item" data-cat="status"><i class="fa fa-dashboard"></i>系统状态</a>
         </div>
@@ -431,6 +431,6 @@
   <script src="js/lib/echarts.min.js"></script>
   <script src="js/ui-components.js"></script>
   <script src="js/main.js?v=20261111nav"></script>
-  <script src="js/admin.js?v=20261111nav"></script>
+  <script src="js/admin.js?v=20261116a"></script>
 </body>
 </html>

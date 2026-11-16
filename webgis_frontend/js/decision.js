@@ -1,5 +1,5 @@
 /**
- * 决策支持智能体聊天脚本（原生 JavaScript）
+ * 冰冻圈灾害大模型聊天脚本（原生 JavaScript）
  * ==========================================
  * 职责：绑定 decision.html 中 #llm-chat-history / #llm-input / #llm-send-btn，
  * 通过后端 /api/llm/chat（SSE 流式）与 DeepSeek 对话，流式渲染回复。
@@ -47,7 +47,7 @@
     main.className = 'llm-msg-main';
     const label = document.createElement('div');
     label.className = 'llm-msg-role';
-    label.textContent = role === 'user' ? '我' : '智能体';
+    label.textContent = role === 'user' ? '我' : '大模型';
     const body = document.createElement('div');
     body.className = 'llm-msg-body';
     body.textContent = text || '';
@@ -70,7 +70,7 @@
     main.className = 'llm-msg-main';
     const label = document.createElement('div');
     label.className = 'llm-msg-role';
-    label.textContent = '决策智能体';
+    label.textContent = '冰冻圈灾害大模型';
     const body = document.createElement('div');
     body.className = 'llm-msg-body';
     body.textContent = '正在思考';
@@ -183,10 +183,10 @@
       }
 
       if (!errored && !fullReply) {
-        throw new Error('智能体未返回有效内容');
+        throw new Error('大模型未返回有效内容');
       }
     } catch (e) {
-      console.error('[LLM聊天] 请求失败:', e);
+      console.error('[冰冻圈灾害大模型] 请求失败:', e);
       replyBody.textContent = '';
       uiMsg('对话失败：' + (e && e.message ? e.message : e), 'error');
     } finally {
@@ -216,7 +216,7 @@
   // 欢迎语（问候 + 身份定位 + 示例引导 + 能力边界，简明扼要）
   appendMessage(
     'assistant',
-    '您好，我是「冰冻圈灾害决策支持智能体」，可为您研判青藏高原冰冻圈灾害的机理、风险与防治对策。\n\
+    '您好，我是「冰冻圈灾害大模型」，可为您研判青藏高原冰冻圈灾害的机理、风险与防治对策。\n\
 '
   );
 })();

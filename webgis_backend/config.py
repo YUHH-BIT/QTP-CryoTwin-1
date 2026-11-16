@@ -95,7 +95,7 @@ class Config:
     # 高德 API（只从环境变量读取；未配置时相关功能返回明确错误）
     AMAP_KEY = os.environ.get('AMAP_KEY', '')
 
-    # DeepSeek API（决策支持智能体专用，只从环境变量读取）
+    # DeepSeek API（冰冻圈灾害大模型专用，只从环境变量读取）
     DEEPSEEK_API_KEY = os.environ.get('DEEPSEEK_API_KEY', '')
     DEEPSEEK_MODEL = os.environ.get('DEEPSEEK_MODEL', 'deepseek-v4-flash')
     DEEPSEEK_API_URL = os.environ.get(

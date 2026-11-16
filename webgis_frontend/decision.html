@@ -8,7 +8,7 @@
   <!-- 使用多个CDN源确保OpenLayers加载成功 -->
   <link rel="stylesheet" href="css/lib/ol.css" />
   <!-- 移除高德地图API引用 -->
-  <link rel="stylesheet" href="css/styles.css?v=20261111nav" />
+  <link rel="stylesheet" href="css/styles.css?v=20261116a" />
   <link rel="stylesheet" href="css/components.css" />
   <!-- 使用多个CDN源确保Font Awesome加载成功 -->
   <link href="css/lib/font-awesome.min.css" rel="stylesheet">
@@ -62,7 +62,7 @@
           <a href="#" class="dropdown-toggle" data-page="decision">决策支持</a>
           <div class="dropdown-menu" id="decision-dropdown">
             <a href="terrain3d.html" class="dropdown-item">孪生示范</a>
-            <a href="decision.html?cat=llm" class="dropdown-item" data-category="llm">决策支持智能体</a>
+            <a href="decision.html?cat=llm" class="dropdown-item" data-category="llm">冰冻圈灾害大模型</a>
             <a href="decision.html?cat=expert" class="dropdown-item" data-category="expert">专家咨询</a>
             <a href="decision.html?cat=prevention-example" class="dropdown-item" data-category="prevention-example">防灾实例</a>
             <a href="decision.html?cat=non-engineering" class="dropdown-item" data-category="non-engineering">非工程措施</a>
@@ -77,7 +77,7 @@
             <a href="admin.html?cat=permission" class="dropdown-item" data-category="permission">权限管理</a>
             <a href="admin.html?cat=log" class="dropdown-item" data-category="log">系统日志</a>
             <a href="admin.html?cat=data" class="dropdown-item" data-category="data">数据管理</a>
-            <a href="admin.html?cat=agent" class="dropdown-item" data-category="agent">智能体设置</a>
+            <a href="admin.html?cat=agent" class="dropdown-item" data-category="agent">大模型设置</a>
             <a href="admin.html?cat=setting" class="dropdown-item" data-category="setting">系统设置</a>
             <a href="admin.html?cat=status" class="dropdown-item" data-category="status">系统状态</a>
           </div>
@@ -149,15 +149,15 @@
       </div>
     </div>
 
-    <!-- 决策支持智能体 -->
+    <!-- 冰冻圈灾害大模型 -->
     <div class="decision-category-sidebar llm-sidebar" id="llm-category-sidebar" style="display: none;">
-      <!-- 智能体头部（科技感信息栏） -->
+      <!-- 大模型头部信息栏（科技感信息栏） -->
       <div class="llm-agent-header">
         <div class="llm-agent-avatar">
           <i class="fa fa-microchip"></i>
         </div>
         <div class="llm-agent-meta">
-          <div class="llm-agent-name">冰冻圈灾害决策智能体</div>
+          <div class="llm-agent-name">冰冻圈灾害大模型</div>
           <div class="llm-agent-status">
             <span class="llm-status-dot"></span>
             <span id="llm-status-text">在线 · DeepSeek-V4</span>
@@ -413,7 +413,7 @@
   
   <script src="js/ui-components.js"></script>
   <script src="js/main.js?v=20261111nav"></script>
-  <script src="js/decision.js"></script>
+  <script src="js/decision.js?v=20261116a"></script>
   <script src="js/expert.js"></script>
   <script src="js/decision-content.js"></script>  <script>
     // 下拉菜单交互
@@ -451,7 +451,7 @@
         const allCategories = document.querySelectorAll('.decision-category-sidebar');
         allCategories.forEach(cat => { cat.style.display = 'none'; });
 
-        // 显示选中的侧边栏内容（智能体面板需 flex 布局撑满高度，其他分类用 block）
+        // 显示选中的侧边栏内容（大模型面板需 flex 布局撑满高度，其他分类用 block）
         const selectedCategory = document.getElementById(`${category}-category-sidebar`);
         if (selectedCategory) {
           selectedCategory.style.display = selectedCategory.id === 'llm-category-sidebar' ? 'flex' : 'block';
@@ -472,7 +472,7 @@
           'non-engineering': '非工程措施',
           'engineering': '工程措施',
           'expert': '专家咨询',
-          'llm': '冰冻圈灾害决策智能体',
+          'llm': '冰冻圈灾害大模型',
           'prevention-example': '防灾实例'
         };
         return categoryNames[category] || '决策支持';

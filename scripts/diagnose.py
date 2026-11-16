@@ -187,7 +187,7 @@ def main():
         else:
             check('  .env', '已配置')
     else:
-        check('  .env', '缺失（地图编码与决策智能体不可用）', WARN)
+        check('  .env', '缺失（地图编码与冰冻圈灾害大模型不可用）', WARN)
 
     # 7. 端口
     port = int(os.environ.get('PORT', '5000'))

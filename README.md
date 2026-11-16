@@ -10,16 +10,16 @@
 | 灾害数据查询 | `query.html` | 冰冻圈灾害事件（降雨型洪水 PFs / 融雪型洪水 SFs / 冰湖溃决 GLOFs / 滑坡堰塞湖 LLOFs / 冰川跃动 / 热融滑塌 RTS / 风吹雪 / 雪崩）浏览、缓冲分析 |
 | 模拟预测 | `simulate.html` | LSTM 径流模拟（/api/simulate/runoff）、洪水淹没分析（/api/simulate/flood-inundation）、融雪洪水识别（/api/snowmelt/identify），支持导出淹没统计CSV与结果GeoTIFF |
 | 风险评估 | `alert.html` | 栅格像元级洪水风险评估 R = 危险性 × 暴露度 × 脆弱性（/api/alert/risk_assessment），输出 5 级分级 GeoTIFF，支持导出统计CSV / 下载GeoTIFF / 保存图表PNG |
-| 决策支持 | `decision.html` | 决策支持智能体（/api/llm/chat，SSE 流式，**检索增强**：回答自动引用系统真实灾害案例/县域数据/方法学并标注 [数据源]）+ **院士专家名录**（/api/expert/profiles）+ **防灾实例 / 工程措施 / 非工程措施**（/api/decision/content），密钥仅存后端 |
+| 决策支持 | `decision.html` | 冰冻圈灾害大模型（/api/llm/chat，SSE 流式，**检索增强**：回答自动引用系统真实灾害案例/县域数据/方法学并标注 [数据源]）+ **院士专家名录**（/api/expert/profiles）+ **防灾实例 / 工程措施 / 非工程措施**（/api/decision/content），密钥仅存后端 |
 | 三维地形 | `terrain3d.html` | **雅鲁藏布江流域三维地形**（Three.js 引擎）：按流域边界裁剪的立体地形块 + 贴合地形的边界线；Terrarium 公开高程 + 三维卫星影像 / 地形明暗图双贴图，可垂直夸张、切贴图、自动旋转；数据由 `scripts/build_terrain_page.py --basin 雅鲁藏布江 --region-id yarlung --zoom 10 --mesh 700` 生成（4.4MB），渲染完全本地。入口：各页「决策支持」下拉第一项「三维示范区」 |
-| 系统管理 | `admin.html` | 用户 / 角色 / 权限 CRUD、操作日志与图表统计、系统状态、数据文件管理（阈值/模型/上传数据）、决策智能体提示词设置，需登录 |
+| 系统管理 | `admin.html` | 用户 / 角色 / 权限 CRUD、操作日志与图表统计、系统状态、数据文件管理（阈值/模型/上传数据）、冰冻圈灾害大模型提示词设置，需登录 |
 
 ## 技术栈
 
 - 后端：Flask（蓝图 + 会话认证）、SQLite（`admin.db` 用户/角色/日志；`TibetanPlateau_index.db` / `era5_index.db` 数据索引）
 - 计算：rasterio / geopandas / shapely / scipy / numpy / torch（LSTM）/ matplotlib（出图与 GIF）
 - 前端：原生 HTML/JS/CSS，OpenLayers / ECharts / Font Awesome / Google Fonts 均本地托管（js/lib、css/lib、css/fonts），可离线运行（在线高德底图瓦片除外）；三维示范区用 Cesium 1.146（`webgis_frontend/cesium/` 自托管，quantized-mesh 地形瓦片本地生成）
-- 外部服务：高德地理编码 API（`/modules/geocode`）、DeepSeek API（决策智能体）
+- 外部服务：高德地理编码 API（`/modules/geocode`）、DeepSeek API（冰冻圈灾害大模型）
 
 ## 快速开始
 
@@ -109,8 +109,8 @@ Cryo-floods/
 │   │   ├── alert.py           # 洪水径流 / 动画 / 风险评估
 │   │   ├── economy.py         # GDP / 能源 / 水坝 / 水库数据
 │   │   ├── disaster.py        # 冰冻圈灾害事件数据
-│   │   ├── llm.py             # DeepSeek 决策智能体（SSE，检索增强 RAG）
-│   │   ├── expert_kb.py       # 智能体真实数据知识库（构建与检索，RAG 数据层）
+│   │   ├── llm.py             # 冰冻圈灾害大模型（SSE，检索增强 RAG）
+│   │   ├── expert_kb.py       # 冰冻圈灾害大模型真实数据知识库（构建与检索，RAG 数据层）
 │   │   ├── expert.py          # 院士专家名录（公开资料档案 / 领域检索 / 单位联系方式）
 │   │   ├── decision.py        # 决策支持内容（防灾实例 / 工程措施 / 非工程措施）
 │   │   ├── geocode.py         # 地理编码
@@ -191,7 +191,7 @@ python -m pytest tests/ -q
 - 模拟：`/api/simulate/models`、`/api/simulate/runoff`、`/api/simulate/flood-inundation`、`/api/simulate/flood/thresholds`
 - 融雪：`/api/snowmelt/identify`、`/api/snowmelt/result/<file>`
 - 风险：`/api/alert/risk_assessment`
-- 智能体：`/api/llm/chat`（SSE，检索增强：自动注入系统真实数据并要求 [数据源] 标注）、`/api/llm/health`
+- 冰冻圈灾害大模型：`/api/llm/chat`（SSE，检索增强：自动注入系统真实数据并要求 [数据源] 标注）、`/api/llm/health`
 - 专家名录：`/api/expert/profiles`（支持 `?field=` 领域筛选、`?q=` 搜索）、`/api/expert/fields`（领域分类）
 - 决策内容：`/api/decision/content`（防灾实例 10 例 / 工程措施 20 条 / 非工程措施 12 条，含来源）
 - 三维示范区：`/api/3d/regions`、`/api/3d/regions/<id>`；地形瓦片 `/tiles3d/<region>/terrain/layer.json` 与 `/tiles3d/<region>/terrain/<z>/<x>/<y>.terrain`（quantized-mesh，TMS 网格 2^(z+1)×2^z）；矢量 `/tiles3d/<region>/vectors/<name>.geojson`；引擎静态资源 `/cesium/*`

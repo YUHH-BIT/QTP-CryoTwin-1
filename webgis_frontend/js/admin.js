@@ -545,7 +545,7 @@
 
     },
 
-    // ---------------- 智能体设置 ----------------
+    // ---------------- 大模型设置 ----------------
     async renderAgent() {
       let roleCode = '';
       try {
@@ -554,8 +554,8 @@
       } catch (e) { /* ignore */ }
       const canEdit = roleCode !== 'viewer';
       const html =
-        '<div class="admin-toolbar"><h3>智能体设置</h3></div>' +
-        '<p style="color:#8a99a8;font-size:12px;margin-bottom:10px;line-height:1.7;">以下内容作为「冰冻圈灾害决策智能体」（decision.html）的系统提示词，定义它的身份、职责、回答规则与能力边界。保存后立即生效。</p>' +
+        '<div class="admin-toolbar"><h3>大模型设置</h3></div>' +
+        '<p style="color:#8a99a8;font-size:12px;margin-bottom:10px;line-height:1.7;">以下内容作为「冰冻圈灾害大模型」（decision.html）的系统提示词，定义它的身份、职责、回答规则与能力边界。保存后立即生效。</p>' +
         '<textarea id="agent-prompt" rows="16" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #d4dbe6;border-radius:8px;font-family:inherit;font-size:13px;line-height:1.6;"' + (canEdit ? '' : ' readonly') + '></textarea>' +
         '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;">' +
           (canEdit
@@ -571,7 +571,7 @@
         const ta = document.getElementById('agent-prompt');
         if (ta) ta.value = d.system_prompt || '';
       } catch (e) {
-        toast('智能体配置读取失败：' + (e && e.message ? e.message : '接口不可用'), 'error');
+        toast('大模型配置读取失败：' + (e && e.message ? e.message : '接口不可用'), 'error');
       }
 
       const saveBtn = document.getElementById('agent-save');

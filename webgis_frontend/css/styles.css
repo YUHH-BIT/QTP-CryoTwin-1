@@ -3298,7 +3298,7 @@ position: absolute;
   background: rgba(30, 41, 59, 0.98);
   overflow-y: auto;
   border-radius: 16px;
-  /* 纵向弹性布局：智能体面板可占满剩余高度，输入框固定底部 */
+  /* 纵向弹性布局：大模型面板可占满剩余高度，输入框固定底部 */
   display: flex;
   flex-direction: column;
 }
@@ -3836,7 +3836,7 @@ position: absolute;
   border-color: var(--primary);
 }
 
-/* ============ 决策支持智能体（LLM聊天） ============ */
+/* ============ 冰冻圈灾害大模型（LLM 聊天） ============ */
 
 /* 侧边栏卡片：科技感渐变边框 */
 .llm-sidebar {
@@ -3849,7 +3849,7 @@ position: absolute;
   flex-direction: column;
 }
 
-/* 智能体头部信息栏 */
+/* 大模型头部信息栏 */
 .llm-agent-header {
   display: flex;
   align-items: center;

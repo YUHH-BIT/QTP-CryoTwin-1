@@ -107,9 +107,9 @@ def main():
                 body = f.read()
             with open(env_file, 'w', encoding='utf-8') as f:
                 f.write(body)
-            print('  [!] 已从 .env.example 生成 .env，请填 API Key 后使用地图/智能体')
+            print('  [!] 已从 .env.example 生成 .env，请填 API Key 后使用地图/冰冻圈灾害大模型')
         else:
-            print('  [!] 缺 .env（地图编码与决策智能体不可用）')
+            print('  [!] 缺 .env（地图编码与冰冻圈灾害大模型不可用）')
     else:
         print('  [√] .env 已配置')
 
