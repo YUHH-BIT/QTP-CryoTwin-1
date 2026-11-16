@@ -50,6 +50,10 @@ data/webgis/outputs/
 *.tif
 !Training/output/*.png
 
+# ============ 超大文档（超 GitHub 100MB 单文件限制，仅本地保留） ============
+# 科研进展报道原图版 127.86 MB，无法入库；精简版(2.15MB)仍随仓库提交。
+output/科研进展报道.docx
+
 # ============ 日志 / 缓存 / 测试 ============
 *.log
 .pytest_cache/
