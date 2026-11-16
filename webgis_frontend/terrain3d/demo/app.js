@@ -108,6 +108,36 @@ const LAYERS = [
 const SPEEDS = [1, 1.5, 2, 4, 8];
 const SIM_SECONDS_PER_REAL_SECOND = 18;
 
+/* 视觉节奏补偿（2026-11-17 用户：「错坚河、色琼、吉隆口岸的速度不相同，我知道这是对的，
+   但视觉上后面两段太慢，视觉上不可行，你只要慢一点点就可以了」）。
+   问题在**数据**，不在播放倍率 —— 沿沟道中轴把 arrival.bin 的到达时间抽出来实测：
+     ratio 0.05~0.30：每 0.05 推进 2.0~2.2 km（视觉 1.77~1.86 km/墙钟秒）
+     ratio 0.35~0.95：每 0.05 只推进 0.42~0.73 km（视觉 0.39~0.51 km/墙钟秒）
+   后段只有前段的 27%，看上去像水爬到色琼之后就"不走"了。
+   物理上不该改：论文锚点是 180 s 到色琼(15 km)、505 s 到口岸，后 7 km 天然占 56% 时长；
+   硬把后段 T 拉直就等于改论文数据。
+   所以这里只补偿**播放节奏**（t 的推进速率随 ratio 放大）：水面、时钟、前锋球、
+   冲击判据全部读同一条 t 轴，彼此仍然严格对应，KPI 与口径一个字不动 ——
+   只是"墙上时间 → 仿真时刻"的斜率在后段变陡。
+   表的来源：PACE[i] = 0.90 × 前段平均推进 / 第 i 段推进（i = ratio×40，0.025 一档共 41 档），
+   只加速不减速，再对 pace 做 3 点平滑，上限 6.0；0~0.26 保持 1.0（源区起步本来就该慢），
+   0.26~0.32 用 smoothstep 接入。0.90 就是用户要的"只慢一点点"（后段保持前段的九成）。
+   效果：后段视觉速度 0.51 → 1.53~1.69 km/s，为前段 1.82 的 84~93%；
+   1.2 亿工况全程 22.7 s → 11.8 s（前段节奏不变，省下来的全在磨叽的后两段）。
+   末段 0.9~1.0 只有 1.18（65%）是刻意的：那里水已经铺进口岸扇区、冲击正要发生，
+   留一点"到站"的顿挫；再往后 T 场已饱和（水头不再前进），pace 拉到 5.5 只是把
+   空转的时钟快进掉，不产生位移。
+   场数据 / 默认工况变了要重算：node scripts/_pacegen.mjs 0.90 6.0。 */
+const PACE_TABLE = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1.16, 1.99, 2.71, 3.25, 3.24, 3.34, 3.33,
+                    3.24, 3.13, 3.25, 3.68, 3.91, 3.89, 3.69, 3.58, 3.4, 3.1, 3.09, 3.41, 3.72, 3.58,
+                    3.35, 3.22, 3.26, 3.05, 3.4, 4.35, 5.51];
+function paceAt(ratio) {
+  const n = PACE_TABLE.length - 1;
+  const x = clamp(ratio, 0, 1) * n;
+  const i = Math.floor(x);
+  return i >= n ? PACE_TABLE[n] : lerp(PACE_TABLE[i], PACE_TABLE[i + 1], x - i);
+}
+
 /* ------------------------------ 工具函数 ------------------------------ */
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -2640,7 +2670,11 @@ function loop(now) {
     const rNow = state.t / Math.max(1, f.total);
     // 0.86 起因：实测水面前锋在 ratio 0.86~0.88 之间跨过口岸那片扇区。
     const slow = 1 - 0.30 * smoothstep01((rNow - 0.86) / 0.06);
-    state.t = Math.min(f.total, state.t + dt * SIM_SECONDS_PER_REAL_SECOND * state.speed * slow);
+    /* paceAt：后段节奏补偿（表见文件头 PACE_TABLE 注释）。
+       注意顺序：pace 是「把磨叽的后两段追上来」，slow 是「冲击瞬间顿一下」，
+       两者相乘 —— 0.86 之后净速率约 3.4×0.7 ≈ 2.4 倍，仍有一下顿挫，但不再爬。 */
+    const pace = paceAt(rNow);
+    state.t = Math.min(f.total, state.t + dt * SIM_SECONDS_PER_REAL_SECOND * state.speed * slow * pace);
     // 口岸冲击：前锋（橙色球 = 水面可见前缘）首次压到口岸时触发一次。
     // 2026-11-15：判据从「ratio ≥ 0.985」改成「球到口岸」—— 场里的水在 ratio≈0.95
     // 就铺到口岸了，按比例判会晚十几秒，画面看起来是「水都到了半天才震一下」。
@@ -3518,6 +3552,12 @@ async function boot() {
     return { center: [Math.round(cx), Math.round(cy), Math.round(cz)], rows };
   };
   window.__ready = true;
+  // 节奏补偿表体检：__pace() 返回 0~1 每 0.05 一档的 pace（验收用，不影响播放）
+  window.__pace = () => {
+    const out = [];
+    for (let i = 0; i <= 20; i++) out.push(+paceAt(i / 20).toFixed(2));
+    return out;
+  };
   window.__dbg = () => ({
     ready: true,
     engine: state.engine, cesiumReady, cesiumErr,
