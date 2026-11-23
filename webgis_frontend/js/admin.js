@@ -633,7 +633,6 @@
       const bad = '<span style="color:#d7191c;font-weight:600;">异常</span>';
       const html =
         '<div class="admin-toolbar"><h3>系统状态</h3>' +
-          '<span class="admin-search" style="border:none;background:transparent;color:#64748b;font-size:12px;">实时运行指标 · 示例 / 仅供参考</span>' +
           '<button class="admin-btn admin-btn-sm" id="status-refresh">刷新</button>' +
         '</div>' +
         this.statSection('运行概况', [
