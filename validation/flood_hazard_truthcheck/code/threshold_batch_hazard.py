@@ -80,21 +80,19 @@ def main():
         thrs.append(align_to_reference(a, t, c, ref_shape, ref_transform, ref_crs))
     print("阈值已对齐: %s" % quantiles)
 
-    # ---- 边界掩膜（只算一次）----
+    # ---- 边界掩膜（只算一次；按几何而不是按首日数值，避免把首日 0 值像元误删）----
     bmask = None
     if args.boundary and os.path.exists(args.boundary):
         import geopandas as gpd
-        from rasterio.mask import mask as rio_mask
+        from rasterio.features import geometry_mask
         gdf = gpd.read_file(args.boundary).to_crs(ref_crs)
-        with rasterio.open(files[0]) as ref:
-            out_img, _ = rio_mask(ref, [gdf.geometry.union_all()], crop=False,
-                                  nodata=0, filled=True, invert=False)
-        bmask = out_img[0] > 0
+        bmask = geometry_mask([gdf.geometry.union_all()],
+                              out_shape=ref_shape, transform=ref_transform,
+                              invert=True)
         print("研究区边界掩膜完成，边界内像元 %d" % int(bmask.sum()))
 
     # ---- 一次遍历，累积 N 个阈值的淹没最大场 ----
     haz = [np.zeros(ref_shape, dtype=np.float32) for _ in quantiles]
-    buf = np.zeros(ref_shape, dtype=np.float32)
     t0 = time.time()
     n_mis = 0
     for i, f in enumerate(files, 1):
@@ -102,9 +100,9 @@ def main():
         if arr.shape != ref_shape or t != ref_transform:
             arr = align_to_reference(arr, t, c, ref_shape, ref_transform, ref_crs)
         for k, thr in enumerate(thrs):
-            buf[:] = 0.0
-            np.copyto(buf, arr, where=(arr >= thr))
-            np.maximum(haz[k], buf, out=haz[k])
+            # 等价于「淹没日保留 runoff 值，否则 0」后逐日取最大，
+            # 但省掉一次中间数组拷贝（44 年 × 5 阈值时差别显著）。
+            np.maximum(haz[k], arr, out=haz[k], where=(arr >= thr))
         if i % 2000 == 0:
             print("  %d/%d 天，耗时 %.0f s" % (i, len(files), time.time() - t0))
     n_mis = len(files)

@@ -15,7 +15,9 @@ DATA_DIR = BASE / "data"
 OUT_DIR = BASE / "outputs"
 
 # ---- 输入数据（只引用，不复制） ----
-POINTS_SRC = PROJ / "docs" / "历史洪水点位数据集"
+# 原始 docs/历史洪水点位数据集 已在提交 55c575e 中删除；验证所需 SHP 从
+# 提交 e730108 恢复到 data/points_src/（data/ 已被 .gitignore 忽略）。
+POINTS_SRC = BASE / "data" / "points_src" / "docs" / "历史洪水点位数据集"
 CSV_2004_2025 = POINTS_SRC / "QinghaiTibet_Floods_2004_2025_Full.csv"
 SHP_2004_2025 = POINTS_SRC / "2004_2025" / "2004_2025.shp"
 SHP_1980_2003 = POINTS_SRC / "1980_2003" / "1980_2003.shp"

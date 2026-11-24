@@ -45,6 +45,7 @@ def main():
     ap.add_argument("--threshold_dir", required=True)
     ap.add_argument("--quantiles", default="10,50,90,95,99")
     ap.add_argument("--years", default="2024", help="检验年份，逗号分隔")
+    ap.add_argument("--out_dir", default="", help="报告输出目录（默认 outputs/）")
     args = ap.parse_args()
 
     quantiles = [int(q) for q in args.quantiles.split(",") if q.strip()]
@@ -109,7 +110,9 @@ def main():
         lines += ["", "> 若阈值确为该像元历史分位数，应与该年径流统计量明显正相关（>0.8）。",
                   "> 出现负相关＝阈值与径流空间格局相反，说明二者不同源。", ""]
 
-    out = OUT_DIR / ("threshold_audit_%s.md" % "_".join(str(y) for y in years))
+    out = Path(args.out_dir) if args.out_dir else OUT_DIR
+    out.mkdir(parents=True, exist_ok=True)
+    out = out / ("threshold_audit_%s.md" % "_".join(str(y) for y in years))
     out.write_text("\n".join(lines), encoding="utf-8")
     print("报告: %s" % out)
     print("\n".join(lines))

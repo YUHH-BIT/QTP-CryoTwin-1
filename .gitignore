@@ -83,3 +83,10 @@ _pending_delete_*/
 # 目录名不用 _backup_ 前缀，避免命中上面的本地备份忽略规则。
 !archive/
 !archive/**
+
+# ============ 洪水危险性验证目录（用户要求整目录入库） ============
+# 真值 SHP 与 CSV（历史洪水点位数据集，2026-11 从提交 e730108 恢复）
+!validation/flood_hazard_truthcheck/data/
+!validation/flood_hazard_truthcheck/data/**
+# 验证结果栅格：解除全局 *.tif 忽略（含 outputs_v2/hazard 与历史 smoke 产物）
+!validation/flood_hazard_truthcheck/**/*.tif
