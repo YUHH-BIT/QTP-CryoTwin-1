@@ -390,7 +390,9 @@ def main():
                   encoding="utf-8-sig")
 
     # ---- 图 ----
-    plt.rcParams.update({"font.size": 9, "axes.grid": True,
+    plt.rcParams.update({"font.sans-serif": ["Microsoft YaHei", "SimHei", "DejaVu Sans"],
+                         "axes.unicode_minus": False,
+                         "font.size": 9, "axes.grid": True,
                          "grid.alpha": 0.25, "savefig.dpi": 300})
     # ROC
     fig, ax = plt.subplots(figsize=(5, 5))
@@ -401,10 +403,10 @@ def main():
         from sklearn.metrics import roc_curve
         fpr, tpr, _ = roc_curve(y, s)
         ax.plot(fpr, tpr, lw=1.6 if q == 99 else 1.1,
-                label="p%d (AUC=%.3f)" % (q, auc_of(lp, ln)))
+                label="p%d（AUC=%.3f）" % (q, auc_of(lp, ln)))
     ax.plot([0, 1], [0, 1], "k--", lw=0.8)
-    ax.set_xlabel("False positive rate"); ax.set_ylabel("True positive rate")
-    ax.set_title("ROC: 2024-25 flood events vs stratified random points")
+    ax.set_xlabel("假阳性率"); ax.set_ylabel("真阳性率")
+    ax.set_title("ROC 曲线：2024–2025 年历史洪水点位与分层随机对照点")
     ax.legend(frameon=False)
     fig.tight_layout(); fig.savefig(os.path.join(FIG, "roc_holdout.png"))
     fig.savefig(os.path.join(FIG, "roc_holdout.pdf")); plt.close(fig)
@@ -414,51 +416,56 @@ def main():
     ax = axes[0]
     ax.errorbar(df_a.radius_km, df_a.hit_pos,
                 yerr=[df_a.hit_pos - df_a.hit_ci_lo, df_a.hit_ci_hi - df_a.hit_pos],
-                marker="o", capsize=3, label="SHP events")
+                marker="o", capsize=3, label="历史洪水点位")
     ax.errorbar(df_a.radius_km, df_a.hit_neg,
                 yerr=[df_a.hit_neg - df_a.hit_neg_ci_lo,
                       df_a.hit_neg_ci_hi - df_a.hit_neg],
-                marker="s", capsize=3, label="random points")
+                marker="s", capsize=3, label="随机对照点")
     ax.axhline(base_area, ls="--", lw=0.8, color="gray",
-               label="area baseline = %.3f" % base_area)
-    ax.set_xlabel("position tolerance (km)"); ax.set_ylabel("fraction level > 0")
+               label="面积基线 = %.3f" % base_area)
+    ax.set_xlabel("位置容差（km）"); ax.set_ylabel("等级 > 0 的比例")
     ax.set_ylim(0, 1.02); ax.legend(frameon=False, fontsize=7)
-    ax.set_title("level > 0 (saturated)")
+    ax.set_title("等级 > 0（已饱和）")
     ax = axes[1]
-    ax.plot(df_a.radius_km, df_a.hit_pos_ge4, marker="o", label="SHP events")
-    ax.plot(df_a.radius_km, df_a.hit_neg_ge4, marker="s", label="random points")
+    ax.plot(df_a.radius_km, df_a.hit_pos_ge4, marker="o", label="历史洪水点位")
+    ax.plot(df_a.radius_km, df_a.hit_neg_ge4, marker="s", label="随机对照点")
     ax.axhline(base_ge4, ls="--", lw=0.8, color="gray",
-               label="area baseline = %.3f" % base_ge4)
-    ax.set_xlabel("position tolerance (km)"); ax.set_ylabel("fraction level >= 4")
+               label="面积基线 = %.3f" % base_ge4)
+    ax.set_xlabel("位置容差（km）"); ax.set_ylabel("等级 ≥ 4 的比例")
     ax.set_ylim(0, 1.02); ax.legend(frameon=False, fontsize=7)
-    ax.set_title("level >= 4")
+    ax.set_title("等级 ≥ 4")
     fig.tight_layout(); fig.savefig(os.path.join(FIG, "tolerance_curve.png"))
     fig.savefig(os.path.join(FIG, "tolerance_curve.pdf")); plt.close(fig)
 
     # 等级构成
     fig, ax = plt.subplots(figsize=(5, 3.4))
     w = 0.38
-    ax.bar(ks - w / 2, pk, w, label="SHP events")
-    ax.bar(ks + w / 2, nk, w, label="random points")
-    ax.set_xticks(ks); ax.set_xlabel("hazard level")
-    ax.set_ylabel("fraction"); ax.legend(frameon=False)
-    ax.set_title("Level distribution (p99, 1 km)")
+    ax.bar(ks - w / 2, pk, w, label="历史洪水点位")
+    ax.bar(ks + w / 2, nk, w, label="随机对照点")
+    ax.set_xticks(ks); ax.set_xlabel("危险性等级")
+    ax.set_ylabel("比例"); ax.legend(frameon=False)
+    ax.set_title("等级分布（p99，1 km）")
     fig.tight_layout(); fig.savefig(os.path.join(FIG, "level_distribution.png"))
     fig.savefig(os.path.join(FIG, "level_distribution.pdf")); plt.close(fig)
 
-    # 阈值敏感性
+    # 阈值敏感性（横轴按分位类别排列，避免 90/95/99 挤在一起）
     fig, ax1 = plt.subplots(figsize=(5, 3.4))
-    ax1.errorbar(df_s.q, df_s.auc,
+    xs = np.arange(len(df_s))
+    ax1.errorbar(xs, df_s.auc,
                  yerr=[df_s.auc - df_s.auc_ci_lo, df_s.auc_ci_hi - df_s.auc],
                  marker="o", capsize=3, color="C3")
     ax1.axhline(0.5, ls="--", lw=0.8, color="gray")
-    ax1.set_xlabel("threshold quantile"); ax1.set_ylabel("AUC", color="C3")
+    ax1.set_xticks(xs)
+    ax1.set_xticklabels(["p%d" % q for q in df_s.q])
+    ax1.set_xlabel("阈值分位"); ax1.set_ylabel("AUC", color="C3")
     ax1.set_ylim(0.4, 0.9)
     ax2 = ax1.twinx()
-    ax2.plot(df_s.q, df_s.lift_area, marker="s", color="C0", lw=1.2)
-    ax2.set_ylabel("Lift (Hit / area base)", color="C0")
+    ax2.plot(xs, df_s.lift_area, marker="s", color="C0", lw=1.2)
+    ax2.set_ylabel("提升倍数（命中率 / 面积基线）", color="C0")
     ax2.set_ylim(0.8, 1.2)
-    ax1.set_title("Threshold sensitivity (1 km)")
+    ax1.text(0.03, 0.06, "p10–p99 五档结果一致", transform=ax1.transAxes,
+             fontsize=8, color="gray")
+    ax1.set_title("阈值敏感性（1 km）")
     fig.tight_layout(); fig.savefig(os.path.join(FIG, "threshold_sensitivity.png"))
     fig.savefig(os.path.join(FIG, "threshold_sensitivity.pdf")); plt.close(fig)
 
@@ -472,13 +479,13 @@ def main():
                    cmap="YlOrRd", vmin=1, vmax=5, interpolation="nearest")
     tp = gpd.read_file(TP_BOUNDARY)
     tp.boundary.plot(ax=ax, color="k", lw=0.6)
-    ax.scatter(pos.lon, pos.lat, s=5, c="tab:blue", label="SHP events")
+    ax.scatter(pos.lon, pos.lat, s=5, c="tab:blue", label="历史洪水点位")
     ax.scatter(neg_lon, neg_lat, s=3, c="tab:green", alpha=0.4,
-               label="random points")
-    ax.set_xlabel("Longitude"); ax.set_ylabel("Latitude")
+               label="随机对照点")
+    ax.set_xlabel("经度"); ax.set_ylabel("纬度")
     ax.legend(loc="lower left", frameon=True, fontsize=7)
-    ax.set_title("p99 hazard 1980-2023 and validation samples")
-    fig.colorbar(im, ax=ax, shrink=0.6, label="hazard level")
+    ax.set_title("1980–2023 年 p99 危险性等级与验证样本")
+    fig.colorbar(im, ax=ax, shrink=0.6, label="危险性等级")
     fig.tight_layout(); fig.savefig(os.path.join(FIG, "holdout_map.png"))
     fig.savefig(os.path.join(FIG, "holdout_map.pdf")); plt.close(fig)
 
