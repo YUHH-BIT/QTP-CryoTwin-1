@@ -41,7 +41,7 @@ from common import (PROJ, SHP_2004_2025, SHP_1980_2003, TP_BOUNDARY,
 
 BASE = os.path.join(PROJ, "validation", "flood_hazard_truthcheck")
 OUT = os.path.join(BASE, "outputs_v2")
-FIG = os.path.join(OUT, "figures")
+FIG = os.path.join(OUT, "图件")
 RIVER = os.path.join(PROJ, "data", "raw", "geo", "hydrology", "river.geojson")
 BASINS = os.path.join(PROJ, "data", "raw", "geo", "hydrology", "TP_basins.geojson")
 RADII = (0.0, 1.0, 3.0, 5.0)
@@ -175,8 +175,8 @@ def boot_ci(values_pos, values_neg, metric, n_boot=1000, seed=SEED):
 def main():
     global OUT, FIG
     ap = argparse.ArgumentParser(description="留出期危险性真实性检验")
-    ap.add_argument("--hazard_dir", default=os.path.join(OUT, "hazard"))
-    ap.add_argument("--thr_dir", default=os.path.join(OUT, "thresholds"))
+    ap.add_argument("--hazard_dir", default=os.path.join(OUT, "危险性栅格"))
+    ap.add_argument("--thr_dir", default=os.path.join(PROJ, "data", "raw", "thresholds"))
     ap.add_argument("--start", default="1980-01-01")
     ap.add_argument("--end", default="2023-12-31")
     ap.add_argument("--main_radius", type=float, default=1.0)
@@ -184,12 +184,15 @@ def main():
     args = ap.parse_args()
 
     OUT = args.out_dir
-    FIG = os.path.join(OUT, "figures")
+    FIG = os.path.join(OUT, "图件")
     os.makedirs(OUT, exist_ok=True)
     os.makedirs(FIG, exist_ok=True)
 
-    stamp = "%s_to_%s_basin-all_hazard_p%%d.tif" % (args.start, args.end)
-    haz_path = {q: os.path.join(args.hazard_dir, stamp % q) for q in QUANTILES}
+    haz_path = {
+        q: os.path.join(args.hazard_dir,
+                        "危险性_p%d_%s_to_%s.tif" % (q, args.start, args.end))
+        for q in QUANTILES
+    }
     for q, p in haz_path.items():
         if not os.path.exists(p):
             raise SystemExit("缺少危险性栅格: %s" % p)
@@ -252,6 +255,8 @@ def main():
         lv[k] = (lv[k][0][ok_pos], lv[k][1][ok_neg])
     lp_main, ln_main = lv[(99, args.main_radius)]
     print("最终正样本 %d，负样本 %d" % (len(lp_main), len(ln_main)))
+    n_pos_2024 = int((pos.year == 2024).sum())
+    n_pos_2025 = int((pos.year == 2025).sum())
 
     # ---- A 节 ----
     base_area = float((arr99[valid] > 0).mean())
@@ -378,15 +383,15 @@ def main():
         "basin": np.r_[pbasin, nbasin],
     })
     # 注意：pbasin 已按过滤后的 pos 顺序对齐
-    out.to_csv(os.path.join(OUT, "points_holdout_levels.tsv"), sep="\t",
+    out.to_csv(os.path.join(OUT, "验证点位等级表.tsv"), sep="\t",
                index=False, encoding="utf-8-sig")
-    df_a.to_csv(os.path.join(OUT, "metrics_hit_rate.csv"), index=False,
+    df_a.to_csv(os.path.join(OUT, "指标_覆盖度.csv"), index=False,
                 encoding="utf-8-sig")
-    df_b.to_csv(os.path.join(OUT, "metrics_auc.csv"), index=False,
+    df_b.to_csv(os.path.join(OUT, "指标_AUC.csv"), index=False,
                 encoding="utf-8-sig")
-    df_s.to_csv(os.path.join(OUT, "metrics_threshold_sensitivity.csv"),
+    df_s.to_csv(os.path.join(OUT, "指标_阈值敏感性.csv"),
                 index=False, encoding="utf-8-sig")
-    df_sub.to_csv(os.path.join(OUT, "metrics_by_basin.csv"), index=False,
+    df_sub.to_csv(os.path.join(OUT, "指标_分流域.csv"), index=False,
                   encoding="utf-8-sig")
 
     # ---- 图 ----
@@ -394,80 +399,27 @@ def main():
                          "axes.unicode_minus": False,
                          "font.size": 9, "axes.grid": True,
                          "grid.alpha": 0.25, "savefig.dpi": 300})
-    # ROC
-    fig, ax = plt.subplots(figsize=(5, 5))
-    for q in QUANTILES:
-        lp, ln = lv[(q, args.main_radius)]
-        y = np.r_[np.ones(len(lp)), np.zeros(len(ln))]
-        s = np.r_[lp, ln]
-        from sklearn.metrics import roc_curve
-        fpr, tpr, _ = roc_curve(y, s)
-        ax.plot(fpr, tpr, lw=1.6 if q == 99 else 1.1,
-                label="p%d（AUC=%.3f）" % (q, auc_of(lp, ln)))
+    # ROC（只保留 p99；五档最大强度场相同，其余分位见报告表格）
+    from sklearn.metrics import roc_curve
+    lp99, ln99 = lv[(99, args.main_radius)]
+    y = np.r_[np.ones(len(lp99)), np.zeros(len(ln99))]
+    fpr, tpr, _ = roc_curve(y, np.r_[lp99, ln99])
+    fig, ax = plt.subplots(figsize=(5.6, 5))
+    ax.plot(fpr, tpr, lw=1.8, color="C4",
+            label="p99（AUC = %.3f）" % auc_of(lp99, ln99))
     ax.plot([0, 1], [0, 1], "k--", lw=0.8)
-    ax.set_xlabel("假阳性率"); ax.set_ylabel("真阳性率")
-    ax.set_title("ROC 曲线：2024–2025 年历史洪水点位与分层随机对照点")
-    ax.legend(frameon=False)
-    fig.tight_layout(); fig.savefig(os.path.join(FIG, "roc_holdout.png"))
-    fig.savefig(os.path.join(FIG, "roc_holdout.pdf")); plt.close(fig)
+    ax.set_xlabel("假阳性率", fontsize=11); ax.set_ylabel("真阳性率", fontsize=11)
+    ax.tick_params(labelsize=9)
+    ax.set_title("ROC 曲线（p99，1 km，2024–2025 年）：历史洪水点与分层随机对照点",
+                 fontsize=11)
+    ax.legend(frameon=False, loc="lower right", fontsize=9)
+    fig.tight_layout(); fig.savefig(os.path.join(FIG, "图2_ROC曲线.png"))
+    fig.savefig(os.path.join(FIG, "图2_ROC曲线.pdf")); plt.close(fig)
 
-    # 容差曲线：左图 level>0（会饱和），右图 >=4 级（有区分）
-    fig, axes = plt.subplots(1, 2, figsize=(9.6, 3.6))
-    ax = axes[0]
-    ax.errorbar(df_a.radius_km, df_a.hit_pos,
-                yerr=[df_a.hit_pos - df_a.hit_ci_lo, df_a.hit_ci_hi - df_a.hit_pos],
-                marker="o", capsize=3, label="历史洪水点位")
-    ax.errorbar(df_a.radius_km, df_a.hit_neg,
-                yerr=[df_a.hit_neg - df_a.hit_neg_ci_lo,
-                      df_a.hit_neg_ci_hi - df_a.hit_neg],
-                marker="s", capsize=3, label="随机对照点")
-    ax.axhline(base_area, ls="--", lw=0.8, color="gray",
-               label="面积基线 = %.3f" % base_area)
-    ax.set_xlabel("位置容差（km）"); ax.set_ylabel("等级 > 0 的比例")
-    ax.set_ylim(0, 1.02); ax.legend(frameon=False, fontsize=7)
-    ax.set_title("等级 > 0（已饱和）")
-    ax = axes[1]
-    ax.plot(df_a.radius_km, df_a.hit_pos_ge4, marker="o", label="历史洪水点位")
-    ax.plot(df_a.radius_km, df_a.hit_neg_ge4, marker="s", label="随机对照点")
-    ax.axhline(base_ge4, ls="--", lw=0.8, color="gray",
-               label="面积基线 = %.3f" % base_ge4)
-    ax.set_xlabel("位置容差（km）"); ax.set_ylabel("等级 ≥ 4 的比例")
-    ax.set_ylim(0, 1.02); ax.legend(frameon=False, fontsize=7)
-    ax.set_title("等级 ≥ 4")
-    fig.tight_layout(); fig.savefig(os.path.join(FIG, "tolerance_curve.png"))
-    fig.savefig(os.path.join(FIG, "tolerance_curve.pdf")); plt.close(fig)
+    # 容差曲线不做图：0/1/3/5 km 数字保留在 指标_覆盖度.csv 与 A 节表格
 
-    # 等级构成
-    fig, ax = plt.subplots(figsize=(5, 3.4))
-    w = 0.38
-    ax.bar(ks - w / 2, pk, w, label="历史洪水点位")
-    ax.bar(ks + w / 2, nk, w, label="随机对照点")
-    ax.set_xticks(ks); ax.set_xlabel("危险性等级")
-    ax.set_ylabel("比例"); ax.legend(frameon=False)
-    ax.set_title("等级分布（p99，1 km）")
-    fig.tight_layout(); fig.savefig(os.path.join(FIG, "level_distribution.png"))
-    fig.savefig(os.path.join(FIG, "level_distribution.pdf")); plt.close(fig)
-
-    # 阈值敏感性（横轴按分位类别排列，避免 90/95/99 挤在一起）
-    fig, ax1 = plt.subplots(figsize=(5, 3.4))
-    xs = np.arange(len(df_s))
-    ax1.errorbar(xs, df_s.auc,
-                 yerr=[df_s.auc - df_s.auc_ci_lo, df_s.auc_ci_hi - df_s.auc],
-                 marker="o", capsize=3, color="C3")
-    ax1.axhline(0.5, ls="--", lw=0.8, color="gray")
-    ax1.set_xticks(xs)
-    ax1.set_xticklabels(["p%d" % q for q in df_s.q])
-    ax1.set_xlabel("阈值分位"); ax1.set_ylabel("AUC", color="C3")
-    ax1.set_ylim(0.4, 0.9)
-    ax2 = ax1.twinx()
-    ax2.plot(xs, df_s.lift_area, marker="s", color="C0", lw=1.2)
-    ax2.set_ylabel("提升倍数（命中率 / 面积基线）", color="C0")
-    ax2.set_ylim(0.8, 1.2)
-    ax1.text(0.03, 0.06, "p10–p99 五档结果一致", transform=ax1.transAxes,
-             fontsize=8, color="gray")
-    ax1.set_title("阈值敏感性（1 km）")
-    fig.tight_layout(); fig.savefig(os.path.join(FIG, "threshold_sensitivity.png"))
-    fig.savefig(os.path.join(FIG, "threshold_sensitivity.pdf")); plt.close(fig)
+    # 等级构成图不做：论文中以表 1 呈现
+    # 阈值敏感性不做图：p10–p99 五档最大强度场完全相同，表格见 B_区分能力检验.md
 
     # 分级点位分布图（p99 降采样）
     with rasterio.open(haz_path[99]) as s:
@@ -479,15 +431,18 @@ def main():
                    cmap="YlOrRd", vmin=1, vmax=5, interpolation="nearest")
     tp = gpd.read_file(TP_BOUNDARY)
     tp.boundary.plot(ax=ax, color="k", lw=0.6)
-    ax.scatter(pos.lon, pos.lat, s=5, c="tab:blue", label="历史洪水点位")
-    ax.scatter(neg_lon, neg_lat, s=3, c="tab:green", alpha=0.4,
+    ax.scatter(pos.lon, pos.lat, s=7, c="tab:blue", label="历史洪水点")
+    ax.scatter(neg_lon, neg_lat, s=4, c="tab:green", alpha=0.4,
                label="随机对照点")
-    ax.set_xlabel("经度"); ax.set_ylabel("纬度")
-    ax.legend(loc="lower left", frameon=True, fontsize=7)
-    ax.set_title("1980–2023 年 p99 危险性等级与验证样本")
-    fig.colorbar(im, ax=ax, shrink=0.6, label="危险性等级")
-    fig.tight_layout(); fig.savefig(os.path.join(FIG, "holdout_map.png"))
-    fig.savefig(os.path.join(FIG, "holdout_map.pdf")); plt.close(fig)
+    ax.set_xlabel("经度", fontsize=11); ax.set_ylabel("纬度", fontsize=11)
+    ax.tick_params(labelsize=9)
+    ax.legend(loc="lower left", frameon=True, fontsize=9)
+    ax.set_title("1980–2023 年 p99 危险性等级与 2024–2025 年验证样本", fontsize=12)
+    cbar = fig.colorbar(im, ax=ax, shrink=0.6, label="危险性等级")
+    cbar.set_label("危险性等级", fontsize=11)
+    cbar.ax.tick_params(labelsize=9)
+    fig.tight_layout(); fig.savefig(os.path.join(FIG, "图1_危险性等级与验证点位.png"))
+    fig.savefig(os.path.join(FIG, "图1_危险性等级与验证点位.pdf")); plt.close(fig)
 
     # ---- 报告 ----
     def fmt(x, nd=3):
@@ -497,7 +452,7 @@ def main():
          "- 危险性栅格：`%s`（阈值：现有逐像元分位，经 1980–2023 抽样行核验等价；p99）"
          % os.path.basename(haz_path[99]),
          "- 正样本：SHP 2024–2025 事件点，TP 边界 ∩ 栅格 ∩ 有效径流区过滤后 **%d** 点"
-         % len(lp_main),
+         "（2024：%d，2025：%d）" % (len(lp_main), n_pos_2024, n_pos_2025),
          "- 原始 328 点中 5 点落在栅格/TP 边界外或无径流像元，按设计 3.3 剔除",
          "- 真值来源：`2004_2025.shp` + `1980_2003.shp`（原始 docs 目录已在提交 55c575e 删除，"
          "本次从提交 e730108 恢复到 `data/points_src/`）",
@@ -523,8 +478,8 @@ def main():
             r.lift_area_ge4))
     L += ["", "## 判读", "",
           "- 命中率是**覆盖度**而非精度；Lift ≤ 1 表示不比随机落点强。",
-          "- 补充口径（1 km）：≥3 级覆盖率 %.3f（随机点 %.3f，Lift %.2f）；"
-          "≥4 级覆盖率 %.3f（随机点 %.3f，Lift %.2f）。" % (
+          "- 补充口径（1 km）：≥3 级覆盖率 %.3f（随机点 %.3f；相对面积基线 Lift %.2f）；"
+          "≥4 级覆盖率 %.3f（随机点 %.3f；相对面积基线 Lift %.2f）。" % (
               r1.hit_pos_ge3, r1.hit_neg_ge3, r1.lift_area_ge3,
               r1.hit_pos_ge4, r1.hit_neg_ge4, r1.lift_area_ge4),
           "- 本轮阈值修正后，44 年（1980–2023）累计淹没区已覆盖有效区的 %.2f%%，"
@@ -534,11 +489,12 @@ def main():
           "不是数据错误。",
           "- 若需要可区分的覆盖度检验，应改用更极端的阈值（如 p99.9/p99.99）、"
           "更短的危险性合成时段，或直接检验年度危险性图。", ""]
-    with open(os.path.join(OUT, "hit_rate_holdout.md"), "w", encoding="utf-8") as f:
+    with open(os.path.join(OUT, "A_覆盖度复核.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(L))
 
     L = ["# B 节 · 区分能力检验（留出期 2024–2025）", "",
-         "- 评分：危险性等级 0–5；正样本 = SHP 事件点，负样本 = 分层随机点",
+         "- 评分：危险性等级 0–5；正样本 = SHP 事件点（2024：%d，2025：%d），"
+         "负样本 = 分层随机点" % (n_pos_2024, n_pos_2025),
          "- 真值来源：`2004_2025.shp` + `1980_2003.shp`（从提交 e730108 恢复）",
          "- 主口径：p99、1 km；AUC 置信区间为 1000 次分层 bootstrap 的 95% 分位区间", "",
          "## ROC-AUC（p99）", "",
@@ -585,7 +541,7 @@ def main():
           "- 等级是淹没区内的相对分位（各级约 20%），不同阈值/时段的等级不可直接比较。",
           "- 真值只代表“被记录、被编目”的洪水事件，对无记录事件存在漏记。",
           "- 留出期正样本仅 %d 点，置信区间偏宽；分区后样本更少。" % len(lp_main), ""]
-    with open(os.path.join(OUT, "auc_holdout.md"), "w", encoding="utf-8") as f:
+    with open(os.path.join(OUT, "B_区分能力检验.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(L))
 
     print("\nA 节:\n", df_a.to_string(index=False))

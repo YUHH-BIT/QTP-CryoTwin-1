@@ -109,7 +109,7 @@ def main():
     print("淹没最大场完成（%d 天），耗时 %.1f 分钟" % (n_mis, (time.time() - t0) / 60))
 
     # ---- 逐阈值：边界裁剪 + 归一化分级 + 写出 ----
-    stamp = "%s_to_%s_basin-%s" % (args.start, args.end, args.basin)
+    summary_name = "危险性生成汇总_%s_to_%s.csv" % (args.start, args.end)
     rows = ["quantile,threshold_file,hazard_file,inundated_px,valid_px,"
             "inundated_frac,px_l1,px_l2,px_l3,px_l4,px_l5"]
     for k, q in enumerate(quantiles):
@@ -139,7 +139,8 @@ def main():
         n_inun = int(valid_mask.sum())
         n_valid = int(bmask.sum()) if bmask is not None else int(np.isfinite(field).sum())
         counts = [int((level == k2).sum()) for k2 in range(1, 6)]
-        out_path = os.path.join(args.out_dir, "%s_hazard_p%d.tif" % (stamp, q))
+        out_path = os.path.join(
+            args.out_dir, "危险性_p%d_%s_to_%s.tif" % (q, args.start, args.end))
         with rasterio.open(out_path, "w", **profile) as dst:
             dst.write(level, 1)
         print("  %dp: 淹没 %d/%d = %.2f%%，等级 %s → %s" % (
@@ -149,10 +150,10 @@ def main():
             q, q, os.path.basename(out_path), n_inun, n_valid,
             n_inun / n_valid, *counts))
 
-    with open(os.path.join(args.out_dir, "threshold_summary_%s.csv" % stamp),
-              "w", encoding="utf-8-sig") as f:
+    summary_path = os.path.join(args.out_dir, summary_name)
+    with open(summary_path, "w", encoding="utf-8-sig") as f:
         f.write("\n".join(rows) + "\n")
-    print("汇总: %s" % os.path.join(args.out_dir, "threshold_summary_%s.csv" % stamp))
+    print("汇总: %s" % summary_path)
 
 
 if __name__ == "__main__":

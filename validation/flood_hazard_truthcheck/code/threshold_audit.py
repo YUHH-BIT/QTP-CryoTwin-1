@@ -112,7 +112,7 @@ def main():
 
     out = Path(args.out_dir) if args.out_dir else OUT_DIR
     out.mkdir(parents=True, exist_ok=True)
-    out = out / ("threshold_audit_%s.md" % "_".join(str(y) for y in years))
+    out = out / "阈值语义体检.md"
     out.write_text("\n".join(lines), encoding="utf-8")
     print("报告: %s" % out)
     print("\n".join(lines))
