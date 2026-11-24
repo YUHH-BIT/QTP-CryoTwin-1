@@ -1,7 +1,0 @@
-numpy>=1.24
-rasterio>=1.3
-geopandas>=0.14
-pandas>=2.0
-matplotlib>=3.7
-# 步骤 1（径流生成）需要 torch；步骤 2/3 不需要
-torch>=2.0
