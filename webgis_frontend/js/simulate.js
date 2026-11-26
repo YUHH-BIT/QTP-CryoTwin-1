@@ -1627,6 +1627,13 @@ function initializeSimulateDropdown() {
         'ice-simulate': '冰川灾害过程模拟',
         'permafrost-simulate': '冻土灾害过程模拟'
     };
+    // 右侧栏标题图标代表模块本身（过程模拟），不随具体模拟类型变化
+    const titleIcon = 'fa-play-circle';
+    const titleColor = '#4ade80';
+    function setSidebarTitle(key) {
+        const name = categoryNames[key] || '灾害过程模拟';
+        simulateSidebarTitle.innerHTML = `<i class="fa ${titleIcon} rhs-title-icon" style="color:${titleColor}"></i>${name}`;
+    }
     
     // 显示模拟侧边栏
     function showSimulateSidebar() {
@@ -1665,7 +1672,7 @@ function initializeSimulateDropdown() {
         
         // 更新标题
         if (categoryNames[activeCategory]) {
-            simulateSidebarTitle.textContent = categoryNames[activeCategory];
+            setSidebarTitle(activeCategory);
         }
     }
     
@@ -1702,7 +1709,7 @@ function initializeSimulateDropdown() {
         }
         
         // 更新动态标题
-        simulateSidebarTitle.textContent = categoryNames[category] || '灾害过程模拟';
+        setSidebarTitle(category);
         
         // 显示侧边栏
         showSimulateSidebar();

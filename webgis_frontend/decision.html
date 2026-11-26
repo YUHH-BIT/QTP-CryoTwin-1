@@ -8,7 +8,7 @@
   <!-- 使用多个CDN源确保OpenLayers加载成功 -->
   <link rel="stylesheet" href="css/lib/ol.css" />
   <!-- 移除高德地图API引用 -->
-  <link rel="stylesheet" href="css/styles.css?v=20261127c" />
+  <link rel="stylesheet" href="css/styles.css?v=20261127e" />
   <link rel="stylesheet" href="css/components.css" />
   <!-- 使用多个CDN源确保Font Awesome加载成功 -->
   <link href="css/lib/font-awesome.min.css" rel="stylesheet">
@@ -97,7 +97,7 @@
   <!-- 右侧决策支持侧边栏 -->
   <div class="decision-sidebar" id="decision-sidebar">
     <div class="decision-sidebar-header">
-      <h2 class="decision-sidebar-title" id="decision-sidebar-title">决策支持</h2>
+      <h2 class="decision-sidebar-title" id="decision-sidebar-title"><i class="fa fa-lightbulb-o rhs-title-icon" style="color:#c084fc"></i>决策支持</h2>
       <button class="decision-sidebar-close" id="decision-sidebar-close">&times;</button>
     </div>
     
@@ -459,17 +459,17 @@
           selectedCategory.style.display = selectedCategory.id === 'llm-category-sidebar' ? 'flex' : 'block';
         }
 
-        // 更新侧边栏标题
+        // 更新侧边栏标题（带类别图标）
         const sidebarTitle = document.getElementById('decision-sidebar-title');
-        const categoryName = getCategoryName(category);
-        sidebarTitle.textContent = categoryName || '决策支持';
+        const meta = getCategoryMeta(category);
+        sidebarTitle.innerHTML = `<i class="fa ${meta.icon} rhs-title-icon" style="color:${meta.color}"></i>${meta.name}`;
 
         activeCategory = category;
         showDecisionSidebar();
       }
 
-      // 获取类别名称
-      function getCategoryName(category) {
+      // 获取类别名称；标题图标代表模块本身（决策支持），不随子类别变化
+      function getCategoryMeta(category) {
         const categoryNames = {
           'non-engineering': '非工程措施',
           'engineering': '工程措施',
@@ -477,7 +477,11 @@
           'llm': '冰冻圈灾害大模型',
           'prevention-example': '防灾实例'
         };
-        return categoryNames[category] || '决策支持';
+        return {
+          name: categoryNames[category] || '决策支持',
+          icon: 'fa-lightbulb-o',
+          color: '#c084fc'
+        };
       }
 
       // 注册导航栏下拉项点击处理（由 main.js 统一导航调用）
@@ -514,7 +518,7 @@
 
     });
   </script>
-  <script src="js/rhs-tabs.js?v=20261127c"></script>
+  <script src="js/rhs-tabs.js?v=20261127e"></script>
 </body>
 </html>
 </html>

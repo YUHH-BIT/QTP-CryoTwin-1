@@ -10,6 +10,9 @@ class AlertSidebarManager {
             'ice': '冰川灾害风险评估',
             'permafrost': '冻土灾害风险评估'
         };
+        // 右侧栏标题图标代表模块本身（风险评估），不随灾害类型变化
+        this.titleIcon = 'fa-exclamation-triangle';
+        this.titleColor = '#fb7185';
         this.dropdown = null;
         this.toggle = null;
         this.init();
@@ -93,8 +96,8 @@ class AlertSidebarManager {
         const titleElement = document.getElementById('alert-sidebar-title');
         if (titleElement) {
             // 根据类别显示不同的标题
-            const categoryName = this.categoryNames[this.currentCategory] || '';
-            titleElement.textContent = categoryName || '风险评估';
+            const categoryName = this.categoryNames[this.currentCategory] || '风险评估';
+            titleElement.innerHTML = `<i class="fa ${this.titleIcon} rhs-title-icon" style="color:${this.titleColor}"></i>${categoryName}`;
         }
 
         // 隐藏所有灾害分类

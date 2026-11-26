@@ -5145,6 +5145,8 @@ body.rhs-v2 .decision-sidebar-title {
   margin: 0; font-size: 13px; font-weight: 500; letter-spacing: .2px; color: #eaf3ff;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* 右侧栏标题前的类别图标：颜色由 JS 按类别内联设置 */
+body.rhs-v2 .rhs-title-icon { margin-right: 8px; font-size: 13px; vertical-align: -1px; }
 body.rhs-v2 .disaster-sidebar-close,
 body.rhs-v2 .simulate-sidebar-close,
 body.rhs-v2 .alert-sidebar-close,

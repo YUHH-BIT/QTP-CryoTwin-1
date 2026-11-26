@@ -864,6 +864,9 @@ class DisasterSidebarManager {
             'ice': '冰川灾害数据库',
             'permafrost': '冻土灾害数据库'
         };
+        // 右侧栏标题图标代表模块本身（数据库），不随灾害类型变化
+        this.titleIcon = 'fa-database';
+        this.titleColor = '#38bdf8';
         this.dropdown = null;
         this.toggle = null;
         this.init();
@@ -944,8 +947,8 @@ class DisasterSidebarManager {
         const titleElement = document.getElementById('disaster-sidebar-title');
         if (titleElement) {
             // 根据类别显示不同的标题
-            const categoryName = this.categoryNames[this.currentCategory] || '';
-            titleElement.textContent = categoryName || '灾害数据库';
+            const categoryName = this.categoryNames[this.currentCategory] || '灾害数据库';
+            titleElement.innerHTML = `<i class="fa ${this.titleIcon} rhs-title-icon" style="color:${this.titleColor}"></i>${categoryName}`;
         }
 
         // 隐藏所有灾害分类
