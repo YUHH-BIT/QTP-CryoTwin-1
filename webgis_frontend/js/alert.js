@@ -94,7 +94,7 @@ class AlertSidebarManager {
         if (titleElement) {
             // 根据类别显示不同的标题
             const categoryName = this.categoryNames[this.currentCategory] || '';
-            titleElement.textContent = categoryName ? `风险评估 - ${categoryName}` : '风险评估';
+            titleElement.textContent = categoryName || '风险评估';
         }
 
         // 隐藏所有灾害分类

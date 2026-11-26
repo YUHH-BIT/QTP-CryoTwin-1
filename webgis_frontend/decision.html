@@ -8,12 +8,12 @@
   <!-- 使用多个CDN源确保OpenLayers加载成功 -->
   <link rel="stylesheet" href="css/lib/ol.css" />
   <!-- 移除高德地图API引用 -->
-  <link rel="stylesheet" href="css/styles.css?v=20261116a" />
+  <link rel="stylesheet" href="css/styles.css?v=20261127c" />
   <link rel="stylesheet" href="css/components.css" />
   <!-- 使用多个CDN源确保Font Awesome加载成功 -->
   <link href="css/lib/font-awesome.min.css" rel="stylesheet">
 </head>
-<body>
+<body class="rhs-v2">
   <!-- 加载遮罩层 -->
   <div class="loading-overlay" id="loading-overlay">
     <div class="loading-spinner"></div>
@@ -194,6 +194,8 @@
 
   <!-- 侧边栏遮罩（点击关闭） -->
   <div class="decision-sidebar-mask" id="decision-sidebar-mask"></div>
+  <!-- 示范页同款边缘竖标签：点一下收起 / 展开右侧栏 -->
+  <button class="rhs-tab" type="button" aria-expanded="false" title="展开右侧栏"><span>决策支持</span></button>
 
   <!-- 右侧浮动控制面板 -->
   <div class="sidepanel">
@@ -460,7 +462,7 @@
         // 更新侧边栏标题
         const sidebarTitle = document.getElementById('decision-sidebar-title');
         const categoryName = getCategoryName(category);
-        sidebarTitle.textContent = `决策支持 - ${categoryName}`;
+        sidebarTitle.textContent = categoryName || '决策支持';
 
         activeCategory = category;
         showDecisionSidebar();
@@ -512,6 +514,7 @@
 
     });
   </script>
+  <script src="js/rhs-tabs.js?v=20261127c"></script>
 </body>
 </html>
 </html>

@@ -945,7 +945,7 @@ class DisasterSidebarManager {
         if (titleElement) {
             // 根据类别显示不同的标题
             const categoryName = this.categoryNames[this.currentCategory] || '';
-            titleElement.textContent = categoryName ? `灾害数据库 - ${categoryName}` : '灾害数据库';
+            titleElement.textContent = categoryName || '灾害数据库';
         }
 
         // 隐藏所有灾害分类

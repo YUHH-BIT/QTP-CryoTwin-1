@@ -12,7 +12,7 @@
   <script src="js/lib/echarts.min.js"></script>
 
   <!-- 平台样式 -->
-  <link rel="stylesheet" href="css/styles.css?v=20261116a" />
+  <link rel="stylesheet" href="css/styles.css?v=20261127c" />
   <link rel="stylesheet" href="css/lib/air-datepicker.css?v=2" />
   <link rel="stylesheet" href="css/lib/air-datepicker-dark.css?v=2" />
   <link rel="stylesheet" href="css/lib/tom-select.min.css?v=2" />
@@ -61,7 +61,7 @@
     .sim-result-reopen:hover { background: #2563eb; }
   </style>
 </head>
-<body>
+<body class="rhs-v2">
   <!-- 加载遮罩层 -->
   <div class="loading-overlay" id="loading-overlay">
     <div class="loading-spinner"></div>
@@ -481,6 +481,8 @@
 
   <!-- 侧边栏遮罩（点击关闭） -->
   <div class="simulate-sidebar-mask" id="simulate-sidebar-mask"></div>
+  <!-- 示范页同款边缘竖标签：点一下收起 / 展开右侧栏 -->
+  <button class="rhs-tab" type="button" aria-expanded="false" title="展开右侧栏"><span>过程模拟</span></button>
 
   <!-- 右侧浮动控制面板 -->
   <div class="sidepanel">
@@ -808,7 +810,7 @@
   <script src="js/ui-components.js"></script>
   <script src="js/geotiff.js"></script>
   <script src="js/main.js?v=20261111nav"></script>
-  <script src="js/simulate.js"></script>
+  <script src="js/simulate.js?v=20261127c"></script>
   <script src="js/geotiff-render.js"></script>
   <script src="js/meteo-query.js"></script>
   
@@ -845,5 +847,6 @@
   <script src="js/date-picker.js?v=2"></script>
   <script src="js/lib/tom-select.complete.min.js?v=2"></script>
   <script src="js/tomselect-init.js?v=2"></script>
+  <script src="js/rhs-tabs.js?v=20261127c"></script>
 </body>
 </html>

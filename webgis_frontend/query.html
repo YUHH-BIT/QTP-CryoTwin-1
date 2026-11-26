@@ -9,10 +9,10 @@
   <!-- 使用多个CDN源确保OpenLayers加载成功 -->
   <link rel="stylesheet" href="css/lib/ol.css" />
   <!-- 平台样式 -->
-  <link rel="stylesheet" href="css/styles.css?v=20261116a" />
+  <link rel="stylesheet" href="css/styles.css?v=20261127c" />
   <link href="css/lib/font-awesome.min.css" rel="stylesheet" />
 </head>
-<body>
+<body class="rhs-v2">
   <!-- 加载遮罩层 -->
   <div class="loading-overlay" id="loading-overlay">
     <div class="loading-spinner"></div>
@@ -229,6 +229,8 @@
 
   <!-- 侧边栏遮罩（点击关闭） -->
   <div class="disaster-sidebar-mask" id="disaster-sidebar-mask"></div>
+  <!-- 示范页同款边缘竖标签：点一下收起 / 展开右侧栏 -->
+  <button class="rhs-tab" type="button" aria-expanded="false" title="展开右侧栏"><span>灾害数据</span></button>
 
   <!-- 右侧浮动控制面板 - 数据查询与结果整合 -->
   <div class="sidepanel">
@@ -491,7 +493,7 @@
 
 
   <script src="js/main.js?v=20261111nav"></script>
-  <script src="js/query.js"></script>
+  <script src="js/query.js?v=20261127c"></script>
 
   <!-- 气象水文栅格查询：自包含渲染 + 查询交互（需 main.js 先初始化 map） -->
   <script src="js/geotiff-render.js"></script>
@@ -532,5 +534,6 @@
       });
     });
   </script>
+  <script src="js/rhs-tabs.js?v=20261127c"></script>
 </body>
 </html>

@@ -1665,7 +1665,7 @@ function initializeSimulateDropdown() {
         
         // 更新标题
         if (categoryNames[activeCategory]) {
-            simulateSidebarTitle.textContent = `灾害过程模拟 - ${categoryNames[activeCategory]}`;
+            simulateSidebarTitle.textContent = categoryNames[activeCategory];
         }
     }
     
@@ -1702,7 +1702,7 @@ function initializeSimulateDropdown() {
         }
         
         // 更新动态标题
-        simulateSidebarTitle.textContent = `灾害过程模拟 - ${categoryNames[category]}`;
+        simulateSidebarTitle.textContent = categoryNames[category] || '灾害过程模拟';
         
         // 显示侧边栏
         showSimulateSidebar();
