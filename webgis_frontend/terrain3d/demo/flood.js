@@ -405,7 +405,7 @@ uniform vec2  uSrcTexel;
 uniform float uTField, uPeak, uClock, uExagToMeters, uSurge;
 varying vec3  vWorld;
 varying vec2  vUv, vFlow;
-varying float vH, vEta, vFoam, vFront, vRough, vCore;
+varying float vH, vEta, vFoam, vFront, vRough, vCore, vSpeed;
 
 void main() {
   vUv = uv;
@@ -424,12 +424,28 @@ void main() {
     + texture2D(uSource, uv + vec2(0.0, uSrcTexel.y * 2.5)).g
     + texture2D(uSource, uv - vec2(0.0, uSrcTexel.y * 2.5)).g);
   h *= smoothstep(0.24, 0.80, potB);
+
+  /* 动态漫延（2026-11-27）：把湿边从「齐整的一圈」改成随受水区推进而向外吐出的舌状分叉。
+     做法是用到达时间余量 dSim 做一道随时间外扩的波前噪声，只在 potB 边缘带生效；
+     波前越靠外、噪声幅度越大，于是同一张 shape.bin 包络里能读出「水在往两侧爬」。
+     只改观感： potB / T / D 三个数值场一律不动。 */
+  float edgeBand = smoothstep(0.10, 0.55, potB) * (1.0 - smoothstep(0.55, 0.98, potB));
+  float spreadTongue = fbm(vec2(dot(position.xz, vec2(0.016, 0.021)) - uClock * 0.55,
+                                dot(position.xz, vec2(-0.011, 0.014)) + uClock * 0.31));
+  float advance = smoothstep(0.0, 26.0, dSim) * (1.0 - smoothstep(46.0, 88.0, dSim));
+  h *= 1.0 + edgeBand * advance * (spreadTongue - 0.42) * 0.95;
+
   float wet = smoothstep(0.0, 1.1, h);
 
   // 流向由到达时间场梯度给出（真实场推导，不是手画箭头）
   float tx = tAt(uSource, uv + vec2(uSrcTexel.x, 0.0)) - tAt(uSource, uv - vec2(uSrcTexel.x, 0.0));
   float tz = tAt(uSource, uv + vec2(0.0, uSrcTexel.y)) - tAt(uSource, uv - vec2(0.0, uSrcTexel.y));
   vFlow = normalize(vec2(tx, tz) + vec2(1e-5, 0.0));
+  /* 局部推进速度（2026-11-27）：到达时间场空间梯度的倒数 —— 前沿挤得越密（T 变化快）
+     说明这段推进越慢，反之峡谷里 T 铺得开就是高速段。给片元着色器做「快段拉丝亮、
+     慢段翻涌暗」的调制，让同一条河不同段的悍猛程度不一样。 */
+  float gT = length(vec2(tx, tz));
+  vSpeed = clamp(1.0 / (1.0 + gT * 0.30), 0.15, 1.0);
 
   vec4 st = texture2D(uState, uv);
   float eta  = (st.r - 0.5) * 2.0 * ETA_MAX;
@@ -493,7 +509,7 @@ uniform vec3  uSun, uSky;
 uniform float uClock, uAlpha, uExagToMeters, uPeak;
 varying vec3  vWorld;
 varying vec2  vUv, vFlow;
-varying float vH, vEta, vFoam, vFront, vRough, vCore;
+varying float vH, vEta, vFoam, vFront, vRough, vCore, vSpeed;
 
 void main() {
   if (vH < 0.06) discard;                       // 干区不画，避免负水深硬边
@@ -624,8 +640,19 @@ void main() {
   vec2 dwarp = vec2(mudFlow - 0.5, sediment - 0.5) * 320.0;
   vec2 wpos = vWorld.xz + dwarp;
   float streak = fbm(vec2(dot(wpos, f) * 0.042 - uClock * 0.85, dot(wpos, fc) * 0.30));
-  float streakK = smoothstep(0.34, 0.76, streak) * (0.18 + 0.82 * vFront) * uStreakK;
-  body += body * (1.00 * streakK) + vec3(0.055, 0.046, 0.033) * streakK;
+  // 速度调制（2026-11-27）：快段（vSpeed→1）把泥沙流线拉得更长更亮，慢段压回去 ——
+  // 同一条河里「峡谷段在冲、宽谷段在漫」的差别从这里读出来。
+  // 前锋加速（2026-11-27）：越靠近水头，流线被拉得越长越亮，读起来像「越冲越快」。
+  float surgeBoost = 1.0 + 1.35 * pow(vFront, 1.6);
+  float streakK = smoothstep(0.34, 0.76, streak) * (0.18 + 0.82 * vFront) * uStreakK
+                * (0.42 + 1.05 * vSpeed) * surgeBoost;
+  body += body * (0.85 * streakK) + vec3(0.060, 0.050, 0.036) * streakK;
+
+  /* 冲刷沟（2026-11-27）：横向高频、沿流向拉长的暗纹，随局部流速增强 ——
+     高速泥浆在河床上犁出的条沟，给平涂的顶面加一层「被水推过」的方向感。
+     频率压在 0.02 量级（≈ 50 m 一团），避免近景碎成搓衣板。 */
+  float scour = fbm(vec2(dot(wpos, fc) * 0.085, dot(wpos, f) * 0.014 - uClock * 0.62));
+  body *= 1.0 - 0.17 * smoothstep(0.50, 0.84, scour) * (0.30 + 0.70 * vSpeed);
   /* 流头湿趾：最前沿压暗一道，读成「推土机铲刀」的湿泥边 —— 泥石流推进时
      最靠前的永远是最湿、最暗的那一条，后面才是翻起来的白沫。 */
   body *= 1.0 - 0.34 * smoothstep(0.45, 1.0, vFront);
@@ -674,8 +701,8 @@ void main() {
      暗褐泥浆形成强反差 —— 这是「一眼看出有冲击力」最直接的来源。
      只取 vFront 0.62 以上（最前沿十几米），不会向后蔓延成白饼；强度乘 fn，
      冠面因此是断断续续的浪花而不是一条均匀的白边。 */
-  float crown = smoothstep(0.62, 1.0, vFront) * (0.55 + 0.45 * fn);
-  col = mix(col, vec3(0.95, 0.93, 0.87), crown * 0.60);
+  float crown = smoothstep(0.50, 0.98, vFront) * (0.62 + 0.38 * fn);
+  col = mix(col, vec3(0.96, 0.94, 0.88), crown * 0.78);
   /* 白沫拉丝（2026-11-15）：真实泥石流表面是一张「撕开又连上」的白色网 ——
      顺流向拉长的细丝，而不是均匀的白点。复用上面域扭曲后的 wpos，把沿流向的
      采样频率压到横向的 1/5（等价于沿流向拉长 5 倍），只在已有泡沫处显形，
@@ -738,6 +765,50 @@ void main() {
   gl_FragColor = vec4(uRim, a * uOpacity);
 }`;
 
+/* ------------------------------ 真三维卷浪带（2026-11-27） ------------------------------
+   顶面 sheet 再怎么变形也只是「一张纸」。这一层是沿水头横跨沟道生成的**封闭侧壁**：
+   基边落在河床、顶边是抬起的浪冠，法线朝下游，因此从侧下方能看到实实在在的厚度。
+   几何在 CPU 每帧按 frontHint() 重排（只有 (N_LAT+1)×2 个顶点，开销可忽略），
+   高度仍读同一份 arrival/shape/depth 场，不引入任何新数字。 */
+const BORE_VERT = `
+attribute float aSide;     // 0 = 河床基边, 1 = 浪冠顶边
+attribute float aLat;      // -1..1 横向
+attribute float aWet;      // 0 = 干区（顶点压到地下、片元 discard）
+varying float vSide, vLat, vWet;
+varying vec3  vWorld;
+void main() {
+  vSide = aSide; vLat = aLat; vWet = aWet;
+  vec4 wp = modelMatrix * vec4(position, 1.0);
+  vWorld = wp.xyz;
+  gl_Position = projectionMatrix * viewMatrix * wp;
+}`;
+const BORE_FRAG = GLSL_COMMON + `
+uniform float uClock;
+uniform vec3  uSun;
+uniform float uMuddy;
+varying float vSide, vLat, vWet;
+varying vec3  vWorld;
+void main() {
+  if (vWet < 0.03) discard;
+  // 与顶面同源的泥浆基色：顶缘亮、下缘压暗，但整体保持暖棕，避免深棕「布帘」
+  float cap = smoothstep(0.55, 1.0, vSide);
+  float fn = fbm(vec2(dot(vWorld.xz, vec2(0.013, 0.019)) - uClock * 0.38, vLat * 3.0));
+  vec3 mud = vec3(0.44, 0.36, 0.27) * (0.72 + 0.42 * vSide);
+  // 顺落向的拉丝 + 悬浮泥沙斑驳
+  float rib = fbm(vec2(vLat * 6.0 + fn * 2.0, vSide * 2.2 - uClock * 0.9));
+  mud *= 0.84 + 0.30 * rib;
+  // 翻卷白冠：只在最顶缘、断续出现
+  float crown = cap * smoothstep(0.46, 0.76, fn) * (0.40 + 0.45 * uMuddy);
+  mud = mix(mud, vec3(0.91, 0.89, 0.83), crown);
+  // 下缘没入水面：淡出到透明，消除「布帘下摆」的硬边
+  float fade = smoothstep(0.0, 0.28, vSide);
+  vec3 gN = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
+  if (gN.y < 0.0) gN = -gN;
+  float lit = max(0.0, dot(gN, normalize(uSun))) * 0.16;
+  mud += vec3(0.14, 0.16, 0.18) * lit * vSide;
+  gl_FragColor = vec4(mud, clamp(vWet * fade, 0.0, 1.0));
+}`;
+
 /* ------------------------------ 粒子 ------------------------------ */
 const PARTICLE_VERT = `
 attribute float aAlpha;
@@ -775,6 +846,10 @@ export class FloodSystem {
   constructor(opts) {
     Object.assign(this, opts);
     this.cenAtFn = opts.cenAt || null;   // 演进中轴线（居中），缺省时回退到 chanAt
+    // 卷浪层默认关闭（2026-11-27）：用户反馈口岸处那条立起来的带子很奇怪，
+    // 要求水到口岸后自然铺开、不要"墙"。需要卷浪时用 ?bore=1 显式开启。
+    this.noBore = !(typeof location !== 'undefined' &&
+                    new URLSearchParams(location.search).get('bore') === '1');
     this.enabled = true;
     this.layers = { water: true, debris: true, spray: true };
     this.tField = 0;
@@ -1143,7 +1218,9 @@ export class FloodSystem {
         // 前锋涌浪高度（场景单位）。46 ≈ 35 m 实际高度，2026-11-15 提到 58：
         // 末段机位压到 1.25 km 后，水墙在画面里被放大 2.7 倍，这个高度才够「挡视线」。
         // ?surge= 可调，0 = 关闭。
-        uSurge: { value: 58 },
+        // 2026-11-27 默认改为 0：用户反馈口岸处那条立起来的浪墙/带子很奇怪，
+        // 要求水到口岸后自然铺开。需要浪墙时用 ?surge=58 显式恢复。
+        uSurge: { value: 0 },
         // 流速条纹强度。1 = 开（默认），0 = 关；?streak=0 可关掉做 A/B 验收。
         uStreakK: { value: 1 },
         uSun: { value: sunDir }, uSky: { value: new THREE.Color(0.62, 0.74, 0.86) },
@@ -1168,6 +1245,107 @@ export class FloodSystem {
     this.waterMesh.renderOrder = 3.2;
     this.waterMesh.frustumCulled = false;
     this.group.add(this.waterMesh);
+  }
+
+  /* ---------- ③a 真三维卷浪带 ----------
+     沿水头横跨沟道铺一条 5 段剖面的侧壁：后肩贴河床 → 爬升 → 浪冠 → 前卷 → 扑下。
+     顶点每帧按 frontHint() 重排，横向每个位置独立读水面与水深，所以浪高在沟心
+     最高、往两岸自然收窄，不是一条等高的直墙。 */
+  buildBore() {
+    const N_LAT = 40, N_P = 5;
+    // off = 沿流向偏移（下游为正），k = 该点在「河床→浪冠」之间的高度比例
+    const prof = [
+      { off: -140, k: 0.00 },   // 后肩：浸在水下的起始边
+      { off: -58,  k: 0.56 },   // 爬升面
+      { off: 12,   k: 1.00 },   // 浪冠
+      { off: 52,   k: 0.90 },   // 前卷：向下游扑
+      { off: 86,   k: 0.16 },   // 湿趾：拍回河床
+    ];
+    const nv = (N_LAT + 1) * N_P;
+    const pos = new Float32Array(nv * 3);
+    const aSide = new Float32Array(nv);
+    const aLat = new Float32Array(nv);
+    const aWet = new Float32Array(nv);
+    const idx = new Uint16Array(N_LAT * (N_P - 1) * 6);
+    let p = 0;
+    for (let i = 0; i <= N_LAT; i++) for (let j = 0; j < N_P; j++) {
+      const q = i * N_P + j;
+      aSide[q] = prof[j].k;
+      aLat[q] = (i / N_LAT) * 2 - 1;
+    }
+    for (let i = 0; i < N_LAT; i++) for (let j = 0; j < N_P - 1; j++) {
+      const a = i * N_P + j, b = a + 1, c = (i + 1) * N_P + j + 1, d = (i + 1) * N_P + j;
+      idx[p++] = a; idx[p++] = b; idx[p++] = c;
+      idx[p++] = a; idx[p++] = c; idx[p++] = d;
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute('aSide', new THREE.BufferAttribute(aSide, 1));
+    g.setAttribute('aLat', new THREE.BufferAttribute(aLat, 1));
+    g.setAttribute('aWet', new THREE.BufferAttribute(aWet, 1).setUsage(THREE.DynamicDrawUsage));
+    g.setIndex(new THREE.BufferAttribute(idx, 1));
+    g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
+
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: BORE_VERT, fragmentShader: BORE_FRAG,
+      uniforms: {
+        uClock: { value: 0 },
+        uSun: { value: this.waterMat.uniforms.uSun.value },
+        uMuddy: { value: this.waterMat.uniforms.uMuddy.value },
+      },
+      transparent: true, depthWrite: true, depthTest: true,
+      side: THREE.DoubleSide,
+      extensions: { derivatives: true },
+    });
+    this.boreMesh = new THREE.Mesh(g, mat);
+    this.boreMesh.name = 'anchor_flood_bore';
+    this.boreMesh.renderOrder = 3.3;      // 顶面 3.2 / 碎块 3.4 之间
+    this.boreMesh.frustumCulled = false;
+    this.group.add(this.boreMesh);
+    this._boreCfg = { N_LAT, N_P, prof, W_HALF: 560 };
+  }
+
+  updateBore() {
+    const cfg = this._boreCfg;
+    if (!cfg || !this.boreMesh) return;
+    const g = this.boreMesh.geometry;
+    const pos = g.attributes.position.array;
+    const wet = g.attributes.aWet.array;
+    const f = this.frontHint();
+    const tx = f.tx, tz = f.tz;
+    const surge = this.waterMat.uniforms.uSurge.value;
+    this.boreMesh.material.uniforms.uMuddy.value = this.waterMat.uniforms.uMuddy.value;
+    // 立面只在近景才有意义：22 km 俯视时它是画面里一条突兀的带子，
+    // 而顶面 sheet 自带的 surge 墙已经足够表达推进。近景贴水才切到这套真几何。
+    const near = (this.camDist || 1e9) < 2800;
+    this.boreMesh.visible = near && !this.noBore && this.layers.water && this.enabled && this.tField > 1.0;
+    if (!this.boreMesh.visible) return;
+    if (this.tField < 1.0) {                   // 水还没起来：整条压到地下，不画
+      for (let i = 0; i < wet.length; i++) wet[i] = 0;
+      g.attributes.aWet.needsUpdate = true;
+      return;
+    }
+    for (let i = 0; i <= cfg.N_LAT; i++) {
+      const lat = ((i / cfg.N_LAT) * 2 - 1) * cfg.W_HALF;
+      const x = f.x - tz * lat, z = f.z + tx * lat;
+      const w = this.waterY(x, z, this.tField);
+      // 只在真正过水的横向位置立墙。pot 阈值压到 0.02（srcPot 全网格均值只有 0.046），
+      // 否则整条墙会被误判成干区；高度改以**水面**为基准（不是河床），
+      // 这样横向扫到岸坡时不会因为地形高差把顶点甩到天上。
+      const gate = smoothstep(0.015, 0.16, w.s.pot) * smoothstep(0.5, 5.0, w.h);
+      const base = w.y - Math.min(w.h, 24) * 0.75;
+      const top = w.y + surge * gate;
+      for (let j = 0; j < cfg.N_P; j++) {
+        const q = i * cfg.N_P + j;
+        const pr = cfg.prof[j];
+        pos[q * 3]     = x + tx * pr.off;
+        pos[q * 3 + 1] = base + (top - base) * pr.k;
+        pos[q * 3 + 2] = z + tz * pr.off;
+        wet[q] = gate;
+      }
+    }
+    g.attributes.position.needsUpdate = true;
+    g.attributes.aWet.needsUpdate = true;
   }
 
   /* ---------- ③b 图 7 淹没范围（贴地图层） ----------
@@ -1377,6 +1555,7 @@ export class FloodSystem {
     this.scene.add(this.group);
     this.buildCompute();
     this.buildWater();
+    this.buildBore();
     this.buildExtent();
     this.buildDebris();
     this.buildParticles();
@@ -1518,6 +1697,7 @@ export class FloodSystem {
     const dt = Math.min(dtReal, 0.05);
     if (this.layers.water) this.stepGPU(dt);
     this.waterMat.uniforms.uClock.value = this.clock;
+    if (this.layers.water) this.updateBore();
     this.updateImpact(dt);                  // 冲击波环按真实帧推进，先于早退
     if (this.tField <= 1.0) return;         // 失稳前没有洪水，不生成碎冰与飞溅
     if (this.layers.debris) this.updateDebris(dt);
@@ -1778,6 +1958,7 @@ export class FloodSystem {
     const on = this.enabled, wet = this.tField > 1.0;
     this.group.visible = on;
     if (this.waterMesh) this.waterMesh.visible = on && this.layers.water;
+    // 卷浪可见性由 updateBore() 按视距再判定（俯视不画立面）；这里只做总开关
     // 范围层与时间无关：它画的是整场包络，t=0 就该看得见
     if (this.extentMesh) this.extentMesh.visible = on && this.layers.extent;
     if (this.debrisGroup) this.debrisGroup.visible = on && this.layers.debris && wet;
@@ -1831,6 +2012,16 @@ export class FloodSystem {
       floatingBodies: this.diag.floatingBodies || 0,
       contacts: this.diag.contacts || 0,
       particles: N_SPRAY + N_DUST, activeParticles: this.diag.activeParticles || 0,
+      bore: this.boreMesh ? (() => {
+        const a = this.boreMesh.geometry.attributes.position.array;
+        const w = this.boreMesh.geometry.attributes.aWet.array;
+        let mn = 1e9, mx = -1e9, gate = 0;
+        for (let i = 1; i < a.length; i += 3) { if (a[i] < mn) mn = a[i]; if (a[i] > mx) mx = a[i]; }
+        for (let i = 0; i < w.length; i++) gate += w[i];
+        return { visible: this.boreMesh.visible, noBore: !!this.noBore,
+                 yMin: Math.round(mn), yMax: Math.round(mx),
+                 gateSum: +gate.toFixed(1) };
+      })() : null,
     };
   }
 }
