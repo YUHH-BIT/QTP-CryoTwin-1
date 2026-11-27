@@ -3172,6 +3172,17 @@ function initSidepanelFloat() {
     });
     document.body.appendChild(toggle);
   }
+
+  // Esc 收起图层面板（等同于点标题栏 ×）
+  // 弹窗 / 详情侧栏打开时让它们优先响应，同一次 Esc 不同时收起图层面板
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || document.body.classList.contains('sidepanel-collapsed')) return;
+    if (document.querySelector('.ui-modal-overlay.active, #disaster-sidebar.active, #alert-sidebar.active')) return;
+    const ae = document.activeElement;
+    if (ae && (ae.matches('input:not([type=checkbox]):not([type=radio]), textarea, select') || ae.isContentEditable)) return;
+    panels.forEach(panel => panel.classList.add('collapsed'));
+    document.body.classList.add('sidepanel-collapsed');
+  });
 }
 
 // 初始化默认图层状态
