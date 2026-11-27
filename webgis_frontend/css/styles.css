@@ -4159,6 +4159,141 @@ position: absolute;
   align-items: center;
 }
 
+/* ===================== Markdown 渲染（仅 assistant 气泡） =====================
+   渲染后的内容由块级元素控制间距，必须取消 pre-wrap，
+   否则 innerHTML 里的换行会在元素之间撑出多余空行。 */
+.llm-msg-body.llm-md {
+  white-space: normal;
+}
+
+.llm-msg-body.llm-md > *:first-child { margin-top: 0; }
+.llm-msg-body.llm-md > *:last-child { margin-bottom: 0; }
+
+.llm-msg-body.llm-md p {
+  margin: 0 0 7px;
+}
+
+.llm-msg-body.llm-md h3,
+.llm-msg-body.llm-md h4,
+.llm-msg-body.llm-md h5,
+.llm-msg-body.llm-md h6 {
+  margin: 12px 0 6px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #cfe4ff;
+}
+
+.llm-msg-body.llm-md h3 { font-size: 14px; }
+.llm-msg-body.llm-md h4 { font-size: 13.5px; }
+.llm-msg-body.llm-md h5,
+.llm-msg-body.llm-md h6 { font-size: 13px; opacity: 0.92; }
+
+.llm-msg-body.llm-md ul,
+.llm-msg-body.llm-md ol {
+  margin: 0 0 7px;
+  padding-left: 20px;
+}
+
+.llm-msg-body.llm-md li {
+  margin: 2px 0;
+}
+
+.llm-msg-body.llm-md strong {
+  color: #eaf3ff;
+  font-weight: 600;
+}
+
+.llm-msg-body.llm-md em {
+  font-style: italic;
+  color: #d6e6ff;
+}
+
+.llm-msg-body.llm-md del { opacity: 0.65; }
+
+.llm-msg-body.llm-md a {
+  color: #7dd3fc;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.llm-msg-body.llm-md code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(125, 211, 252, 0.12);
+  border: 1px solid rgba(125, 211, 252, 0.2);
+  font-family: Consolas, Monaco, monospace;
+  font-size: 12px;
+  color: #9fdcff;
+}
+
+.llm-msg-body.llm-md pre {
+  margin: 0 0 7px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(6, 14, 26, 0.75);
+  border: 1px solid rgba(58, 74, 102, 0.6);
+  overflow-x: auto;
+}
+
+.llm-msg-body.llm-md pre code {
+  padding: 0;
+  background: none;
+  border: none;
+  color: #b8d8f0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.llm-msg-body.llm-md blockquote {
+  margin: 0 0 7px;
+  padding: 4px 10px;
+  border-left: 3px solid rgba(125, 211, 252, 0.45);
+  background: rgba(125, 211, 252, 0.06);
+  border-radius: 0 4px 4px 0;
+  color: var(--text-secondary);
+}
+
+.llm-msg-body.llm-md hr {
+  height: 1px;
+  margin: 10px 0;
+  border: none;
+  background: rgba(58, 74, 102, 0.7);
+}
+
+/* 表格：气泡宽度有限，横向滚动而不是硬挤压内容 */
+.llm-md-table-wrap {
+  margin: 0 0 8px;
+  overflow-x: auto;
+  border-radius: 6px;
+  border: 1px solid rgba(58, 74, 102, 0.6);
+}
+
+.llm-msg-body.llm-md table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+
+.llm-msg-body.llm-md th,
+.llm-msg-body.llm-md td {
+  padding: 5px 8px;
+  text-align: left;
+  border-bottom: 1px solid rgba(58, 74, 102, 0.5);
+  vertical-align: top;
+  white-space: normal;
+}
+
+.llm-msg-body.llm-md th {
+  background: rgba(59, 130, 246, 0.14);
+  color: #cfe4ff;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.llm-msg-body.llm-md tbody tr:last-child td {
+  border-bottom: none;
+}
+
 /* 横排三点弹跳加载动画 */
 .llm-typing-dots {
   display: inline-flex;
@@ -5468,10 +5603,12 @@ body.rhs-v2 .decision-content-sidebar { gap: 8px; }
 
 /* ---------- 边缘竖标签：替换原滑出抽屉的「无入口」状态 ---------- */
 body.rhs-v2 .rhs-tab {
-  position: absolute; z-index: 31;
-  /* 最小化态紧贴屏幕右边缘，像从右侧滑出的抽屉把手（2026-11-27 20:28） */
-  top: 50%; margin-top: -58px; right: 0;
-  width: 34px; height: 116px; padding: 14px 0;
+  /* fixed + 50% + translateY(-50%)：不受任何父容器影响，永远是视口右缘正中
+     （原先按右侧栏垂直中点算，比屏幕中心偏下约 30px，2026-11-27 21:19 修正） */
+  position: fixed; z-index: 31;
+  top: 50%; right: 0; transform: translateY(-50%);
+  /* 高度随文字长度自适应（「灾害过程模拟」6 字比 4 字长一截），min-height 保底 */
+  width: 34px; height: auto; min-height: 116px; padding: 14px 0;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 8px;
   border: 0; border-radius: 10px 0 0 10px;
@@ -5483,7 +5620,7 @@ body.rhs-v2 .rhs-tab {
     inset 0 1px 0 rgba(255, 255, 255, .06),
     0 6px 20px rgba(0, 0, 0, .4);
   cursor: pointer; outline: none;
-  transition: transform .2s ease, box-shadow .2s ease, color .15s ease;
+  transition: transform .22s ease, opacity .22s ease, box-shadow .2s ease, color .15s ease;
 }
 /* 模块图标：数据库 / 过程模拟 / 风险评估 / 决策支持 */
 body.rhs-v2 .rhs-tab::before {
@@ -5502,7 +5639,7 @@ body.rhs-v2 .rhs-tab span {
 }
 /* 悬停：整块向左滑出 3px，暗示"可以拉开" */
 body.rhs-v2 .rhs-tab:hover {
-  transform: translateX(-3px);
+  transform: translate(-3px, -50%);
   color: #fff;
   box-shadow:
     inset 1px 0 0 var(--mod),
@@ -5513,12 +5650,15 @@ body.rhs-v2 .rhs-tab:hover::before {
   color: #fff;
   text-shadow: 0 0 10px var(--mod-line);
 }
-/* 展开时标签贴住面板真实宽度（--rhs-panel-w 由 rhs-tabs.js 同步） */
+/* 面板展开时把手隐藏：竖条只属于「收起态」，滑出屏幕右侧（2026-11-27 21:09 用户要求）
+   收起后靠 right:0 + top:50% 回到屏幕右缘中心。 */
 body.rhs-v2 .disaster-sidebar.active ~ .rhs-tab,
 body.rhs-v2 .simulate-sidebar.active ~ .rhs-tab,
 body.rhs-v2 .alert-sidebar.active ~ .rhs-tab,
 body.rhs-v2 .decision-sidebar.active ~ .rhs-tab {
-  right: calc(var(--rhs-gap) + var(--rhs-panel-w));
+  opacity: 0;
+  transform: translate(100%, -50%);
+  pointer-events: none;
 }
 
 /* ---------- 图层管理浮层（main.js 的 .sidepanel / .sidepanel-toggle） ---------- */

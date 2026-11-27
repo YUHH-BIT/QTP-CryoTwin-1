@@ -949,12 +949,6 @@ function createEconomyBubbleLayerFromGeoJSON(geoData) {
     // 优先使用中文县名，显示更友好的名称
     const county = properties.NAME_DECODED || properties.NAME || properties.PYNAME || properties.county || '';
     
-    // 跳过重复的县
-    if (processedCounties.has(county)) {
-      return;
-    }
-    processedCounties.add(county);
-    
     // 计算最新GDP（2015年数据）
     const gdp2015 = parseFloat(properties['GDP_2015'] || 0);
     const gdp2000 = parseFloat(properties['GDP_2000'] || 0);
@@ -963,9 +957,26 @@ function createEconomyBubbleLayerFromGeoJSON(geoData) {
     const growth_rate = gdp2000 > 0 ? ((gdp2015 / gdp2000) ** (1/15) - 1) * 100 : 0;
     
     if (county && gdp2015 > 0) {
-      // 数据已经是EPSG:3857投影坐标，直接使用
-      const coordinates = feature.geometry.coordinates;
-      
+      // 同一个县只画一个点（有 GDP 数据的要素才占位，
+      // 避免同名但无数据的要素把后面的有效点挤掉）
+      if (processedCounties.has(county)) {
+        return;
+      }
+      processedCounties.add(county);
+
+      // 坐标兼容：economy_counties.geojson 存的是经纬度(WGS84)，
+      // 必须投影到 EPSG:3857 才能落在底图正确位置；
+      // 若日后换回 3857 米坐标（|x| > 180）则原样使用。
+      // 旧代码把经纬度直接当米用 → 点全部堆在原点附近，图层"加载了但地图上看不见"。
+      const rawCoord = feature.geometry && feature.geometry.coordinates;
+      if (!Array.isArray(rawCoord) || rawCoord.length < 2) {
+        return;
+      }
+      const isLonLat = Math.abs(rawCoord[0]) <= 180 && Math.abs(rawCoord[1]) <= 90;
+      const coordinates = isLonLat
+        ? ol.proj.fromLonLat([rawCoord[0], rawCoord[1]])
+        : [rawCoord[0], rawCoord[1]];
+
       // 创建气泡特征
       const bubbleFeature = new ol.Feature({
         geometry: new ol.geom.Point(coordinates),
@@ -1008,7 +1019,11 @@ function createEconomyBubbleLayerFromGeoJSON(geoData) {
   });
   
   map.addLayer(economyLayer);
-  
+
+  // 面板勾选状态为唯一事实来源：异步加载期间用户可能已取消勾选
+  const economyCheckbox = document.getElementById('layer-economy');
+  economyLayer.setVisible(!!(economyCheckbox && economyCheckbox.checked));
+
   // 添加交互功能
   addEconomyInteraction();
   

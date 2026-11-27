@@ -45,6 +45,192 @@
     if (emptyEl) emptyEl.style.display = show ? '' : 'none';
   }
 
+  // ===================== 轻量 Markdown 渲染 =====================
+  // 安全模型：所有文本先经 escHtml 转义，再做标记替换，绝不把原始 HTML 注入 DOM。
+  // 支持：###/##/# 标题、**加粗**、*斜体*、~~删除线~~、`行内代码`、```代码块、
+  //       - / 1. 列表、> 引用、--- 分隔线、| 表格 |。
+  // 后端返回的 [数据源：xxx] 按普通文本处理，不做特殊解析。
+  const MD_TOKEN = '\uE000'; // 私有区字符做占位，正常文本不会出现
+
+  function escHtml(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  /** 中文之间不加空格，英文/数字之间补空格（段落内换行合并用） */
+  function joinLines(arr) {
+    let s = '';
+    const cjk = /[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/;
+    for (let k = 0; k < arr.length; k++) {
+      if (k > 0 && s) {
+        const prev = s.charAt(s.length - 1);
+        const next = arr[k].charAt(0);
+        if (!cjk.test(prev) && !cjk.test(next)) s += ' ';
+      }
+      s += arr[k];
+    }
+    return s;
+  }
+
+  /** 行内标记：入参为原始文本，内部先转义 */
+  function inlineMd(raw) {
+    const codes = [];
+    let s = escHtml(raw).replace(/`([^`]+)`/g, function (m, p1) {
+      codes.push(p1);
+      return MD_TOKEN + (codes.length - 1) + MD_TOKEN;
+    });
+    // 链接：仅放行 http(s) / mailto / 站内相对路径，挡掉 javascript: 等伪协议
+    s = s.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, function (m, label, url) {
+      if (!/^(https?:\/\/|mailto:|\/|#)/i.test(url)) return m;
+      return '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + label + '</a>';
+    });
+    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/__([^_]+)__/g, '<strong>$1</strong>');
+    s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+    s = s.replace(/~~([^~]+)~~/g, '<del>$1</del>');
+    s = s.replace(new RegExp(MD_TOKEN + '(\\d+)' + MD_TOKEN, 'g'), function (m, i) {
+      return '<code>' + codes[+i] + '</code>';
+    });
+    return s;
+  }
+
+  function isTableSep(line) {
+    return line.indexOf('-') >= 0 && /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(line);
+  }
+
+  function splitRow(line) {
+    let t = line.trim();
+    if (t.charAt(0) === '|') t = t.slice(1);
+    if (t.charAt(t.length - 1) === '|') t = t.slice(0, -1);
+    return t.split('|').map(function (c) { return c.trim(); });
+  }
+
+  /** 把 Markdown 源码渲染成 HTML 字符串 */
+  function renderMd(src) {
+    const lines = String(src).replace(/\r\n?/g, '\n').split('\n');
+    const out = [];
+    let para = [];
+    let list = null; // { type: 'ul'|'ol', items: [] }
+    let i = 0;
+
+    function flushPara() {
+      if (para.length) {
+        out.push('<p>' + inlineMd(joinLines(para)) + '</p>');
+        para = [];
+      }
+    }
+    function flushList() {
+      if (list) {
+        out.push('<' + list.type + '>' + list.items.map(function (t) {
+          return '<li>' + inlineMd(t) + '</li>';
+        }).join('') + '</' + list.type + '>');
+        list = null;
+      }
+    }
+
+    while (i < lines.length) {
+      const line = lines[i];
+      const trimmed = line.trim();
+
+      // 代码块
+      if (/^```/.test(trimmed)) {
+        flushPara(); flushList();
+        const buf = [];
+        i++;
+        while (i < lines.length && !/^```/.test(lines[i].trim())) {
+          buf.push(lines[i]);
+          i++;
+        }
+        i++; // 跳过结束围栏
+        out.push('<pre><code>' + escHtml(buf.join('\n')) + '</code></pre>');
+        continue;
+      }
+
+      // 空行断段
+      if (!trimmed) {
+        flushPara(); flushList();
+        i++;
+        continue;
+      }
+
+      // 分隔线
+      if (/^([-*_])\1{2,}$/.test(trimmed)) {
+        flushPara(); flushList();
+        out.push('<hr>');
+        i++;
+        continue;
+      }
+
+      // 标题：整体压两级，避免气泡里 h1 过大
+      const h = /^(#{1,6})\s+(.*)$/.exec(trimmed);
+      if (h) {
+        flushPara(); flushList();
+        const lvl = Math.min(h[1].length + 2, 6);
+        out.push('<h' + lvl + '>' + inlineMd(h[2]) + '</h' + lvl + '>');
+        i++;
+        continue;
+      }
+
+      // 表格：本行含 | 且下一行是分隔行
+      if (trimmed.indexOf('|') >= 0 && i + 1 < lines.length && isTableSep(lines[i + 1])) {
+        flushPara(); flushList();
+        const head = splitRow(lines[i]);
+        i += 2;
+        const rows = [];
+        while (i < lines.length && lines[i].trim() && lines[i].indexOf('|') >= 0) {
+          rows.push(splitRow(lines[i]));
+          i++;
+        }
+        let html = '<div class="llm-md-table-wrap"><table><thead><tr>';
+        head.forEach(function (c) { html += '<th>' + inlineMd(c) + '</th>'; });
+        html += '</tr></thead><tbody>';
+        rows.forEach(function (r) {
+          html += '<tr>';
+          for (let k = 0; k < head.length; k++) html += '<td>' + inlineMd(r[k] || '') + '</td>';
+          html += '</tr>';
+        });
+        html += '</tbody></table></div>';
+        out.push(html);
+        continue;
+      }
+
+      // 引用
+      if (/^>\s?/.test(trimmed)) {
+        flushPara(); flushList();
+        const q = [];
+        while (i < lines.length && /^>\s?/.test(lines[i].trim())) {
+          q.push(lines[i].trim().replace(/^>\s?/, ''));
+          i++;
+        }
+        out.push('<blockquote>' + inlineMd(joinLines(q)) + '</blockquote>');
+        continue;
+      }
+
+      // 列表
+      const ul = /^[-*+]\s+(.*)$/.exec(trimmed);
+      const ol = /^(\d+)[.)]\s+(.*)$/.exec(trimmed);
+      if (ul || ol) {
+        flushPara();
+        const type = ul ? 'ul' : 'ol';
+        if (list && list.type !== type) flushList();
+        if (!list) list = { type: type, items: [] };
+        list.items.push(ul ? ul[1] : ol[2]);
+        i++;
+        continue;
+      }
+
+      // 普通段落
+      flushList();
+      para.push(trimmed);
+      i++;
+    }
+
+    flushPara();
+    flushList();
+    return out.join('');
+  }
+
   /** textarea 随内容增高，超过 96px 后内部滚动 */
   function autoGrow() {
     if (!inputEl || inputEl.tagName !== 'TEXTAREA') return;
@@ -150,6 +336,25 @@
     let replyStarted = false;
 
     let fullReply = '';
+    // 流式渲染节流：每个 chunk 都全量重解析 Markdown 会掉帧，60ms 合并一次
+    let renderTimer = null;
+    let renderedLen = 0;
+
+    function paintReply() {
+      renderTimer = null;
+      if (!fullReply) return;
+      replyBody.classList.add('llm-md');
+      replyBody.innerHTML = renderMd(fullReply);
+      renderedLen = fullReply.length;
+    }
+    function scheduleReplyRender() {
+      if (renderTimer) return;
+      renderTimer = setTimeout(function () {
+        paintReply();
+        scrollToBottom();
+      }, 60);
+    }
+
     try {
       const resp = await fetch('/api/llm/chat', {
         method: 'POST',
@@ -200,8 +405,7 @@
                 replyBody.innerHTML = '';
               }
               fullReply += obj.content;
-              replyBody.textContent = fullReply;
-              scrollToBottom();
+              scheduleReplyRender();
             }
           } catch (e) {
             if (!(e instanceof SyntaxError)) {
@@ -217,10 +421,18 @@
       }
     } catch (e) {
       console.error('[冰冻圈灾害大模型] 请求失败:', e);
+      if (renderTimer) { clearTimeout(renderTimer); renderTimer = null; }
       replyBody.textContent = '';
       uiMsg('对话失败：' + (e && e.message ? e.message : e), 'error');
     } finally {
       setSending(false);
+      // 补最后一帧，保证流结束时完整内容已经渲染（不被节流吞掉）
+      if (renderTimer) {
+        clearTimeout(renderTimer);
+        paintReply();
+      } else if (fullReply && fullReply.length !== renderedLen) {
+        paintReply();
+      }
       // 保留已收到的内容；若有内容则记录到历史，否则移除占位气泡
       if (fullReply) {
         messages.push({ role: 'assistant', content: fullReply });

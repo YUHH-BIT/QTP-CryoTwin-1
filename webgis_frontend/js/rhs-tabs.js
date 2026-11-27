@@ -14,11 +14,12 @@
   function measure() {
     var rect = panel.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
-    // 面板宽度 → 展开时标签的 right 偏移，以及收起时面板的 off-screen 距离
+    // 面板宽度 → 收起时面板的 off-screen 距离等
     document.body.style.setProperty('--rhs-panel-w', Math.round(rect.width) + 'px');
-    // 标签对齐面板垂直中点（标签高 104px，上移 52px）
-    tab.style.top = Math.round(rect.top + rect.height / 2 + window.pageYOffset) + 'px';
-    tab.style.marginTop = '-52px';
+    // 竖标签位置由 CSS 固定为「视口右缘正中」（position:fixed + top:50% + translateY(-50%)），
+    // 不再跟随面板中点——原先按面板算会比屏幕中心偏下约 30px（2026-11-27 21:19）。
+    tab.style.top = '';
+    tab.style.marginTop = '';
   }
 
   function sync() {
