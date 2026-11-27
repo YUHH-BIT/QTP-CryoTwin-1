@@ -5143,9 +5143,14 @@ body.rhs-v2 .disaster-sidebar-title,
 body.rhs-v2 .simulate-sidebar-title,
 body.rhs-v2 .alert-sidebar-title,
 body.rhs-v2 .decision-sidebar-title {
-  margin: 0; font-size: 13px; font-weight: 500; letter-spacing: .2px; color: #eaf3ff;
+  margin: 0; font-size: 13px; font-weight: 500; letter-spacing: .2px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+/* 标题用模块图标色的高亮版：与前面的 fa-* 图标呼应，亮度接近白保证可读 */
+body.rhs-v2 .disaster-sidebar-title { color: #bae6fd; } /* 数据库蓝 #38bdf8 */
+body.rhs-v2 .simulate-sidebar-title { color: #d1fae5; } /* 过程模拟绿 #4ade80 */
+body.rhs-v2 .alert-sidebar-title { color: #fecdd3; }    /* 风险评估玫红 #fb7185 */
+body.rhs-v2 .decision-sidebar-title { color: #e9d5ff; } /* 决策支持紫 #c084fc */
 /* 右侧栏标题前的类别图标：颜色由 JS 按类别内联设置 */
 body.rhs-v2 .rhs-title-icon { margin-right: 8px; font-size: 13px; vertical-align: -1px; }
 body.rhs-v2 .disaster-sidebar-close,
@@ -5155,15 +5160,20 @@ body.rhs-v2 .decision-sidebar-close {
   flex: 0 0 auto; width: 26px; height: 26px; padding: 0;
   display: flex; align-items: center; justify-content: center;
   border: 1px solid transparent; border-radius: 6px;
-  background: transparent; color: var(--rhs-ink-3);
+  background: transparent;
   font-size: 18px; line-height: 1;
   transition: border-color .15s, color .15s, background .15s;
 }
+/* 收起（最小化）按钮取模块主题色：与侧栏标题、字段标签同色系（2026-11-27 17:43） */
+body.rhs-v2 .disaster-sidebar-close { color: #bae6fd; }
+body.rhs-v2 .simulate-sidebar-close { color: #d1fae5; }
+body.rhs-v2 .alert-sidebar-close { color: #fecdd3; }
+body.rhs-v2 .decision-sidebar-close { color: #e9d5ff; }
 body.rhs-v2 .disaster-sidebar-close:hover,
 body.rhs-v2 .simulate-sidebar-close:hover,
 body.rhs-v2 .alert-sidebar-close:hover,
 body.rhs-v2 .decision-sidebar-close:hover {
-  border-color: var(--rhs-ice); color: var(--rhs-ink); background: rgba(59, 130, 246, .12);
+  border-color: var(--rhs-ice); color: #fff; background: rgba(59, 130, 246, .12);
 }
 
 /* 内容分区：示范页 .card 的口径 */
@@ -5320,7 +5330,18 @@ body.rhs-v2 .rhs-tab {
 body.rhs-v2 .rhs-tab span {
   writing-mode: vertical-rl; font-size: 10px; letter-spacing: 2px;
 }
-body.rhs-v2 .rhs-tab:hover { border-color: var(--rhs-ice); color: var(--rhs-ink); }
+/* 竖标签取模块主题色：与标题 / 字段标签 / 收起按钮同色系（2026-11-27 17:44）
+   .rhs-tab 是各页 .xxx-sidebar 的后续兄弟，用 ~ 区分页面，纯 CSS 不动 JS */
+body.rhs-v2 .disaster-sidebar ~ .rhs-tab { color: #bae6fd; }
+body.rhs-v2 .simulate-sidebar ~ .rhs-tab { color: #d1fae5; }
+body.rhs-v2 .alert-sidebar ~ .rhs-tab { color: #fecdd3; }
+body.rhs-v2 .decision-sidebar ~ .rhs-tab { color: #e9d5ff; }
+body.rhs-v2 .disaster-sidebar ~ .rhs-tab:hover,
+body.rhs-v2 .simulate-sidebar ~ .rhs-tab:hover,
+body.rhs-v2 .alert-sidebar ~ .rhs-tab:hover,
+body.rhs-v2 .decision-sidebar ~ .rhs-tab:hover {
+  border-color: var(--rhs-ice); color: var(--rhs-ink);
+}
 /* 展开时标签贴住面板真实宽度（--rhs-panel-w 由 rhs-tabs.js 同步） */
 body.rhs-v2 .disaster-sidebar.active ~ .rhs-tab,
 body.rhs-v2 .simulate-sidebar.active ~ .rhs-tab,
@@ -5353,7 +5374,10 @@ body.rhs-v2 .sidepanel-head-title {
 }
 body.rhs-v2 .sidepanel-collapse-btn {
   width: 24px; height: 24px; border-radius: 6px;
-  border: 1px solid transparent; background: transparent; color: var(--rhs-ink-3);
+  border: 1px solid transparent; background: transparent;
+  /* 与收起后 44×44 圆形展开钮的图标同色（@2026-11-27 17:47 用户要求） */
+  color: #7dd3fc;
+  font-size: 18px; line-height: 1;
 }
 body.rhs-v2 .sidepanel-collapse-btn:hover {
   border-color: var(--rhs-ice); color: var(--rhs-ink); background: rgba(59, 130, 246, .12);
@@ -5384,6 +5408,127 @@ body.rhs-v2 .sidepanel .mode-switch button {
 }
 body.rhs-v2 .sidepanel .mode-switch button.active {
   background: #3b82f6; border-color: #3b82f6; color: #fff;
+}
+
+/* ---------- 右侧栏标题层级统一（2026-11-27）----------
+   一级 = 侧栏顶部 h2：13px + 模块提亮色（保持原样）
+   二级 = 分区标题：12px + 近白 + 1px 同色细线，去掉旧版双线 / 2px 蓝线
+   三级 = 数据来源小标题：11px + 冰蓝 + 无下划线
+   ---------- */
+body.rhs-v2 .disaster-sidebar-header,
+body.rhs-v2 .simulate-sidebar-header,
+body.rhs-v2 .alert-sidebar-header,
+body.rhs-v2 .decision-sidebar-header { border-bottom: 1px solid var(--rhs-line); }
+body.rhs-v2 .alert-section-title,
+body.rhs-v2 .alert-category-sidebar-header,
+body.rhs-v2 .simulate-category-sidebar-header,
+body.rhs-v2 .simulate-sidebar h3,
+body.rhs-v2 .alert-sidebar h3,
+body.rhs-v2 .decision-sidebar h3 {
+  margin: 0 0 8px; padding: 0 0 6px; display: block;
+  font-size: 12px; font-weight: 500; line-height: 1.4;
+  color: var(--rhs-ink);
+  border-bottom: 1px solid var(--rhs-line);
+}
+/* ID 选择器优先级高于上面的类规则，需单独拉回「模拟结果」等 18px 蓝色标题 */
+body.rhs-v2 #simulate-results h3 {
+  margin: 0 0 8px; padding: 0 0 6px; display: block;
+  font-size: 12px; font-weight: 500; line-height: 1.4;
+  color: var(--rhs-ink);
+  border-bottom: 1px solid var(--rhs-line);
+}
+body.rhs-v2 .simulate-sidebar h4,
+body.rhs-v2 .alert-sidebar h4,
+body.rhs-v2 .decision-sidebar h4 {
+  margin: 0 0 6px; padding: 0; border-bottom: 0;
+  font-size: 11px; font-weight: 500; color: var(--rhs-ink-2) !important;
+}
+/* 旧版 60px 双线装饰不再保留 */
+body.rhs-v2 .alert-section-title::after { display: none !important; }
+body.rhs-v2 .disaster-source-title { font-size: 11px; }
+
+/* 洪水灾害风险评估：权重面板字号来自 alert.html 内联 <style> 旧口径
+   （11 / 11.5 / 12.5 / 13 / 14px 混用），此处按右侧栏统一口径拉回：
+   分区标题 12px / 正文 11px / 徽标 10px，标题线同 1px 细线 */
+body.rhs-v2 .alert-weight-badge {
+  font-size: 10px; font-weight: 400; color: var(--rhs-ice);
+  background: rgba(59, 130, 246, .18); border-color: var(--rhs-line-2);
+}
+body.rhs-v2 .alert-weight-toggle {
+  font-size: 11px; font-weight: 400; color: var(--rhs-ink-2);
+}
+body.rhs-v2 .alert-weight-group-title {
+  margin: 0 0 6px; padding: 0 0 5px;
+  font-size: 12px; font-weight: 500; color: var(--rhs-ink);
+  border-left: 0; border-bottom: 1px solid var(--rhs-line);
+}
+body.rhs-v2 .alert-weight-sum,
+body.rhs-v2 .alert-weight-hint,
+body.rhs-v2 .alert-weight-entropy-note,
+body.rhs-v2 .entropy-hybrid-note,
+body.rhs-v2 .alert-analysis-item label {
+  font-size: 11px; font-weight: 400; color: var(--rhs-ink-2); line-height: 1.55;
+}
+body.rhs-v2 .alert-analysis-value {
+  font-size: 11px; font-weight: 600; color: var(--rhs-ice);
+}
+body.rhs-v2 .alert-weight-group .btn-small {
+  padding: 6px 10px; font-size: 11px; border-radius: 6px;
+}
+
+/* 洪水过程模拟的三个子模块（径流 / 洪水识别 / 淹没）内容包在
+   .flood-submodule-content 里，不是 .simulate-category-sidebar-content 的直接子元素，
+   上面的 > label / > select 选择器命不中，回退到默认 14px 白字。
+   这里补齐，与风险评估页表单口径一致：label / 输入框 11px。 */
+body.rhs-v2 .flood-submodule-content label {
+  display: block; margin: 0 0 5px;
+  font-size: 11px; font-weight: 400; color: var(--rhs-ink);
+}
+body.rhs-v2 .flood-submodule-content select,
+body.rhs-v2 .flood-submodule-content input[type="date"],
+body.rhs-v2 .flood-submodule-content input[type="text"] {
+  width: 100%; box-sizing: border-box;
+  padding: 6px 8px; margin: 0 0 9px;
+  background: rgba(10, 20, 36, .7); border: 1px solid var(--rhs-line-2);
+  border-radius: 6px; color: var(--rhs-ink); font-size: 11px; color-scheme: dark;
+}
+
+/* ---------- 表单视觉配平（2026-11-27 17:28 用户选「配平字级+压框高」）----------
+   问题：label 11px 灰字配 38px 高的 13px 白字输入框，头轻脚重。
+   口径：label 12px 近白、框内 12px、框高 34px、间距收紧。
+   ---------- */
+body.rhs-v2 .alert-category-sidebar-content > label,
+body.rhs-v2 .simulate-category-sidebar-content > label,
+body.rhs-v2 .flood-submodule-content label {
+  margin: 0 0 4px;
+  font-size: 12px; font-weight: 400;
+}
+/* 字段标签取模块主题色：与侧栏标题同色系（2026-11-27 17:38 用户要求）
+   只用提亮版（风险评估 #fecdd3 / 过程模拟 #d1fae5），亮度接近白，12px 仍清楚。
+   数据库页与决策页的 label 是图层勾选项，不参与染色，避免列表花掉。 */
+body.rhs-v2 .alert-category-sidebar-content > label { color: #fecdd3; }
+body.rhs-v2 .simulate-category-sidebar-content > label,
+body.rhs-v2 .flood-submodule-content label { color: #d1fae5; }
+body.rhs-v2 .alert-category-sidebar-content > select,
+body.rhs-v2 .alert-category-sidebar-content > input[type="date"],
+body.rhs-v2 .alert-category-sidebar-content > input[type="text"],
+body.rhs-v2 .simulate-category-sidebar-content > select,
+body.rhs-v2 .simulate-category-sidebar-content > input[type="date"],
+body.rhs-v2 .simulate-category-sidebar-content > input[type="text"],
+body.rhs-v2 .flood-submodule-content select,
+body.rhs-v2 .flood-submodule-content input[type="date"],
+body.rhs-v2 .flood-submodule-content input[type="text"] {
+  height: 34px; padding: 6px 9px; margin: 0 0 8px;
+  font-size: 12px; line-height: 20px;
+}
+/* TomSelect 渲染出来的控件（原 select 被隐藏），须单独压高与字级 */
+body.rhs-v2 .alert-category-sidebar .ts-wrapper.single .ts-control,
+body.rhs-v2 .simulate-category-sidebar .ts-wrapper.single .ts-control {
+  min-height: 34px !important; padding: 5px 9px !important;
+}
+body.rhs-v2 .alert-category-sidebar .ts-wrapper .ts-control .item,
+body.rhs-v2 .simulate-category-sidebar .ts-wrapper .ts-control .item {
+  font-size: 12px !important; line-height: 20px; color: var(--rhs-ink) !important;
 }
 
 @media (max-width: 900px) {
