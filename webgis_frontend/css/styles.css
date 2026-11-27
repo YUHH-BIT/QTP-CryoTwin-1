@@ -5231,6 +5231,26 @@ body.rhs-v2 .disaster-layer-check-mark {
   width: 14px; height: 14px; font-size: 9px; background: #3b82f6;
 }
 
+/* 灾害数据库：分类图层列表下方的数据来源说明 */
+.disaster-source-note {
+  margin: 8px 0 0;
+  padding: 9px 11px;
+  background: rgba(27, 40, 64, .5);
+  border: 1px solid var(--rhs-line, rgba(125, 211, 252, .18));
+  border-radius: 8px;
+}
+.disaster-source-title {
+  display: flex; align-items: center; gap: 6px;
+  margin: 0 0 5px;
+  font-size: 10.5px; font-weight: 500; color: var(--rhs-ice, #7dd3fc);
+}
+.disaster-source-title i { font-size: 10px; opacity: .85; }
+.disaster-source-note p {
+  margin: 0;
+  font-size: 10px; line-height: 1.6; color: var(--rhs-ink-3, #8496b0);
+  overflow-wrap: anywhere;
+}
+
 /* 表单 / 标签 / 按钮：紧凑单轴，不再用大号白底控件 */
 body.rhs-v2 .alert-category-sidebar-content > label,
 body.rhs-v2 .simulate-category-sidebar-content > label,
