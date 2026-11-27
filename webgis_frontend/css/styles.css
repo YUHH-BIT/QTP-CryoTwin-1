@@ -176,7 +176,8 @@ body {
   background: var(--card-bg);
   border-radius: 10px;
   padding: 3px;
-  flex: 1;
+  flex: 0 1 auto; /* 按内容自适应，不再平分整行；右侧留白给搜索栏 */
+  min-width: 0;
 }
 
 .topbar .nav-links a {
@@ -190,9 +191,9 @@ body {
   position: relative;
   overflow: hidden;
   white-space: nowrap;
-  flex: 1;
+  flex: 0 0 auto; /* 每项贴合文字宽度 */
   text-align: center;
-  min-width: 108px;
+  min-width: 0;   /* 去掉 108px 硬下限，长文字不再被拉伸 */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -203,7 +204,7 @@ body {
 .dropdown-container {
   position: relative;
   display: inline-block;
-  flex: 1;
+  flex: 0 0 auto; /* 下拉项按内容宽度，不参与均分拉伸 */
 }
 
 .dropdown-toggle {
