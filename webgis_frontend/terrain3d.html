@@ -7,7 +7,7 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20261111b" />
   <!-- 与其余页面保持完全一致的样式引入顺序 -->
   <link rel="stylesheet" href="css/lib/ol.css" />
-  <link rel="stylesheet" href="css/styles.css?v=20261127nav" />
+  <link rel="stylesheet" href="css/styles.css?v=20261127nav22" />
   <link rel="stylesheet" href="css/components.css" />
   <link href="css/lib/font-awesome.min.css" rel="stylesheet">
   <!-- Three.js 本地托管（js/lib/，npm 包解出，非 CDN）。不使用 importmap：
@@ -15,7 +15,7 @@
        少一层解析、也少一类"映射没生效就整页不跑"的故障。 -->
   <style>
     /* 三维示范区：系统导航区保持原样，内容区改为内嵌吉隆灾害链演示页。
-       导航占 --nav-height(100px)，iframe 铺满其余视口。 */
+       导航占 --nav-height(单行 62px)，iframe 铺满其余视口。 */
     html, body { margin: 0; height: 100%; background: #070b14; overflow: hidden; }
     #demo-frame {
       display: block; width: 100%;
@@ -49,7 +49,7 @@
   <!-- 顶部导航：与 index/decision 等页面逐字一致（本页不加载 main.js，故末尾内联一份下拉交互） -->
   <div class="topbar">
     <div class="topbar-row1">
-      <div class="logo">青藏高原冰冻圈灾害数字孪生系统</div>
+      <div class="logo"><span class="logo-name">青藏高原<em class="logo-key">冰冻圈</em>灾害数字孪生系统</span><span class="logo-code">QTP-CryoTwin</span></div>
       <div class="user">
         <span><i style="font-size:11px;"></i></span>
       </div>

@@ -4,6 +4,12 @@
  * 职责：绑定 decision.html 中 #llm-chat-history / #llm-input / #llm-send-btn，
  * 通过后端 /api/llm/chat（SSE 流式）与 DeepSeek 对话，流式渲染回复。
  *
+ * 2026-11-27 18:29 交互升级：
+ * - 输入框改 textarea：Enter 发送 / Shift+Enter 换行，随内容自动增高（上限 96px）
+ * - 空态（欢迎语 + 快捷提问）改为静态 HTML，首条消息后隐藏，新对话时恢复
+ * - 新增「回到底部」浮动按钮（滚动离底 40px 以上出现）
+ * - 新增「开始新对话」按钮（清空会话历史，重置空态）
+ *
  * 约定：
  * - 全程原生 JS，不依赖 jQuery；
  * - 错误提示统一使用 UI.toast（无则降级 alert）；
@@ -18,6 +24,10 @@
   const sendBtn = document.getElementById('llm-send-btn');
   if (!historyEl || !inputEl || !sendBtn) return;
 
+  const emptyEl = document.getElementById('llm-empty');
+  const clearBtn = document.getElementById('llm-clear-btn');
+  const scrollBtn = document.getElementById('llm-scroll-bottom');
+
   // 会话消息历史（不含 system，system 由后端注入）
   const messages = [];
   let streaming = false;
@@ -30,7 +40,20 @@
     }
   }
 
+  /** 空态显隐：首条消息发出后隐藏欢迎语与快捷提问 */
+  function showEmpty(show) {
+    if (emptyEl) emptyEl.style.display = show ? '' : 'none';
+  }
+
+  /** textarea 随内容增高，超过 96px 后内部滚动 */
+  function autoGrow() {
+    if (!inputEl || inputEl.tagName !== 'TEXTAREA') return;
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 96) + 'px';
+  }
+
   function appendMessage(role, text) {
+    showEmpty(false);
     const wrap = document.createElement('div');
     wrap.className = 'llm-msg';
     if (role === 'user') {
@@ -61,6 +84,7 @@
   }
 
   function appendTyping() {
+    showEmpty(false);
     const wrap = document.createElement('div');
     wrap.className = 'llm-msg llm-msg-assistant llm-msg-typing';
     const avatar = document.createElement('div');
@@ -92,17 +116,22 @@
     return wrap;
   }
 
-  function scrollToBottom() {
-    historyEl.scrollTop = historyEl.scrollHeight;
+  function scrollToBottom(smooth) {
+    if (smooth && historyEl.scrollTo) {
+      historyEl.scrollTo({ top: historyEl.scrollHeight, behavior: 'smooth' });
+    } else {
+      historyEl.scrollTop = historyEl.scrollHeight;
+    }
   }
 
   function setSending(disable) {
     streaming = disable;
     sendBtn.disabled = disable;
     inputEl.disabled = disable;
-    sendBtn.querySelector('i').className = disable
-      ? 'fa fa-circle-o-notch fa-spin'
-      : 'fa fa-paper-plane';
+    const icon = sendBtn.querySelector('i');
+    if (icon) {
+      icon.className = disable ? 'fa fa-circle-o-notch fa-spin' : 'fa fa-paper-plane';
+    }
   }
 
   async function sendMessage() {
@@ -110,6 +139,7 @@
     if (!text || streaming) return;
 
     inputEl.value = '';
+    autoGrow();
     messages.push({ role: 'user', content: text });
     appendMessage('user', text);
 
@@ -197,26 +227,63 @@
         typingWrap.classList.remove('llm-msg-typing');
       } else {
         typingWrap.remove();
+        // 一条都没发出去时恢复空态
+        if (!historyEl.querySelector('.llm-msg')) showEmpty(true);
       }
       scrollToBottom();
     }
   }
 
-  // 事件绑定
+  // ---- 事件绑定 ----
   sendBtn.addEventListener('click', function () {
     sendMessage();
   });
+
+  inputEl.addEventListener('input', autoGrow);
   inputEl.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') {
+    // Enter 发送；Shift+Enter 换行；输入法组合中不拦截
+    if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       sendMessage();
     }
   });
 
-  // 欢迎语（问候 + 身份定位 + 示例引导 + 能力边界，简明扼要）
-  appendMessage(
-    'assistant',
-    '您好，我是「冰冻圈灾害大模型」，可为您研判青藏高原冰冻圈灾害的机理、风险与防治对策。\n\
-'
-  );
+  // 快捷提问：填入问题并直接发送
+  document.querySelectorAll('.llm-suggest-chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      if (streaming) return;
+      const q = chip.getAttribute('data-q') || chip.textContent.trim();
+      inputEl.value = q;
+      autoGrow();
+      sendMessage();
+    });
+  });
+
+  // 回到底部：离底超过 40px 时显示
+  if (scrollBtn) {
+    historyEl.addEventListener('scroll', function () {
+      const gap = historyEl.scrollHeight - historyEl.scrollTop - historyEl.clientHeight;
+      scrollBtn.classList.toggle('show', gap > 40);
+    });
+    scrollBtn.addEventListener('click', function () {
+      scrollToBottom(true);
+    });
+  }
+
+  // 开始新对话
+  if (clearBtn) {
+    clearBtn.addEventListener('click', function () {
+      if (streaming) return;
+      messages.length = 0;
+      historyEl.querySelectorAll('.llm-msg').forEach(function (n) { n.remove(); });
+      showEmpty(true);
+      inputEl.value = '';
+      autoGrow();
+      if (scrollBtn) scrollBtn.classList.remove('show');
+      inputEl.focus();
+    });
+  }
+
+  // 初始：空态由 HTML 静态渲染，不再在 JS 里补欢迎语
+  autoGrow();
 })();

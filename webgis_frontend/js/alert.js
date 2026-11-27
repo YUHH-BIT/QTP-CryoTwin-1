@@ -1238,7 +1238,7 @@ function showNoInundationGuide(detail, startDate, endDate) {
             <div style="font-size:17px;font-weight:600;color:#f8fafc;">无法评估：缺少淹没范围数据</div>
         </div>
         <div style="font-size:12px;color:#94a3b8;margin-bottom:14px;">工作流前置依赖未满足</div>
-        <div style="display:inline-block;padding:3px 10px;border-radius:999px;background:rgba(56,189,248,0.12);color:#7dd3fc;font-size:12px;margin-bottom:12px;">${stepLabel}</div>
+        <div style="display:inline-block;padding:3px 10px;border-radius:999px;background:rgba(251,113,133,0.12);color:#fecdd3;font-size:12px;margin-bottom:12px;">${stepLabel}</div>
         <div style="margin:0 0 16px;color:#cbd5e1;">${msg}</div>
         <div style="background:rgba(15,23,42,0.6);border:1px solid rgba(148,163,184,0.18);border-radius:8px;padding:10px 12px;font-size:12px;color:#94a3b8;margin-bottom:18px;">
             评估日期：<span style="color:#e2e8f0;">${startDate} ~ ${endDate}</span><br>
@@ -1246,7 +1246,7 @@ function showNoInundationGuide(detail, startDate, endDate) {
         </div>
         <div style="display:flex;gap:10px;justify-content:flex-end;">
             <button id="no-inundation-close" style="padding:8px 16px;border:1px solid rgba(148,163,184,0.3);background:transparent;color:#cbd5e1;border-radius:8px;cursor:pointer;">关闭</button>
-            <button id="no-inundation-go" style="padding:8px 16px;border:none;background:#2563eb;color:#fff;border-radius:8px;cursor:pointer;font-weight:600;">前往灾害过程模拟</button>
+            <button id="no-inundation-go" style="padding:8px 16px;border:none;background:#e11d48;color:#fff;border-radius:8px;cursor:pointer;font-weight:600;">前往灾害过程模拟</button>
         </div>
     `;
     overlay.appendChild(card);
@@ -1293,11 +1293,9 @@ function _makeRiskModalDraggable() {
 // 绑定结果面板事件（script 在 body 末尾，DOM 已就绪）
 (function() {
     const closeBtn = document.getElementById('risk-modal-close');
-    const minBtn = document.getElementById('risk-modal-min');
     const reopenBtn = document.getElementById('risk-modal-reopen');
     const overlay = document.getElementById('risk-result-overlay');
     if (closeBtn) closeBtn.addEventListener('click', hideRiskResultModal);
-    if (minBtn) minBtn.addEventListener('click', hideRiskResultModal);
     if (overlay) overlay.addEventListener('click', hideRiskResultModal);
     if (reopenBtn) reopenBtn.addEventListener('click', () => {
         if (_lastModalArgs) showRiskResultModal(..._lastModalArgs);

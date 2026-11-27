@@ -3650,6 +3650,16 @@ function initUnifiedDropdowns() {
     }
   });
 
+  // 2b. Esc 关闭下拉并归还焦点到触发项（键盘可达性）
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    const open = document.querySelector('.dropdown-menu.active');
+    if (!open) return;
+    open.classList.remove('active');
+    const toggle = open.previousElementSibling;
+    if (toggle && toggle.classList.contains('dropdown-toggle')) toggle.focus();
+  });
+
   // 3. 下拉项点击：同页切换分类（不刷新），跨页正常跳转
   document.querySelectorAll('.dropdown-item').forEach(item => {
     item.addEventListener('click', (e) => {

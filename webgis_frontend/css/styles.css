@@ -35,7 +35,7 @@
   --warning-color: #fbbf24;
 
   /* 布局 */
-  --nav-height: 100px; /* 两行导航栏总高（紧凑版：8+38+8+38+8 = 100） */
+  --nav-height: 62px; /* 单行导航栏总高（系统名 + 模块按钮 + 搜索框同一行） */
   --panel-width: 360px;
   --map-height: calc(100vh - var(--nav-height));
 
@@ -57,14 +57,16 @@ body {
   overflow: hidden;
 }
 
-/* 顶部导航栏样式 */
+/* 顶部导航栏样式（单行：系统名 | 模块按钮 | 搜索框） */
 .topbar {
   height: var(--nav-height);
   background: var(--grad-topbar);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
   display: flex;
-  flex-direction: column;
-  padding: 8px 20px;
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+  padding: 0 20px;
   position: relative;
   /* 导航栏须高于左侧图层管理面板(z:25)、右侧侧边栏(z:30)及其遮罩(z:29)，
      否则其下拉菜单会被这些面板盖住；低于全屏遮罩(z:1000+)与弹窗(z:2000+) */
@@ -85,20 +87,23 @@ body {
   pointer-events: none;
 }
 
-/* 第一行导航栏 */
+/* 第一行导航栏（单行模式下并入 .topbar，仅作系统名容器） */
 .topbar-row1 {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  height: 38px;
-  margin-bottom: 8px;
+  justify-content: flex-start;
+  flex: 0 0 auto;
+  height: auto;
+  margin-bottom: 0;
 }
 
-/* 第二行导航栏 */
+/* 第二行导航栏（单行模式下与第一行并排：模块按钮靠左、搜索框靠右） */
 .topbar-row2 {
   display: flex;
   align-items: center;
-  height: 38px;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: auto;
   justify-content: space-between;
 }
 
@@ -123,8 +128,8 @@ body {
 .topbar .searchbar {
   display: flex;
   align-items: center;
-  min-width: 300px;
-  margin-left: 300px;
+  flex: 0 0 auto;
+  margin-left: auto; /* 单行导航栏：搜索框贴右，模块按钮居中留白 */
 }
 
 .topbar input[type="search"] {
@@ -169,26 +174,38 @@ body {
   box-shadow: 0 0 8px var(--primary-glow);
 }
 
-/* 导航链接 - Tab栏样式 */
+/* 导航链接 —— 「玻璃胶囊条」：整条半透明深色底 + 细描边，当前项实心渐变胶囊。
+   材质与右侧 cmd 搜索框同源（深色填充 + 1px 描边 + 内高光），整条顶栏语言统一。 */
 .topbar .nav-links {
   display: flex;
-  gap: 4px;
-  background: var(--card-bg);
-  border-radius: 10px;
-  padding: 3px;
+  gap: 2px;
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 11px;
+  padding: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   flex: 0 1 auto; /* 按内容自适应，不再平分整行；右侧留白给搜索栏 */
   min-width: 0;
 }
 
-.topbar .nav-links a {
-  color: var(--text-secondary);
+.topbar .nav-links a:not(.dropdown-item) {
+  color: #93a4bd;
   text-decoration: none;
-  font-size: 15px;
-  font-weight: 600;
-  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  padding: 0 12px;
   border-radius: 7px;
-  transition: all 0.2s;
+  border: 1px solid transparent; /* 占位，active 加描边时不产生尺寸抖动 */
+  box-sizing: border-box;
+  /* 统一缓动曲线：ease-out-quad 质感，切换不突兀 */
+  transition:
+    color 0.18s cubic-bezier(0.22, 0.61, 0.36, 1),
+    background-color 0.18s cubic-bezier(0.22, 0.61, 0.36, 1),
+    border-color 0.2s cubic-bezier(0.22, 0.61, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 0.61, 0.36, 1);
   position: relative;
+  isolation: isolate; /* 让 ::before 的负 z-index 只在本项内层叠，不跑到玻璃条后面 */
   overflow: hidden;
   white-space: nowrap;
   flex: 0 0 auto; /* 每项贴合文字宽度 */
@@ -198,6 +215,27 @@ body {
   align-items: center;
   justify-content: center;
   height: 32px;
+}
+
+/* 当前项的渐变底：渐变本身无法插值，用独立图层做 opacity/scale 过渡实现平滑淡入 */
+.topbar .nav-links a:not(.dropdown-item)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.38), rgba(37, 99, 235, 0.26));
+  opacity: 0;
+  transform: scale(0.94);
+  transition:
+    opacity 0.22s cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.topbar .nav-links a:not(.dropdown-item).active::before {
+  opacity: 1;
+  transform: scale(1);
 }
 
 /* 下拉菜单样式 */
@@ -214,13 +252,13 @@ body {
 .dropdown-toggle::after {
   content: '\f107'; /* FontAwesome fa-angle-down（细角箭头） */
   font-family: 'FontAwesome';
-  margin-left: 8px;
-  font-size: 13px;
-  color: var(--text-secondary);
+  margin-left: 6px;
+  font-size: 10px;
+  color: rgba(147, 164, 189, 0.75);
   vertical-align: middle;
   line-height: 1;
   display: inline-block;
-  transition: transform 0.25s ease, color 0.2s ease;
+  transition: transform 0.24s cubic-bezier(0.22, 0.61, 0.36, 1), color 0.18s ease;
 }
 
 /* 下拉展开时箭头旋转 180° 并高亮 */
@@ -229,41 +267,54 @@ body {
   color: var(--primary);
 }
 
+/* 下拉面板 —— 与导航胶囊条同一材质：深色玻璃 + 1px 描边 + 内高光。
+   原样式有三个毛病：① 顶部小箭头写死 left:22px，和触发项对不齐、描边还在拐角处留缺口；
+   ② 悬停时 padding-left 从 14 跳到 20，文字整体右移像在抖；③ 悬停是横向渐变、选中是左侧粗条，
+   两套语言互相打架。这里统一成「淡填充 + 左侧细指示条」。 */
 .dropdown-menu {
   display: none;
   position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  min-width: 150px;
-  background: rgba(16, 26, 44, 0.97);
-  border: 1px solid rgba(125, 211, 252, 0.16);
+  top: calc(100% + 9px);
+  left: -2px; /* 抵消触发项 1px 边框 + 12px 内边距与面板 11px 内边距的差，让首项文字与按钮文字左对齐 */
+  /* 宽度逐个贴合各自最长的一项（不设大 min-width，否则会被统一撑宽：
+     min-width 作用在内容盒上，会把 4 字菜单也撑到和 8 字菜单一样宽）；
+     min-width 只留一个很小的下限，防止两字菜单窄到没法看 */
+  width: max-content;
+  min-width: 92px;
+  max-width: 260px;
+  background: rgba(17, 26, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.16);
   border-radius: 12px;
   box-shadow:
-    0 12px 32px rgba(0, 0, 0, 0.45),
-    0 4px 12px rgba(0, 0, 0, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(14px);
-  padding: 6px;
+    0 18px 44px rgba(2, 6, 23, 0.55),
+    0 4px 12px rgba(2, 6, 23, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px) saturate(140%);
+  padding: 4px;
   z-index: 1000;
+  /* 项数多（系统管理 8 项）或窗口矮时内部滚动，避免菜单顶到屏幕外 */
+  max-height: min(70vh, 460px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   opacity: 0;
-  transform: translateY(-8px) scale(0.98);
+  transform: translateY(-4px) scale(0.985);
   transform-origin: top left;
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  transition:
+    opacity 0.18s cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 顶部小箭头（指向触发菜单） */
+/* 小箭头已移除：触发项在玻璃条内，箭头位置随视口变化对不准，且描边缺口显脏 */
 .dropdown-menu::before {
-  content: '';
-  position: absolute;
-  top: -6px;
-  left: 22px;
-  width: 10px;
-  height: 10px;
-  background: rgba(16, 26, 44, 0.97);
-  border-left: 1px solid rgba(125, 211, 252, 0.16);
-  border-top: 1px solid rgba(125, 211, 252, 0.16);
-  transform: rotate(45deg);
-  border-radius: 2px 0 0 0;
+  display: none;
+}
+
+/* 内容溢出时用细滚动条，不破坏圆角 */
+.dropdown-menu::-webkit-scrollbar { width: 6px; }
+.dropdown-menu::-webkit-scrollbar-track { background: transparent; }
+.dropdown-menu::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.28);
+  border-radius: 3px;
 }
 
 .dropdown-menu.active {
@@ -273,80 +324,84 @@ body {
 }
 
 .dropdown-item {
-  display: block;
-  padding: 9px 14px;
+  display: flex;
+  align-items: center;
+  padding: 7px 11px;
   border-radius: 8px;
-  color: var(--text-primary);
+  color: #b6c4d8;
   text-decoration: none;
   font-size: 13px;
   font-weight: 500;
+  line-height: 1.35;
   position: relative;
   white-space: nowrap;
-  transition: all 0.16s ease;
+  transition:
+    background-color 0.16s cubic-bezier(0.22, 0.61, 0.36, 1),
+    color 0.16s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-.dropdown-item:hover {
-  background: linear-gradient(90deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.05));
-  color: #fff;
-  padding-left: 20px;
-}
-
-/* hover 左侧指示条 */
-.dropdown-item:hover::before {
+/* 左侧指示条：绝对定位，不参与盒模型，悬停时文字不再位移。
+   位置从 2px 挪到 4px、加粗到 3px，并去掉「冰蓝→深蓝」渐变——深的一端落在深色底上直接糊没了，
+   统一用亮冰蓝 + 淡光晕，选中项一眼能看见。 */
+.dropdown-item::before {
   content: '';
   position: absolute;
-  left: 8px;
+  left: 4px;
   top: 50%;
-  transform: translateY(-50%);
+  margin-top: -7.5px;
   width: 3px;
   height: 15px;
   border-radius: 2px;
-  background: var(--primary);
-  box-shadow: 0 0 8px var(--primary-glow);
+  background: var(--ice);
+  box-shadow: 0 0 7px rgba(125, 211, 252, 0.5);
+  opacity: 0;
+  transition: opacity 0.16s cubic-bezier(0.22, 0.61, 0.36, 1);
 }
 
-/* 当前激活分类（导航下拉高亮：浅色底 + 左侧指示条，不用大色块） */
+/* 悬停只做填充与文字提亮，不显示竖线——左侧蓝线专属于「当前所在分类」，语义唯一 */
+.dropdown-item:hover {
+  background-color: rgba(148, 163, 184, 0.12);
+  color: #eef4fb;
+}
+
+/* 当前所在分类：淡蓝填充 + 冰蓝文字 + 实心指示条 */
 .dropdown-item.active {
-  color: #7dd3fc;
-  background: rgba(59, 130, 246, 0.1);
+  background-color: rgba(59, 130, 246, 0.16);
+  color: #9ddcff;
   font-weight: 600;
 }
+
 .dropdown-item.active::before {
-  content: '';
-  position: absolute;
-  left: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 3px;
-  height: 15px;
-  border-radius: 2px;
-  background: var(--primary);
+  opacity: 1;
+  box-shadow: 0 0 7px rgba(125, 211, 252, 0.5);
 }
 
-/* 增强当前选中状态的Tab样式：浅色底 + 底部指示条，去掉整块渐变 */
-.topbar .nav-links a.active {
-  background: rgba(59, 130, 246, 0.12);
-  color: #7dd3fc;
-  box-shadow: none;
+.dropdown-item.active:hover {
+  background-color: rgba(59, 130, 246, 0.22);
+}
+
+/* 当前选中：实心渐变胶囊 + 冰蓝描边 + 内高光（渐变底由 ::before 提供并淡入，这里只管描边与阴影） */
+.topbar .nav-links a:not(.dropdown-item).active {
+  border-color: rgba(125, 211, 252, 0.32);
+  color: #eaf6ff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 2px 10px rgba(37, 99, 235, 0.22);
   transform: none;
-  border-radius: 8px 8px 0 0;
-  position: relative;
-}
-.topbar .nav-links a.active::after {
-  content: '';
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 4px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--primary);
-  box-shadow: 0 0 8px var(--primary-glow);
 }
 
-.topbar .nav-links a:hover:not(.active) {
-  background: rgba(59, 130, 246, 0.1);
-  color: var(--ice-bright);
+.topbar .nav-links a:not(.dropdown-item).active::after {
+  content: none;
+}
+
+.topbar .nav-links a:not(.dropdown-item):hover:not(.active) {
+  background-color: rgba(148, 163, 184, 0.12);
+  color: #e6edf7;
+}
+
+.topbar .nav-links a:not(.dropdown-item):focus-visible {
+  outline: 1px solid rgba(125, 211, 252, 0.55);
+  outline-offset: 1px;
 }
 
 /* 用户区域样式 */
@@ -667,33 +722,71 @@ body {
   background: var(--card-hover);
 }
 
+/* 品牌区：纯色标题 + 冰晶竖条，右侧一道细分隔线，去掉渐变文字与发光（与搜索框的克制感统一） */
 .topbar .logo {
   display: flex;
   align-items: center;
   font-family: var(--font-display);
-  font-size: 23px;
+  font-size: 17px;
   font-weight: 700;
-  letter-spacing: 2px;
-  background: var(--grad-logo);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-  color: var(--ice-bright);
-  margin-right: 32px;
-  text-shadow: none;
-  filter: drop-shadow(0 0 12px var(--ice-glow));
+  letter-spacing: 0.6px;
+  color: #eef4fc;
+  margin-right: 24px;
+  /* 不要给 .logo 加 text-shadow：渐变字的填充是透明的，阴影会浮在字形外圈变成脏影 */
+  filter: none;
   position: relative;
 }
 
 /* logo 前置冰晶竖条 */
 .topbar .logo::before {
   content: '';
-  width: 4px;
-  height: 22px;
+  width: 3px;
+  height: 18px;
   margin-right: 12px;
   border-radius: 2px;
-  background: var(--grad-accent-bar);
-  box-shadow: 0 0 10px var(--ice-glow);
+  background: linear-gradient(180deg, var(--ice) 0%, var(--primary) 100%);
+  box-shadow: 0 0 8px rgba(125, 211, 252, 0.45);
+}
+
+/* 品牌与模块之间的分隔改用「系统代号左侧的竖线」，这里不再重复画一条 */
+.topbar .logo::after {
+  display: none;
+}
+
+/* 系统名：整串走「白 → 淡冰蓝」的左到右渐变（横跨 240px，渐变才看得出来；
+   纵向渐变在 17px 字高上跨度太小，等于没渐变）。末端用亮蓝而不是灰蓝，避免后半句发灰。
+   「冰冻圈」三字用同一色系但更亮一档，保持关键词层次又不打断整串的连续性。
+   注意 text-shadow 在 background-clip:text + 透明填充下会浮在字形外圈变成脏影，必须去掉。 */
+.topbar .logo-name {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: #eef4fc; /* 不支持 background-clip:text 时的回退色 */
+  background: linear-gradient(96deg, #ffffff 0%, #d8efff 30%, #7fcdfb 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  white-space: nowrap;
+}
+
+/* 「冰冻圈」跟随整串渐变，不再自己起一段——单独设渐变会在渐变中段插一段白，
+   反而让这三个字比周围更亮、跳出来一块。 */
+.topbar .logo-key {
+  font-style: normal;
+}
+
+/* 系统代号：Chakra Petch 是科技感拉丁字体，中文用不上、这里正好用得上 */
+.topbar .logo-code {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  color: #6b83a3;
+  padding-left: 10px;
+  margin-left: 10px;
+  border-left: 1px solid rgba(148, 163, 184, 0.22);
+  white-space: nowrap;
+  flex: none;
 }
 
 .topbar .logo img {
@@ -703,7 +796,8 @@ body {
 }
 
 .topbar .searchbar {
-  flex: 1;
+  flex: 0 0 auto;
+  margin-left: auto;
   display: flex;
   align-items: center;
 }
@@ -5138,6 +5232,25 @@ body.rhs-v2 .decision-sidebar {
   transition: right .24s ease, opacity .2s ease;
 }
 body.rhs-v2 .decision-sidebar { display: flex; flex-direction: column; }
+/* 灾害数据库：图层名带灾害类型与计数，fit-content 会把面板撑到 420px。
+   收窄到 300px，靠高度换宽度（图层名允许折两行，见下方 .disaster-layer-name）。 */
+body.rhs-v2 .disaster-sidebar {
+  min-width: 264px;
+  max-width: min(300px, 44vw);
+}
+/* 风险评估：四个子模块选项卡一行排开把面板撑到 420px。
+   收窄到 340px，选项卡改 2×2，用一行高度换 80px 宽度。 */
+body.rhs-v2 .alert-sidebar {
+  min-width: 296px;
+  max-width: min(340px, 44vw);
+}
+body.rhs-v2 .alert-sidebar .flood-submodule-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  border-bottom: 0;
+  margin-bottom: 12px;
+}
 body.rhs-v2 .disaster-sidebar.active,
 body.rhs-v2 .simulate-sidebar.active,
 body.rhs-v2 .alert-sidebar.active,
@@ -5261,7 +5374,15 @@ body.rhs-v2 .alert-layer-label-sidebar:hover {
 /* 勾选后文字用模块主题色 */
 body.rhs-v2 .disaster-layer-checkbox-sidebar:checked + .disaster-layer-label-sidebar,
 body.rhs-v2 .alert-layer-checkbox-sidebar:checked + .alert-layer-label-sidebar { color: var(--mod-ink); }
-body.rhs-v2 .disaster-layer-name { overflow: hidden; text-overflow: ellipsis; }
+/* 收窄面板后图层名允许多行，最多两行，超出省略（用高度换宽度） */
+body.rhs-v2 .disaster-layer-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+  word-break: break-word;
+}
 body.rhs-v2 .alert-layer-count-sidebar,
 body.rhs-v2 .disaster-layer-count-sidebar {
   flex: 0 0 auto; font-size: 10px; font-weight: 400; color: var(--rhs-ink-2);
@@ -5319,12 +5440,8 @@ body.rhs-v2 .decision-chip {
 }
 body.rhs-v2 .flood-submodule-tabs .tab-btn:hover,
 body.rhs-v2 .weight-method-opt:hover,
-body.rhs-v2 .decision-chip:hover { border-color: var(--rhs-ice); color: var(--rhs-ink); }
-body.rhs-v2 .flood-submodule-tabs .tab-btn.active,
-body.rhs-v2 .weight-method-opt.active,
-body.rhs-v2 .decision-chip.active {
-  background: #3b82f6; border-color: #3b82f6; color: #fff;
-}
+body.rhs-v2 .decision-chip:hover { border-color: var(--mod); color: var(--rhs-ink); }
+/* 选中态的模块色统一由下方「选中 tab / 主按钮」段接管，此处不再写死蓝色 */
 body.rhs-v2 .alert-section { margin-bottom: 10px; }
 body.rhs-v2 .alert-section-title {
   margin: 0 0 8px; padding-bottom: 6px;
@@ -5348,23 +5465,49 @@ body.rhs-v2 .decision-content-sidebar { gap: 8px; }
 /* ---------- 边缘竖标签：替换原滑出抽屉的「无入口」状态 ---------- */
 body.rhs-v2 .rhs-tab {
   position: absolute; z-index: 31;
-  /* 与示范页一致：竖标签在右侧栏垂直中点（104px 高，上移 52px） */
-  top: 50%; margin-top: -52px; right: var(--rhs-gap);
-  width: 22px; height: 104px; padding: 0;
-  display: flex; align-items: center; justify-content: center;
-  /* 不要外框线：留透明边框占位，避免尺寸跳动（2026-11-27 18:25） */
-  border: 1px solid transparent; border-radius: 7px;
-  background: rgba(19, 31, 51, .92); color: var(--mod);
-  backdrop-filter: blur(8px); box-shadow: 0 6px 20px rgba(0, 0, 0, .4);
-  transition: right .24s ease, border-color .15s, color .15s;
+  /* 最小化态紧贴屏幕右边缘，像从右侧滑出的抽屉把手（2026-11-27 20:28） */
+  top: 50%; margin-top: -58px; right: 0;
+  width: 34px; height: 116px; padding: 14px 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px;
+  border: 0; border-radius: 10px 0 0 10px;
+  background: linear-gradient(180deg, rgba(25, 39, 62, .97) 0%, rgba(15, 25, 43, .97) 100%);
+  color: var(--mod);
+  /* 左侧一条模块色内高光 + 顶部一道白色微光，代替外框线 */
+  box-shadow:
+    inset 1px 0 0 var(--mod-line),
+    inset 0 1px 0 rgba(255, 255, 255, .06),
+    0 6px 20px rgba(0, 0, 0, .4);
+  cursor: pointer; outline: none;
+  transition: transform .2s ease, box-shadow .2s ease, color .15s ease;
 }
+/* 模块图标：数据库 / 过程模拟 / 风险评估 / 决策支持 */
+body.rhs-v2 .rhs-tab::before {
+  font: normal normal normal 13px/1 FontAwesome;
+  color: var(--mod);
+  transition: color .15s ease, text-shadow .2s ease;
+}
+body.rhs-v2[data-module="disaster"] .rhs-tab::before { content: "\f1c0"; }
+/* 与标题图标统一为 fa-play-circle（\f144），原 \f0c3 是 fa-flask，两边不一致 */
+body.rhs-v2[data-module="simulate"] .rhs-tab::before { content: "\f144"; }
+body.rhs-v2[data-module="alert"] .rhs-tab::before { content: "\f071"; }
+body.rhs-v2[data-module="decision"] .rhs-tab::before { content: "\f0eb"; }
 body.rhs-v2 .rhs-tab span {
-  writing-mode: vertical-rl; font-size: 10px; letter-spacing: 2px;
+  writing-mode: vertical-rl; font-size: 11px; letter-spacing: 3px;
+  transition: color .15s ease;
 }
-/* 竖标签取模块主题色；悬停只提亮文字与底色，不出现边框 */
+/* 悬停：整块向左滑出 3px，暗示"可以拉开" */
 body.rhs-v2 .rhs-tab:hover {
-  border-color: transparent; color: #fff;
-  background: rgba(30, 45, 70, .98);
+  transform: translateX(-3px);
+  color: #fff;
+  box-shadow:
+    inset 1px 0 0 var(--mod),
+    inset 0 1px 0 rgba(255, 255, 255, .08),
+    0 8px 24px rgba(0, 0, 0, .48);
+}
+body.rhs-v2 .rhs-tab:hover::before {
+  color: #fff;
+  text-shadow: 0 0 10px var(--mod-line);
 }
 /* 展开时标签贴住面板真实宽度（--rhs-panel-w 由 rhs-tabs.js 同步） */
 body.rhs-v2 .disaster-sidebar.active ~ .rhs-tab,
@@ -5438,9 +5581,7 @@ body.rhs-v2 .sidepanel .mode-switch button {
   color: var(--rhs-ink);
 }
 body.rhs-v2 .sidepanel .category-header .toggle-icon { color: var(--rhs-ink-2); }
-body.rhs-v2 .sidepanel .mode-switch button.active {
-  background: #3b82f6; border-color: #3b82f6; color: #fff;
-}
+/* .sidepanel .mode-switch button.active 的模块色由下方合并规则统一接管 */
 
 /* ---------- 右侧栏标题层级统一（2026-11-27）----------
    一级 = 侧栏顶部 h2：13px + 模块提亮色（保持原样）
@@ -5496,6 +5637,18 @@ body.rhs-v2 .alert-weight-group {
   border: 1px solid var(--rhs-line); border-radius: 8px;
 }
 body.rhs-v2 .alert-weight-hint { border-left-width: 1px; border-radius: 4px; }
+/* 自定义权重面板补漏（2026-11-27 18:47）：开关复选框 / 合计数值 / 熵权说明竖线 / 小按钮 */
+body.rhs-v2 .alert-weight-toggle input { accent-color: var(--mod); }
+body.rhs-v2 .alert-weight-sum b { color: var(--mod-ink); }
+body.rhs-v2 .alert-weight-entropy-note p { border-left-color: var(--mod-line); }
+body.rhs-v2 .alert-weight-group .btn-small {
+  background: var(--mod-deep); color: #fff;
+}
+body.rhs-v2 .alert-weight-group .btn-small:hover {
+  background: var(--mod-deep);
+  filter: brightness(1.1);
+  box-shadow: 0 4px 12px var(--mod-line);
+}
 body.rhs-v2 .alert-weight-toggle {
   font-size: 11px; font-weight: 400; color: var(--rhs-ink-2);
 }
@@ -5512,7 +5665,7 @@ body.rhs-v2 .alert-analysis-item label {
   font-size: 11px; font-weight: 400; color: var(--rhs-ink-2); line-height: 1.55;
 }
 body.rhs-v2 .alert-analysis-value {
-  font-size: 11px; font-weight: 600; color: var(--rhs-ice);
+  font-size: 11px; font-weight: 600; color: var(--mod-ink);
 }
 body.rhs-v2 .alert-weight-group .btn-small {
   padding: 6px 10px; font-size: 11px; border-radius: 6px;
@@ -5603,9 +5756,20 @@ body.rhs-v2 .simulate-category-sidebar-content > select,
 body.rhs-v2 .flood-submodule-content select {
   border-color: var(--mod-line);
 }
-body.rhs-v2 .ts-dropdown .option.selected {
+/* 下拉展开态：悬停 / 键盘高亮 / 已选项 / 小箭头 / 边框全部取模块色
+   （tom-select-dark.css 的原规则带 !important 且特异性 0,4,0，这里必须 0,4,1 才压得住） */
+body.rhs-v2 .ts-dropdown .ts-dropdown-content .option:hover,
+body.rhs-v2 .ts-dropdown .ts-dropdown-content .option.active {
+  background: var(--mod-soft) !important;
+  color: #fff !important;
+}
+body.rhs-v2 .ts-dropdown .ts-dropdown-content .option.selected {
   color: #fff !important;
   background: var(--mod-soft) !important;
+}
+body.rhs-v2 .ts-dropdown { border-color: var(--rhs-line-2) !important; }
+body.rhs-v2 .ts-wrapper.single.dropdown-active::after {
+  border-color: transparent transparent var(--mod) !important;
 }
 
 /* ---------- 模拟结果区：深色卡片口径 + 模块主题色（2026-11-27 17:56）----------
@@ -5653,7 +5817,7 @@ body.rhs-v2 .alert-sidebar [id$="result-table"]:not(.ui-table) tbody td {
 }
 body.rhs-v2 .simulate-sidebar [id$="result-table"]:not(.ui-table) tbody tr:hover,
 body.rhs-v2 .alert-sidebar [id$="result-table"]:not(.ui-table) tbody tr:hover {
-  background: rgba(59, 130, 246, .08);
+  background: var(--mod-soft);
 }
 /* 表头底色取模块色 */
 body.rhs-v2 .simulate-sidebar [id$="result-table"] thead,
@@ -5666,10 +5830,8 @@ body.rhs-v2 .risk-result-modal { background: var(--rhs-surface); border-color: v
 body.rhs-v2 .risk-result-modal-header { border-bottom-color: var(--rhs-line); }
 body.rhs-v2 .risk-result-modal-title { color: var(--mod-ink); }
 body.rhs-v2 .risk-result-modal-sub { color: var(--rhs-ink-2); }
-body.rhs-v2 .risk-result-modal-close,
-body.rhs-v2 .risk-result-modal-min { color: var(--rhs-ink-2); }
-body.rhs-v2 .risk-result-modal-close:hover,
-body.rhs-v2 .risk-result-modal-min:hover { color: var(--mod-ink); }
+body.rhs-v2 .risk-result-modal-close { color: var(--rhs-ink-2); }
+body.rhs-v2 .risk-result-modal-close:hover { color: var(--mod-ink); }
 body.rhs-v2 .risk-stat-card { background: var(--rhs-card); border-color: var(--rhs-line); }
 body.rhs-v2 .risk-stat-label { color: var(--rhs-ink-2); }
 body.rhs-v2 .risk-stat-value { color: var(--mod-ink); }
@@ -5736,6 +5898,169 @@ body.rhs-v2 .disaster-layer-item-sidebar.loading .disaster-layer-label-sidebar {
   border-color: var(--mod-line) !important;
 }
 
+/* ---------- 通用组件 ui-table 跟随模块色（2026-11-27 18:35）----------
+   表头原来是 rgba(37,99,235) 蓝色渐变 + 冰蓝字，是侧栏里面积最大的一块蓝。 */
+body.rhs-v2 .ui-table {
+  background: rgba(19, 31, 51, .5); border-color: var(--rhs-line);
+}
+body.rhs-v2 .ui-table thead th {
+  background: var(--mod-soft);
+  color: var(--mod-ink);
+  border-bottom: 1px solid var(--rhs-line);
+}
+body.rhs-v2 .ui-table tbody td {
+  color: var(--rhs-ink);
+  border-bottom-color: var(--rhs-line);
+}
+body.rhs-v2 .ui-table tbody tr:hover { background: var(--mod-soft); }
+
+/* ---------- 专家卡 / 专家搜索 / 权重滑块：跟随模块紫（2026-11-27 18:35 全面检查补漏）----------
+   注意：.expert-card-avatar 的背景是按专家姓名生成的彩色标识（JS 内联），刻意不覆盖。 */
+body.rhs-v2 .expert-card { background: var(--rhs-card); border-color: var(--rhs-line); }
+body.rhs-v2 .expert-card.expanded { border-color: var(--mod); }
+body.rhs-v2 .expert-card-head:hover { background: var(--mod-soft); }
+body.rhs-v2 .expert-card-name { color: var(--rhs-ink); }
+body.rhs-v2 .expert-card-title,
+body.rhs-v2 .expert-card-field { color: var(--rhs-ink-2); }
+body.rhs-v2 .expert-card-toggle { color: var(--mod-ink); }
+body.rhs-v2 .expert-card-detail { border-top-color: var(--rhs-line); }
+body.rhs-v2 .expert-search { background: rgba(10, 20, 36, .7); border-color: var(--rhs-line); }
+body.rhs-v2 .expert-search:focus-within {
+  border-color: var(--mod); box-shadow: 0 0 0 1px var(--mod-line);
+}
+body.rhs-v2 .expert-search input { color: var(--rhs-ink); }
+body.rhs-v2 .expert-search input::placeholder { color: var(--rhs-ink-3); }
+/* 权重滑块两套伪元素（WebKit / Firefox） */
+body.rhs-v2 .alert-analysis-item input[type="range"]::-webkit-slider-thumb { background: var(--mod); }
+body.rhs-v2 .alert-analysis-item input[type="range"]::-moz-range-thumb { background: var(--mod); }
+body.rhs-v2 .alert-analysis-item input[type="range"]::-webkit-slider-thumb:hover { background: var(--mod-deep); }
+body.rhs-v2 .alert-analysis-item input[type="range"]::-moz-range-thumb:hover { background: var(--mod-deep); }
+body.rhs-v2 .alert-analysis-item input[type="range"] { accent-color: var(--mod); }
+
+/* ---------- 大模型聊天面板：模块紫贯穿（2026-11-27 18:29）----------
+   原来整块是蓝色渐变（头像 / 消息头像 / 用户气泡 / 发送按钮 / 聚焦光晕），
+   与决策支持的紫色主题脱节。这里统一走 --mod 变量。 */
+body.rhs-v2 .llm-agent-header {
+  flex: 0 0 auto; padding: 10px 12px;
+  border-bottom: 1px solid var(--rhs-line);
+  background: linear-gradient(135deg, rgba(192, 132, 252, .10), rgba(19, 31, 51, .55));
+}
+body.rhs-v2 .llm-agent-header::after {
+  background: radial-gradient(circle at 100% 0%, var(--mod-soft), transparent 70%);
+}
+body.rhs-v2 .llm-agent-avatar {
+  width: 34px; height: 34px; border-radius: 9px; font-size: 16px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--mod-deep), var(--mod));
+  box-shadow: 0 2px 10px var(--mod-line);
+}
+body.rhs-v2 .llm-agent-status { font-size: 11px; color: var(--rhs-ink-2); }
+body.rhs-v2 .llm-agent-hint { font-size: 10.5px; color: var(--rhs-ink-3); margin-top: 2px; }
+body.rhs-v2 .llm-clear-btn {
+  margin-left: auto; width: 26px; height: 26px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 6px; background: transparent;
+  color: var(--rhs-ink-3); font-size: 13px; cursor: pointer;
+  transition: color .15s, background .15s;
+}
+body.rhs-v2 .llm-clear-btn:hover { color: var(--mod-ink); background: var(--mod-soft); }
+
+/* 消息气泡与头像 */
+body.rhs-v2 .llm-msg-assistant .llm-msg-avatar {
+  color: #fff;
+  background: linear-gradient(135deg, var(--mod-deep), var(--mod));
+  box-shadow: 0 0 8px var(--mod-line);
+}
+body.rhs-v2 .llm-msg-assistant .llm-msg-body {
+  background: rgba(27, 40, 64, .8);
+  border-color: var(--rhs-line);
+  color: var(--rhs-ink);
+}
+body.rhs-v2 .llm-msg-user .llm-msg-body {
+  background: linear-gradient(135deg, var(--mod-deep), var(--mod));
+  box-shadow: 0 3px 10px var(--mod-line);
+}
+body.rhs-v2 .llm-msg-role { color: var(--rhs-ink-3); }
+
+/* 消息区 */
+body.rhs-v2 .llm-chat-history {
+  flex: 1 1 auto; min-height: 0;
+  background: rgba(10, 20, 36, .5);
+  border-color: var(--rhs-line);
+  scrollbar-color: var(--mod-line) transparent;
+}
+body.rhs-v2 .llm-chat-history::-webkit-scrollbar-thumb { background: var(--mod-line); }
+
+/* 输入区：多行 textarea + 图标发送按钮 */
+body.rhs-v2 .llm-chat-input { border-color: var(--rhs-line); background: rgba(10, 20, 36, .7); }
+body.rhs-v2 .llm-chat-input:focus-within {
+  border-color: var(--mod);
+  box-shadow: 0 0 0 1px var(--mod-line);
+}
+body.rhs-v2 .llm-chat-input textarea {
+  flex: 1; min-height: 20px; max-height: 96px;
+  margin: 0; padding: 6px 4px;
+  border: 0; background: transparent; outline: none; resize: none;
+  color: var(--rhs-ink); font-size: 13px; line-height: 1.5;
+  font-family: inherit; color-scheme: dark;
+}
+body.rhs-v2 .llm-chat-input textarea::placeholder { color: var(--rhs-ink-3); }
+body.rhs-v2 .llm-chat-input .btn {
+  width: 34px; height: 34px; padding: 0; margin: 0; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; font-size: 13px;
+  /* 原规则直接写死 background 渐变，不读 --bs-btn-* 变量，必须显式覆盖 */
+  background: linear-gradient(135deg, var(--mod-deep), var(--mod));
+  border: 0; color: #fff;
+  box-shadow: 0 3px 10px var(--mod-line);
+}
+body.rhs-v2 .llm-chat-input .btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--mod), var(--mod-deep));
+  transform: translateY(-1px);
+}
+body.rhs-v2 .llm-chat-input .btn:disabled {
+  opacity: .5; cursor: not-allowed; transform: none;
+}
+
+/* 空态：欢迎语 + 快捷提问 */
+body.rhs-v2 .llm-empty { margin: auto; text-align: center; padding: 6px 4px; }
+body.rhs-v2 .llm-empty-icon {
+  width: 40px; height: 40px; margin: 0 auto 10px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; color: var(--mod-ink);
+  background: var(--mod-soft); border: 1px solid var(--mod-line);
+}
+body.rhs-v2 .llm-empty-text {
+  margin: 0 0 14px; font-size: 12px; line-height: 1.7; color: var(--rhs-ink-2);
+}
+body.rhs-v2 .llm-empty-label {
+  font-size: 10.5px; color: var(--rhs-ink-3);
+  margin-bottom: 8px; letter-spacing: .3px;
+}
+body.rhs-v2 .llm-suggest { display: flex; flex-direction: column; gap: 6px; }
+body.rhs-v2 .llm-suggest-chip {
+  padding: 7px 10px; border-radius: 8px; text-align: left;
+  font-size: 11.5px; color: var(--rhs-ink);
+  background: rgba(27, 40, 64, .7); border: 1px solid var(--rhs-line-2);
+  cursor: pointer; font-family: inherit;
+  transition: border-color .15s, background .15s, color .15s;
+}
+body.rhs-v2 .llm-suggest-chip:hover {
+  border-color: var(--mod); background: var(--mod-soft); color: #fff;
+}
+
+/* 回到底部 */
+body.rhs-v2 .llm-chat-wrap { position: relative; }
+body.rhs-v2 .llm-scroll-bottom {
+  position: absolute; right: 22px; bottom: 66px; z-index: 3;
+  width: 30px; height: 30px; border-radius: 50%;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(27, 40, 64, .96); border: 1px solid var(--mod-line);
+  color: var(--mod-ink); font-size: 12px; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
+}
+body.rhs-v2 .llm-scroll-bottom.show { display: flex; }
+
 /* ---------- 焦点态统一为模块色（2026-11-27 18:04）----------
    点选复选框 / 输入框后，浏览器默认的蓝色 focus ring 与模块色冲突，
    这是「选了以后还有蓝色框线」的直接来源。 */
@@ -5775,4 +6100,100 @@ body.rhs-v2 input[type="range"]:focus { outline: none; }
     max-width: none;
   }
   body.rhs-v2 .rhs-tab { display: none; }
+}
+
+/* ============ 单行导航栏自适应 ============
+   系统名 + 模块按钮 + 搜索框挤在同一行，窄屏时按 1560 / 1360 / 1120 三档逐级压缩，
+   保证模块按钮不被搜索框挤出、搜索框不被压到无法输入。 */
+@media (max-width: 1560px) {
+  .topbar .logo { margin-right: 14px; }
+  .topbar .logo-name { font-size: 16px; }
+  .topbar .nav-links a:not(.dropdown-item) { padding: 0 10px; }
+}
+
+@media (max-width: 1360px) {
+  .topbar { padding: 0 14px; }
+  .topbar .logo { margin-right: 10px; }
+  .topbar .logo-name { font-size: 15px; letter-spacing: 0.3px; }
+  /* 代号只在字号上退一档，不隐藏——1360 宽度下实测仍放得下 */
+  .topbar .logo-code { font-size: 10px; padding-left: 8px; margin-left: 8px; }
+  .topbar .logo::before { height: 16px; margin-right: 9px; }
+  .topbar .nav-links { padding: 3px; border-radius: 9px; }
+  .topbar .nav-links a:not(.dropdown-item) { font-size: 13px; padding: 0 8px; height: 30px; border-radius: 6px; }
+  .topbar .dropdown-toggle::after { margin-left: 4px; font-size: 9px; }
+  .topbar .searchbar.cmd-mode input[type="search"] { width: 150px; font-size: 13px; }
+}
+
+@media (max-width: 1240px) {
+  /* 1200 上下是临界区：品牌 + 代号 + 六个模块 + 搜索框刚好占满，再挤就贴上了 */
+  .topbar .logo-name { font-size: 14px; }
+  .topbar .logo-code { font-size: 9px; letter-spacing: 0.3px; padding-left: 7px; margin-left: 7px; }
+  .topbar .nav-links a:not(.dropdown-item) { font-size: 12.5px; padding: 0 6px; }
+  .topbar .searchbar.cmd-mode input[type="search"] { width: 120px; }
+}
+
+@media (max-width: 1120px) {
+  .topbar .logo-name { font-size: 13.5px; letter-spacing: 0; }
+  .topbar .logo-code { font-size: 8.5px; letter-spacing: 0.3px; }
+  .topbar .nav-links a:not(.dropdown-item) { font-size: 12.5px; padding: 0 6px; }
+  .topbar .searchbar.cmd-mode input[type="search"] { width: 110px; }
+}
+
+@media (max-width: 900px) {
+  /* 极小宽度下系统名换行会撑高单行导航，直接单行省略 */
+  .topbar .logo { white-space: nowrap; overflow: hidden; max-width: 34vw; }
+  .topbar .logo-name { overflow: hidden; text-overflow: ellipsis; }
+  .topbar .logo-code { display: none; } /* 到这一步才真正放不下代号 */
+  .topbar .logo::after { display: none; }
+  /* 不能给 nav-links 设 overflow（会造成滚动容器），否则绝对定位的下拉菜单会被裁掉 */
+  .topbar .nav-links { overflow: visible; }
+  .topbar .nav-links a:not(.dropdown-item) { font-size: 12px; padding: 0 5px; }
+  .topbar input[type="search"] { width: 120px; }
+}
+
+/* ============ 切页与状态的平滑过渡 ============
+   1) 多页应用每次跳转都是硬闪：用跨文档 View Transitions（Chrome / Edge 126+）让内容区淡入淡出；
+   2) 顶栏 7 个页面结构完全一致，单独命名并禁用动画，切页时视觉上保持连续，观感接近单页应用；
+   3) 不支持的浏览器会自动忽略这些规则，属渐进增强，无副作用。 */
+@view-transition {
+  navigation: auto;
+}
+
+.topbar {
+  view-transition-name: app-topbar;
+}
+
+::view-transition-old(root) {
+  animation: vt-fade-out 0.14s ease both;
+}
+::view-transition-new(root) {
+  animation: vt-fade-in 0.24s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+/* 顶栏不参与淡化与位移 */
+::view-transition-group(app-topbar),
+::view-transition-old(app-topbar),
+::view-transition-new(app-topbar) {
+  animation: none;
+}
+
+@keyframes vt-fade-out {
+  to { opacity: 0; }
+}
+@keyframes vt-fade-in {
+  from { opacity: 0; }
+}
+
+/* 系统设置了「减少动效」时全部退化为瞬切 */
+@media (prefers-reduced-motion: reduce) {
+  .topbar .nav-links a:not(.dropdown-item),
+  .topbar .nav-links a:not(.dropdown-item)::before,
+  .dropdown-menu,
+  .dropdown-toggle::after,
+  .dropdown-item {
+    transition-duration: 0.01ms !important;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
 }

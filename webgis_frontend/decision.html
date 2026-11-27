@@ -8,7 +8,7 @@
   <!-- 使用多个CDN源确保OpenLayers加载成功 -->
   <link rel="stylesheet" href="css/lib/ol.css" />
   <!-- 移除高德地图API引用 -->
-  <link rel="stylesheet" href="css/styles.css?v=20261127noborder" />
+  <link rel="stylesheet" href="css/styles.css?v=20261127icon2" />
   <link rel="stylesheet" href="css/components.css" />
   <!-- 使用多个CDN源确保Font Awesome加载成功 -->
   <link href="css/lib/font-awesome.min.css" rel="stylesheet">
@@ -24,7 +24,7 @@
   <!-- 顶部导航 -->
   <div class="topbar">
     <div class="topbar-row1">
-      <div class="logo">青藏高原冰冻圈灾害数字孪生系统</div>
+      <div class="logo"><span class="logo-name">青藏高原<em class="logo-key">冰冻圈</em>灾害数字孪生系统</span><span class="logo-code">QTP-CryoTwin</span></div>
       <div class="user">
         <span><i style="font-size:11px;"></i></span>
       </div>
@@ -152,27 +152,43 @@
 
     <!-- 冰冻圈灾害大模型 -->
     <div class="decision-category-sidebar llm-sidebar" id="llm-category-sidebar" style="display: none;">
-      <!-- 大模型头部信息栏（科技感信息栏） -->
+      <!-- 大模型状态条：名称已由侧栏标题承担，这里只放状态与操作，避免重复 -->
       <div class="llm-agent-header">
         <div class="llm-agent-avatar">
           <i class="fa fa-microchip"></i>
         </div>
         <div class="llm-agent-meta">
-          <div class="llm-agent-name">冰冻圈灾害大模型</div>
           <div class="llm-agent-status">
             <span class="llm-status-dot"></span>
             <span id="llm-status-text">在线 · DeepSeek-V4</span>
           </div>
+          <div class="llm-agent-hint">研判机理 · 评估风险 · 防治对策</div>
         </div>
+        <button type="button" class="llm-clear-btn" id="llm-clear-btn" title="开始新对话" aria-label="开始新对话">
+          <i class="fa fa-refresh"></i>
+        </button>
       </div>
       <div class="llm-chat-wrap">
-        <div id="llm-chat-history" class="llm-chat-history">
-          <!-- 聊天历史记录 -->
+        <div id="llm-chat-history" class="llm-chat-history" aria-live="polite" aria-label="对话记录">
+          <!-- 空态：欢迎语 + 快捷提问，首条消息发出后隐藏 -->
+          <div class="llm-empty" id="llm-empty">
+            <div class="llm-empty-icon"><i class="fa fa-comments-o"></i></div>
+            <p class="llm-empty-text">您好，我是「冰冻圈灾害大模型」，可为您研判青藏高原冰冻圈灾害的机理、风险与防治对策。</p>
+            <div class="llm-empty-label">试试这样问</div>
+            <div class="llm-suggest">
+              <button type="button" class="llm-suggest-chip" data-q="青藏高原近年有哪些典型的冰川跃动事件？">冰川跃动典型事件</button>
+              <button type="button" class="llm-suggest-chip" data-q="如何评估某流域的冰湖溃决洪水风险？">冰湖溃决洪水风险</button>
+              <button type="button" class="llm-suggest-chip" data-q="冻土融沉对青藏公路路基有哪些影响？">冻土融沉与路基</button>
+            </div>
+          </div>
         </div>
+        <button type="button" class="llm-scroll-bottom" id="llm-scroll-bottom" aria-label="回到底部" title="回到底部">
+          <i class="fa fa-arrow-down"></i>
+        </button>
         <div class="llm-chat-input">
-          <input type="text" id="llm-input" placeholder="输入您的问题..." autocomplete="off">
-          <button id="llm-send-btn" class="btn">
-            <i class="fa fa-paper-plane"></i> 发送
+          <textarea id="llm-input" rows="1" placeholder="输入问题，Enter 发送 · Shift+Enter 换行" autocomplete="off"></textarea>
+          <button id="llm-send-btn" class="btn" type="button" aria-label="发送">
+            <i class="fa fa-paper-plane"></i>
           </button>
         </div>
       </div>
@@ -415,8 +431,8 @@
   </script>
   
   <script src="js/ui-components.js"></script>
-  <script src="js/main.js?v=20261127esc"></script>
-  <script src="js/decision.js?v=20261116a"></script>
+  <script src="js/main.js?v=20261127esc2"></script>
+  <script src="js/decision.js?v=20261127llm"></script>
   <script src="js/expert.js"></script>
   <script src="js/decision-content.js"></script>  <script>
     // 下拉菜单交互

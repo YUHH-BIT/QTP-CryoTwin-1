@@ -8,7 +8,7 @@
   <!-- 使用多个CDN源确保OpenLayers加载成功 -->
   <link rel="stylesheet" href="css/lib/ol.css" />
   <!-- 移除高德地图API引用 -->
-  <link rel="stylesheet" href="css/styles.css?v=20261127noborder" />
+  <link rel="stylesheet" href="css/styles.css?v=20261127icon2" />
   <!-- UI 组件库（statCard/badge/ring/btn/toast，统一评估模块视觉风格） -->
   <link rel="stylesheet" href="css/components.css" />
   <link rel="stylesheet" href="css/lib/air-datepicker.css?v=2" />
@@ -119,11 +119,11 @@
     .risk-result-modal-title { font-size: 16px; font-weight: 600; color: var(--text-primary); }
     .risk-result-modal-sub { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
     .risk-result-modal-actions { display: flex; align-items: center; gap: 8px; }
-    .risk-result-modal-close, .risk-result-modal-min {
+    .risk-result-modal-close {
       background: none; border: none; color: var(--text-secondary);
       font-size: 20px; cursor: pointer; line-height: 1; padding: 0 6px;
     }
-    .risk-result-modal-close:hover, .risk-result-modal-min:hover { color: var(--text-primary); }
+    .risk-result-modal-close:hover { color: var(--text-primary); }
     .risk-modal-reopen {
       position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
       z-index: 2001;
@@ -282,7 +282,7 @@
   <!-- 顶部导航 -->
   <div class="topbar">
     <div class="topbar-row1">
-      <div class="logo">青藏高原冰冻圈灾害数字孪生系统</div>
+      <div class="logo"><span class="logo-name">青藏高原<em class="logo-key">冰冻圈</em>灾害数字孪生系统</span><span class="logo-code">QTP-CryoTwin</span></div>
       <div class="user">
         <span><i style="font-size:11px;"></i></span>
       </div>
@@ -914,7 +914,6 @@
         <div class="risk-result-modal-sub" id="risk-modal-sub"></div>
       </div>
       <div class="risk-result-modal-actions">
-        <button class="risk-result-modal-min" id="risk-modal-min" title="最小化">&minus;</button>
         <button class="risk-result-modal-close" id="risk-modal-close" title="隐藏">&times;</button>
       </div>
     </div>
@@ -946,11 +945,11 @@
 
   <script src="js/ui-components.js"></script>
   <script src="js/geotiff.js"></script>
-  <script src="js/main.js?v=20261127esc"></script>
+  <script src="js/main.js?v=20261127esc2"></script>
   <!-- 截图库：将 DOM 节点导出为 PNG（SVG foreignObject 方案，原生保留 conic-gradient/box-shadow 等现代 CSS） -->
   <script src="js/lib/dom-to-image-more.min.js"></script>
   <!-- 引入风险评估JS -->
-  <script src="js/alert.js?v=20261127e"></script>
+  <script src="js/alert.js?v=20261127nomin"></script>
   <script src="js/geotiff-render.js"></script>
   <script src="js/meteo-query.js"></script>
   <script src="js/lib/air-datepicker.js?v=2"></script>

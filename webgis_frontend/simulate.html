@@ -12,7 +12,7 @@
   <script src="js/lib/echarts.min.js"></script>
 
   <!-- 平台样式 -->
-  <link rel="stylesheet" href="css/styles.css?v=20261127noborder" />
+  <link rel="stylesheet" href="css/styles.css?v=20261127icon2" />
   <link rel="stylesheet" href="css/lib/air-datepicker.css?v=2" />
   <link rel="stylesheet" href="css/lib/air-datepicker-dark.css?v=2" />
   <link rel="stylesheet" href="css/lib/tom-select.min.css?v=2" />
@@ -33,32 +33,40 @@
       position: fixed; top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       width: 820px; max-width: 94vw; max-height: 88vh; overflow: auto;
-      background: #1e293b; border: 1px solid var(--border-color, #334155);
+      background: var(--rhs-surface, #1e293b);
+      border: 1px solid var(--rhs-line-2, #334155);
       border-radius: 10px; box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
       z-index: 2000; display: none;
     }
     .sim-result-modal.active { display: block; }
     .sim-result-modal-header {
       display: flex; justify-content: space-between; align-items: center;
-      padding: 14px 18px; border-bottom: 1px solid var(--border-color, #334155);
+      padding: 14px 18px; border-bottom: 1px solid var(--rhs-line, #334155);
       cursor: move; user-select: none;
     }
-    .sim-result-modal-title { font-size: 16px; font-weight: 600; color: #e2e8f0; }
-    .sim-result-modal-sub { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+    .sim-result-modal-title { font-size: 16px; font-weight: 600; color: var(--mod-ink, #d1fae5); }
+    .sim-result-modal-sub { font-size: 12px; color: var(--rhs-ink-2, #94a3b8); margin-top: 2px; }
     .sim-result-modal-actions { display: flex; align-items: center; gap: 8px; }
-    .sim-result-modal-close, .sim-result-modal-min {
-      background: none; border: none; color: #94a3b8;
+    .sim-result-modal-close {
+      background: none; border: none; color: var(--rhs-ink-2, #94a3b8);
       font-size: 20px; cursor: pointer; line-height: 1; padding: 0 6px;
     }
-    .sim-result-modal-close:hover, .sim-result-modal-min:hover { color: #e2e8f0; }
+    .sim-result-modal-close:hover { color: var(--mod-ink, #d1fae5); }
     .sim-result-modal-body { padding: 16px; }
     .sim-result-reopen {
       position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%);
       z-index: 2001; padding: 10px 18px; font-size: 14px; cursor: pointer;
-      background: #3b82f6; color: #fff; border: none; border-radius: 8px;
-      box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
+      /* 跟随过程模拟模块绿（2026-11-27 18:40） */
+      background: linear-gradient(135deg, var(--mod-deep, #16a34a), var(--mod, #4ade80));
+      color: #fff; border: none; border-radius: 8px;
+      box-shadow: 0 4px 16px var(--mod-line, rgba(74, 222, 128, .4));
+      transition: transform .15s ease, box-shadow .15s ease;
     }
-    .sim-result-reopen:hover { background: #2563eb; }
+    .sim-result-reopen:hover {
+      background: linear-gradient(135deg, var(--mod, #4ade80), var(--mod-deep, #16a34a));
+      transform: translateX(-50%) translateY(-1px);
+      box-shadow: 0 6px 20px var(--mod-line, rgba(74, 222, 128, .45));
+    }
   </style>
   <link rel="stylesheet" href="css/command-palette.css?v=20261127size" />
 </head>
@@ -72,7 +80,7 @@
   <!-- 顶部导航 -->
   <div class="topbar">
     <div class="topbar-row1">
-      <div class="logo">青藏高原冰冻圈灾害数字孪生系统</div>
+      <div class="logo"><span class="logo-name">青藏高原<em class="logo-key">冰冻圈</em>灾害数字孪生系统</span><span class="logo-code">QTP-CryoTwin</span></div>
       <div class="user">
         <span><i style="font-size:11px;"></i></span>
       </div>
@@ -791,7 +799,6 @@
         <div class="sim-result-modal-sub" id="sim-result-modal-sub"></div>
       </div>
       <div class="sim-result-modal-actions">
-        <button class="sim-result-modal-min" id="sim-result-modal-min" title="最小化">&minus;</button>
         <button class="sim-result-modal-close" id="sim-result-modal-close" title="隐藏">&times;</button>
       </div>
     </div>
@@ -810,8 +817,8 @@
   <!-- OpenLayers 和自定义脚本（按依赖顺序加载） -->
   <script src="js/ui-components.js"></script>
   <script src="js/geotiff.js"></script>
-  <script src="js/main.js?v=20261127esc"></script>
-  <script src="js/simulate.js?v=20261127e"></script>
+  <script src="js/main.js?v=20261127esc2"></script>
+  <script src="js/simulate.js?v=20261127nomin"></script>
   <script src="js/geotiff-render.js"></script>
   <script src="js/meteo-query.js"></script>
   

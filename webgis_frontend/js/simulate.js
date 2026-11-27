@@ -132,11 +132,9 @@ function _makeSimResultModalDraggable() {
 // 绑定弹窗事件（script 在 body 末尾，DOM 已就绪）
 (function() {
     const closeBtn = document.getElementById('sim-result-modal-close');
-    const minBtn = document.getElementById('sim-result-modal-min');
     const reopenBtn = document.getElementById('sim-result-reopen');
     const overlay = document.getElementById('sim-result-overlay');
     if (closeBtn) closeBtn.addEventListener('click', _hideSimResultModal);
-    if (minBtn) minBtn.addEventListener('click', _hideSimResultModal);
     if (overlay) overlay.addEventListener('click', _hideSimResultModal);
     if (reopenBtn) reopenBtn.addEventListener('click', _reopenSimResultModal);
     _makeSimResultModalDraggable();
@@ -788,12 +786,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 symbol: 'circle',
                 symbolSize: 6,
                 data: chartData.map(d => parseFloat(d.value)),
-                lineStyle: { color: '#3b82f6', width: 2.5 },
-                itemStyle: { color: '#7dd3fc', borderColor: '#3b82f6', borderWidth: 2 },
+                lineStyle: { color: '#4ade80', width: 2.5 },
+                itemStyle: { color: '#d1fae5', borderColor: '#4ade80', borderWidth: 2 },
                 areaStyle: {
                     color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                        { offset: 0, color: 'rgba(59, 130, 246, 0.35)' },
-                        { offset: 1, color: 'rgba(59, 130, 246, 0.03)' }
+                        { offset: 0, color: 'rgba(74, 222, 128, 0.35)' },
+                        { offset: 1, color: 'rgba(74, 222, 128, 0.03)' }
                     ])
                 }
             }]
@@ -1116,10 +1114,10 @@ window.loadGeoTiffLayer = async function(filePath, variable, date) {
                     #video-player-controls .control-btn.play-btn {
                         font-size: 24px;
                         padding: 8px 14px;
-                        background: #3b82f6;
+                        background: #4ade80;
                     }
                     #video-player-controls .control-btn.play-btn:hover {
-                        background: #2563eb;
+                        background: #16a34a;
                     }
                     #video-player-controls .progress-container {
                         flex: 1;
@@ -1132,13 +1130,13 @@ window.loadGeoTiffLayer = async function(filePath, variable, date) {
                     }
                     #video-player-controls .progress-bar {
                         height: 100%;
-                        background: #3b82f6;
+                        background: #4ade80;
                         border-radius: 3px;
                         width: 0%;
                         transition: width 0.1s;
                     }
                     #video-player-controls .progress-container:hover .progress-bar {
-                        background: #60a5fa;
+                        background: #86efac;
                     }
                     #video-player-controls .time-display {
                         color: rgba(255,255,255,0.8);
@@ -2097,16 +2095,16 @@ function showSnowmeltFloodResult(response, sub) {
                     smooth: true,
                     data: chartData.map(item => item.value),
                     lineStyle: {
-                        color: '#3b82f6',
+                        color: '#4ade80',
                         width: 2
                     },
                     itemStyle: {
-                        color: '#3b82f6'
+                        color: '#4ade80'
                     },
                     areaStyle: {
                         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            { offset: 0, color: 'rgba(59, 130, 246, 0.3)' },
-                            { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
+                            { offset: 0, color: 'rgba(74, 222, 128, 0.3)' },
+                            { offset: 1, color: 'rgba(74, 222, 128, 0.05)' }
                         ])
                     }
                 }]
@@ -2215,16 +2213,16 @@ function drawLineChart(containerId, title, data, yAxisName, unit) {
             smooth: true,
             data: data.map(item => item.value),
             lineStyle: {
-                color: '#3b82f6',
+                color: '#4ade80',
                 width: 2
             },
             itemStyle: {
-                color: '#3b82f6'
+                color: '#4ade80'
             },
             areaStyle: {
                 color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: 'rgba(59, 130, 246, 0.5)' },
-                    { offset: 1, color: 'rgba(59, 130, 246, 0.05)' }
+                    { offset: 0, color: 'rgba(74, 222, 128, 0.5)' },
+                    { offset: 1, color: 'rgba(74, 222, 128, 0.05)' }
                 ])
             }
         }]
@@ -2911,16 +2909,16 @@ function initializeFloodSimulationModule() {
                     smooth: true,
                     data: chartData.map(d => d.value),
                     lineStyle: {
-                        color: '#3b82f6',
+                        color: '#4ade80',
                         width: 2
                     },
                     itemStyle: {
-                        color: '#3b82f6'
+                        color: '#4ade80'
                     },
                     areaStyle: {
                         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                            {offset: 0, color: 'rgba(59, 130, 246, 0.3)'},
-                            {offset: 1, color: 'rgba(59, 130, 246, 0.05)'}
+                            {offset: 0, color: 'rgba(74, 222, 128, 0.3)'},
+                            {offset: 1, color: 'rgba(74, 222, 128, 0.05)'}
                         ])
                     }
                 }]
