@@ -118,11 +118,6 @@
       document.querySelectorAll('.admin-nav-item').forEach(n => {
         n.classList.toggle('active', n.getAttribute('data-cat') === cat);
       });
-      // 同步顶栏「系统管理」下拉的选中态：左栏与下拉是同一套分类，
-      // 只亮左栏会让"从下拉进来的当前页"在导航里看不出来。
-      document.querySelectorAll('#admin-dropdown .dropdown-item').forEach(i => {
-        i.classList.toggle('active', i.dataset.category === cat);
-      });
       setContent('<div class="admin-empty">加载中…</div>');
       try {
         await this['render' + cat.charAt(0).toUpperCase() + cat.slice(1)]();
@@ -173,9 +168,12 @@
           '<h3>用户管理</h3>' +
           '<input class="admin-search" id="user-search" placeholder="搜索用户名/显示名（回车查询）" value="' + esc(keyword) + '" />' +
           '<button class="admin-btn" data-action="add-user">＋ 新增用户</button>' +
-          '<button class="admin-btn admin-btn-sm admin-btn-green" data-action="batch-enable">批量启用</button>' +
-          '<button class="admin-btn admin-btn-sm" data-action="batch-disable">批量禁用</button>' +
-          '<button class="admin-btn admin-btn-sm admin-btn-danger" data-action="batch-delete">批量删除</button>' +
+          '<details class="admin-batch"><summary class="admin-btn admin-btn-sm admin-btn-ghost">批量操作 ▾</summary>' +
+            '<div class="admin-batch-menu">' +
+              '<button data-action="batch-enable">启用</button>' +
+              '<button data-action="batch-disable">禁用</button>' +
+              '<button class="danger" data-action="batch-delete">删除</button>' +
+            '</div></details>' +
           '<span id="user-sel-count" class="badge badge-blue" style="' + (selCount ? '' : 'display:none') + '">已选 ' + selCount + ' 个</span>' +
         '</div>' +
         '<table class="admin-table">' +
@@ -247,7 +245,7 @@
           '<option value="0"' + (user && user.status === 0 ? ' selected' : '') + '>禁用</option>' +
         '</select></div>';
       const overlay = openModal(isEdit ? '编辑用户 - ' + esc(user.username) : '新增用户', body,
-        '<button class="admin-btn admin-btn-sm" style="background:#eef1f5;color:#33475b;" data-cancel="1">取消</button>' +
+        '<button class="admin-btn admin-btn-sm admin-btn-cancel" data-cancel="1">取消</button>' +
         '<button class="admin-btn admin-btn-sm" id="f-save">保存</button>');
       overlay.addEventListener('click', async (e) => {
         if (e.target.getAttribute && e.target.getAttribute('data-cancel')) { overlay.remove(); return; }
@@ -286,7 +284,7 @@
       const overlay = openModal('重置密码',
         '<div class="admin-form-row"><label>新密码（至少6位）</label><input id="p-new" type="password" /></div>' +
         '<div class="admin-form-row"><label>确认新密码</label><input id="p-confirm" type="password" /></div>',
-        '<button class="admin-btn admin-btn-sm" style="background:#eef1f5;color:#33475b;" data-cancel="1">取消</button>' +
+        '<button class="admin-btn admin-btn-sm admin-btn-cancel" data-cancel="1">取消</button>' +
         '<button class="admin-btn admin-btn-sm" id="p-save">确认重置</button>');
       overlay.addEventListener('click', async (e) => {
         if (e.target.getAttribute && e.target.getAttribute('data-cancel')) { overlay.remove(); return; }
@@ -320,7 +318,6 @@
         '<td>' + (r.permissions ? r.permissions.length : 0) + '</td>' +
         '<td>' +
           '<button class="admin-btn admin-btn-sm" data-action="edit-role" data-id="' + r.id + '">编辑</button> ' +
-          '<button class="admin-btn admin-btn-sm" data-action="perm-role" data-id="' + r.id + '">权限配置</button> ' +
           '<button class="admin-btn admin-btn-sm admin-btn-danger" data-action="del-role" data-id="' + r.id + '">删除</button>' +
         '</td></tr>'
       ).join('');
@@ -396,13 +393,27 @@
 
     // ---------------- 权限管理 ----------------
     async renderPermission() {
-      const pRes = await api('/api/admin/permissions');
+      const [pRes, rRes] = await Promise.all([api('/api/admin/permissions'), api('/api/admin/roles')]);
       const perms = pRes.data || [];
+      const roles = rRes.data || [];
       const rows = perms.map(p =>
         '<tr><td>' + p.id + '</td><td>' + esc(p.name) + '</td><td><code>' + esc(p.code) + '</code></td><td>' + esc(p.description || '') + '</td></tr>'
       ).join('');
+      const roleBlocks = roles.map(r => {
+        const owned = r.permissions || [];
+        const boxes = perms.map(p =>
+          '<label><input type="checkbox" class="perm-cb" value="' + esc(p.code) + '"' + (owned.indexOf(p.code) >= 0 ? ' checked' : '') + ' /> ' + esc(p.description || p.code) + '</label>'
+        ).join('');
+        return '<details class="admin-role-perm" data-role-id="' + r.id + '">' +
+          '<summary class="admin-role-perm-head"><span>' + esc(r.name) +
+            '<span class="admin-badge-code">' + esc(r.code) + ' · ' + owned.length + '</span></span></summary>' +
+          '<div class="admin-perm-grid">' + boxes + '</div>' +
+          '<div class="admin-role-perm-foot"><button class="admin-btn admin-btn-sm" data-action="save-role-perms" data-id="' + r.id + '">保存</button></div>' +
+          '</details>';
+      }).join('');
       const html =
-        '<div class="admin-toolbar"><h3>权限管理</h3><span style="color:#8a99a8;font-size:12px;">权限点由系统定义，通过在角色管理中勾选分配给角色</span></div>' +
+        '<div class="admin-toolbar"><h3>权限管理</h3></div>' +
+        '<div class="admin-role-perm-list">' + (roleBlocks || '<div class="admin-empty">暂无角色</div>') + '</div>' +
         '<table class="admin-table">' +
           '<thead><tr><th>ID</th><th>模块</th><th>权限编码</th><th>说明</th></tr></thead>' +
           '<tbody>' + (rows || '<tr><td colspan="4" class="admin-empty">暂无权限</td></tr>') + '</tbody>' +
@@ -441,9 +452,11 @@
             '<option value="100"' + (limit === 100 ? ' selected' : '') + '>100条</option>' +
             '<option value="200"' + (limit === 200 ? ' selected' : '') + '>200条</option>' +
           '</select>' +
+          '<button class="admin-btn admin-btn-sm admin-btn-ghost" id="log-charts-toggle">图表</button>' +
+          '<button class="admin-btn admin-btn-sm admin-btn-ghost" id="log-export">导出 CSV</button>' +
           '<button class="admin-btn admin-btn-sm admin-btn-danger" data-action="clear-log">清空日志</button>' +
         '</div>' +
-        '<div class="admin-charts">' +
+        '<div class="admin-charts" id="admin-charts"' + (this._logChartsOpen ? '' : ' style="display:none;"') + '>' +
           '<div class="admin-chart-box"><h4>近 7 天操作趋势</h4><div class="chart" id="chart-trend"></div></div>' +
           '<div class="admin-chart-box"><h4>操作类型分布</h4><div class="chart" id="chart-action"></div></div>' +
           '<div class="admin-chart-box"><h4>用户操作排行</h4><div class="chart" id="chart-user"></div></div>' +
@@ -453,7 +466,8 @@
           '<tbody>' + (rows || '<tr><td colspan="5" class="admin-empty">暂无日志</td></tr>') + '</tbody>' +
         '</table>';
       setContent(html);
-      this.renderCharts(stats);
+      this._logStats = stats;
+      if (this._logChartsOpen) this.renderCharts(stats);
       const sel = document.getElementById('log-limit');
       if (sel) sel.addEventListener('change', () => { this._logLimit = parseInt(sel.value, 10); this.openCategory('log'); });
       const qbtn = document.getElementById('log-query');
@@ -465,12 +479,34 @@
         };
         this.openCategory('log');
       });
+      const chartToggle = document.getElementById('log-charts-toggle');
+      if (chartToggle) chartToggle.addEventListener('click', () => {
+        this._logChartsOpen = !this._logChartsOpen;
+        const box = document.getElementById('admin-charts');
+        if (box) box.style.display = this._logChartsOpen ? '' : 'none';
+        if (this._logChartsOpen && !this._chartInstances.length) this.renderCharts(this._logStats || {});
+      });
+      const exportBtn = document.getElementById('log-export');
+      if (exportBtn) exportBtn.addEventListener('click', () => {
+        const csvRows = [['时间', '用户', '动作', '详情', 'IP']].concat(
+          (logs || []).map(l => [l.created_at || '', l.username || '', l.action || '', l.detail || '', l.ip || ''])
+        );
+        const csv = '\ufeff' + csvRows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = '系统日志.csv';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
     },
 
     renderCharts(stats) {
       if (!window.echarts) {
         const box = document.getElementById('chart-trend');
-        if (box) box.innerHTML = '<div class="admin-empty">图表组件未加载（需要联网加载 ECharts CDN）</div>';
+        if (box) box.innerHTML = '<div class="admin-empty">图表组件未加载</div>';
         return;
       }
       const trendEl = document.getElementById('chart-trend');
@@ -487,7 +523,7 @@
         grid: { left: 40, right: 20, top: 30, bottom: 30 },
         xAxis: { type: 'category', data: daily.map(d => d.date), axisLabel: { fontSize: 11 } },
         yAxis: { type: 'value', minInterval: 1 },
-        series: [{ name: '操作次数', type: 'line', smooth: true, data: daily.map(d => d.count), areaStyle: { opacity: 0.15 }, itemStyle: { color: '#2c7bb6' } }]
+        series: [{ name: '操作次数', type: 'line', smooth: true, data: daily.map(d => d.count), areaStyle: { opacity: 0.15 }, itemStyle: { color: '#3b82f6' } }]
       });
       const acts = stats.by_action || [];
       action.setOption({
@@ -501,7 +537,7 @@
         grid: { left: 70, right: 20, top: 20, bottom: 30 },
         xAxis: { type: 'value', minInterval: 1 },
         yAxis: { type: 'category', data: users.map(u => u.username).reverse(), axisLabel: { fontSize: 11 } },
-        series: [{ name: '操作次数', type: 'bar', data: users.map(u => u.count).reverse(), itemStyle: { color: '#2e9e5b' } }]
+        series: [{ name: '操作次数', type: 'bar', data: users.map(u => u.count).reverse(), itemStyle: { color: '#34d399' } }]
       });
     },
 
@@ -522,8 +558,7 @@
         '<div class="admin-form-row"><label>原密码</label><input id="s-old" type="password" /></div>' +
         '<div class="admin-form-row"><label>新密码（至少6位）</label><input id="s-new" type="password" /></div>' +
         '<div class="admin-form-row"><label>确认新密码</label><input id="s-confirm" type="password" /></div>' +
-        '<button class="admin-btn" id="s-save">保存修改</button>' +
-        '<p style="color:#8a99a8;font-size:12px;margin-top:14px;">修改成功后需重新登录。其他系统配置请通过服务器端 .env 文件调整。</p>';
+        '<button class="admin-btn" id="s-save">保存修改</button>';
       setContent(html);
       const btn = document.getElementById('s-save');
       if (btn) btn.addEventListener('click', async () => {
@@ -555,12 +590,11 @@
       const canEdit = roleCode !== 'viewer';
       const html =
         '<div class="admin-toolbar"><h3>大模型设置</h3></div>' +
-        '<p style="color:#8a99a8;font-size:12px;margin-bottom:10px;line-height:1.7;">以下内容作为「冰冻圈灾害大模型」（decision.html）的系统提示词，定义它的身份、职责、回答规则与能力边界。保存后立即生效。</p>' +
-        '<textarea id="agent-prompt" rows="16" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #d4dbe6;border-radius:8px;font-family:inherit;font-size:13px;line-height:1.6;"' + (canEdit ? '' : ' readonly') + '></textarea>' +
+        '<textarea id="agent-prompt" rows="16" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #cdd8e6;border-radius:8px;font-family:inherit;font-size:13px;line-height:1.6;background:#fff;color:#243b53;"' + (canEdit ? '' : ' readonly') + '></textarea>' +
         '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;">' +
           (canEdit
             ? '<button class="admin-btn" id="agent-save">保存</button>' +
-              '<button class="admin-btn" id="agent-reset" style="background:#eef1f5;color:#33475b;">恢复默认</button>'
+              '<button class="admin-btn admin-btn-cancel" id="agent-reset">恢复默认</button>'
             : '') +
         '</div>';
       setContent(html);
@@ -629,8 +663,8 @@
           dataBytes += (c.size_bytes || 0);
         });
       });
-      const ok = '<span style="color:#2e9e5b;font-weight:600;">正常</span>';
-      const bad = '<span style="color:#d7191c;font-weight:600;">异常</span>';
+      const ok = '<span style="color:#1e7e34;font-weight:600;">正常</span>';
+      const bad = '<span style="color:#dc4c4c;font-weight:600;">异常</span>';
       const html =
         '<div class="admin-toolbar"><h3>系统状态</h3>' +
           '<button class="admin-btn admin-btn-sm" id="status-refresh">刷新</button>' +
@@ -703,9 +737,7 @@
           }
         });
         const html =
-          '<div class="admin-toolbar"><h3>数据管理</h3>' +
-            '<span class="admin-search" style="font-size:12px;color:#64748b;border:none;box-shadow:none;background:transparent;">真实目录：data/raw、data/processed 与 data/webgis/uploads</span>' +
-          '</div>' +
+          '<div class="admin-toolbar"><h3>数据管理</h3></div>' +
           '<div class="data-folder-grid">' + (cards || '<div class="admin-empty">暂无数据目录</div>') + '</div>';
         setContent(html);
         document.querySelectorAll('#admin-content .data-folder-card').forEach(function (card) {
@@ -735,7 +767,7 @@
       const html =
         '<div class="admin-toolbar"><h3>数据管理</h3>' +
           '<button class="admin-btn admin-btn-sm admin-btn-ghost" id="data-back">&laquo; 返回目录</button>' +
-          '<span class="admin-search" style="font-size:12px;color:#64748b;border:none;box-shadow:none;background:transparent;">路径：' + esc(info.directory || '') + '</span>' +
+          '<span class="admin-path">路径：' + esc(info.directory || '') + '</span>' +
         '</div>' +
         '<div class="admin-form-row" style="max-width:760px;">' +
           '<label>上传文件到当前目录：</label>' +
@@ -809,6 +841,8 @@
   document.addEventListener('click', function (e) {
     const btn = e.target.closest ? e.target.closest('[data-action]') : null;
     if (!btn) return;
+    const batchMenu = btn.closest('.admin-batch');
+    if (batchMenu) batchMenu.open = false;
     const action = btn.getAttribute('data-action');
     const id = btn.getAttribute('data-id');
 
@@ -844,12 +878,14 @@
         const role = (rRes.data || []).find(r => String(r.id) === String(id));
         if (role) AdminPanel.openRoleForm(role); else toast('角色不存在', 'error');
       })().catch(e => toast(e.message, 'error'));
-    } else if (action === 'perm-role') {
-      (async () => {
-        const rRes = await api('/api/admin/roles');
-        const role = (rRes.data || []).find(r => String(r.id) === String(id));
-        if (role) AdminPanel.openRoleForm(role); else toast('角色不存在', 'error');
-      })().catch(e => toast(e.message, 'error'));
+    } else if (action === 'save-role-perms') {
+      const box = btn.closest('.admin-role-perm');
+      const codes = Array.prototype.map.call(box.querySelectorAll('.perm-cb:checked'), c => c.value);
+      api('/api/admin/roles/' + id + '/permissions', {
+        method: 'PUT',
+        body: JSON.stringify({ permissions: codes })
+      }).then(function () { toast('已保存', 'success'); })
+        .catch(function (err) { toast(err.message, 'error'); });
     } else if (action === 'del-role') {
       if (window.UI && window.UI.confirm) {
         window.UI.confirm({ title: '确认删除', message: '确定要删除该角色吗？' }).then(ok => {
