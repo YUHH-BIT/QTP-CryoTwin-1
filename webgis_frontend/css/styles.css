@@ -5086,6 +5086,29 @@ body.rhs-v2 {
   --rhs-ice: #7dd3fc;
 }
 
+/* ---------- 模块主题色变量（2026-11-27 18:04）----------
+   --mod     模块主色：勾选标记 / 焦点环 / 表头底 / 按钮底
+   --mod-ink 提亮版：标题 / 竖标签 / 收起按钮 / 字段标签（小字要亮，才看得清）
+   --mod-soft 半透明底：选中行 / 表头
+   --mod-line 半透明线：选中行边框 / 标题下划线
+   首页与系统管理不加载 rhs-v2，继续用系统主色。 */
+body.rhs-v2[data-module="disaster"] {
+  --mod: #fbbf24; --mod-ink: #fef3c7; --mod-deep: #d97706;
+  --mod-soft: rgba(251, 191, 36, .12); --mod-line: rgba(251, 191, 36, .45);
+}
+body.rhs-v2[data-module="simulate"] {
+  --mod: #4ade80; --mod-ink: #d1fae5; --mod-deep: #16a34a;
+  --mod-soft: rgba(74, 222, 128, .12); --mod-line: rgba(74, 222, 128, .45);
+}
+body.rhs-v2[data-module="alert"] {
+  --mod: #fb7185; --mod-ink: #fecdd3; --mod-deep: #e11d48;
+  --mod-soft: rgba(251, 113, 133, .12); --mod-line: rgba(251, 113, 133, .45);
+}
+body.rhs-v2[data-module="decision"] {
+  --mod: #c084fc; --mod-ink: #e9d5ff; --mod-deep: #9333ea;
+  --mod-soft: rgba(192, 132, 252, .12); --mod-line: rgba(192, 132, 252, .45);
+}
+
 /* ---------- 滑出式分类抽屉：尺寸 / 表面 / 开合 ---------- */
 body.rhs-v2 .disaster-sidebar,
 body.rhs-v2 .simulate-sidebar,
@@ -5146,11 +5169,11 @@ body.rhs-v2 .decision-sidebar-title {
   margin: 0; font-size: 13px; font-weight: 500; letter-spacing: .2px;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-/* 标题用模块图标色的高亮版：与前面的 fa-* 图标呼应，亮度接近白保证可读 */
-body.rhs-v2 .disaster-sidebar-title { color: #bae6fd; } /* 数据库蓝 #38bdf8 */
-body.rhs-v2 .simulate-sidebar-title { color: #d1fae5; } /* 过程模拟绿 #4ade80 */
-body.rhs-v2 .alert-sidebar-title { color: #fecdd3; }    /* 风险评估玫红 #fb7185 */
-body.rhs-v2 .decision-sidebar-title { color: #e9d5ff; } /* 决策支持紫 #c084fc */
+/* 标题用饱和的模块主色（2026-11-27 18:19 用户反馈提亮版太浅） */
+body.rhs-v2 .disaster-sidebar-title,
+body.rhs-v2 .simulate-sidebar-title,
+body.rhs-v2 .alert-sidebar-title,
+body.rhs-v2 .decision-sidebar-title { color: var(--mod); }
 /* 右侧栏标题前的类别图标：颜色由 JS 按类别内联设置 */
 body.rhs-v2 .rhs-title-icon { margin-right: 8px; font-size: 13px; vertical-align: -1px; }
 body.rhs-v2 .disaster-sidebar-close,
@@ -5164,16 +5187,16 @@ body.rhs-v2 .decision-sidebar-close {
   font-size: 18px; line-height: 1;
   transition: border-color .15s, color .15s, background .15s;
 }
-/* 收起（最小化）按钮取模块主题色：与侧栏标题、字段标签同色系（2026-11-27 17:43） */
-body.rhs-v2 .disaster-sidebar-close { color: #bae6fd; }
-body.rhs-v2 .simulate-sidebar-close { color: #d1fae5; }
-body.rhs-v2 .alert-sidebar-close { color: #fecdd3; }
-body.rhs-v2 .decision-sidebar-close { color: #e9d5ff; }
+/* 收起（最小化）按钮取模块主题色 */
+body.rhs-v2 .disaster-sidebar-close,
+body.rhs-v2 .simulate-sidebar-close,
+body.rhs-v2 .alert-sidebar-close,
+body.rhs-v2 .decision-sidebar-close { color: var(--mod-ink); }
 body.rhs-v2 .disaster-sidebar-close:hover,
 body.rhs-v2 .simulate-sidebar-close:hover,
 body.rhs-v2 .alert-sidebar-close:hover,
 body.rhs-v2 .decision-sidebar-close:hover {
-  border-color: var(--rhs-ice); color: #fff; background: rgba(59, 130, 246, .12);
+  border-color: var(--mod); color: #fff; background: var(--mod-soft);
 }
 
 /* 内容分区：示范页 .card 的口径 */
@@ -5215,11 +5238,15 @@ body.rhs-v2 .disaster-layer-item-sidebar {
 }
 body.rhs-v2 .alert-layer-item-sidebar:hover,
 body.rhs-v2 .disaster-layer-item-sidebar:hover { border-color: var(--rhs-line-2); }
-body.rhs-v2 .disaster-layer-item-sidebar:has(input:checked) {
-  border-color: rgba(125, 211, 252, .48); background: rgba(59, 130, 246, .14);
+/* 选中行高亮取模块色 */
+body.rhs-v2 .disaster-layer-item-sidebar:has(input:checked),
+body.rhs-v2 .alert-layer-item-sidebar:has(input:checked) {
+  border-color: var(--mod-line); background: var(--mod-soft);
 }
-body.rhs-v2 .alert-layer-checkbox-sidebar {
-  width: 14px; height: 14px; margin: 0; accent-color: var(--rhs-ice); cursor: pointer;
+body.rhs-v2 .alert-layer-checkbox-sidebar,
+body.rhs-v2 .disaster-layer-checkbox-sidebar {
+  width: 14px; height: 14px; margin: 0; cursor: pointer;
+  accent-color: var(--mod);
 }
 body.rhs-v2 .alert-layer-label-sidebar,
 body.rhs-v2 .disaster-layer-label-sidebar {
@@ -5228,9 +5255,12 @@ body.rhs-v2 .disaster-layer-label-sidebar {
   font-size: 12px; font-weight: 400; line-height: 1.4; color: var(--rhs-ink);
 }
 body.rhs-v2 .disaster-layer-label-sidebar:hover,
-body.rhs-v2 .disaster-layer-checkbox-sidebar:checked + .disaster-layer-label-sidebar {
-  background: transparent; border: 0; box-shadow: none; color: var(--rhs-ice);
+body.rhs-v2 .alert-layer-label-sidebar:hover {
+  background: transparent; border: 0; box-shadow: none; color: var(--mod-ink);
 }
+/* 勾选后文字用模块主题色 */
+body.rhs-v2 .disaster-layer-checkbox-sidebar:checked + .disaster-layer-label-sidebar,
+body.rhs-v2 .alert-layer-checkbox-sidebar:checked + .alert-layer-label-sidebar { color: var(--mod-ink); }
 body.rhs-v2 .disaster-layer-name { overflow: hidden; text-overflow: ellipsis; }
 body.rhs-v2 .alert-layer-count-sidebar,
 body.rhs-v2 .disaster-layer-count-sidebar {
@@ -5238,7 +5268,7 @@ body.rhs-v2 .disaster-layer-count-sidebar {
   padding: 1px 5px; border-radius: 8px;
 }
 body.rhs-v2 .disaster-layer-check-mark {
-  width: 14px; height: 14px; font-size: 9px; background: #3b82f6;
+  width: 14px; height: 14px; font-size: 9px; background: var(--mod);
 }
 
 /* 灾害数据库：分类图层列表下方的数据来源说明 */
@@ -5252,7 +5282,7 @@ body.rhs-v2 .disaster-layer-check-mark {
 .disaster-source-title {
   display: flex; align-items: center; gap: 6px;
   margin: 0 0 5px;
-  font-size: 10.5px; font-weight: 500; color: var(--rhs-ice, #7dd3fc);
+  font-size: 10.5px; font-weight: 500; color: var(--mod-ink, #fef3c7);
 }
 .disaster-source-title i { font-size: 10px; opacity: .85; }
 .disaster-source-note p {
@@ -5284,7 +5314,7 @@ body.rhs-v2 .weight-method-opt,
 body.rhs-v2 .decision-chip {
   padding: 5px 8px; border-radius: 6px;
   border: 1px solid var(--rhs-line-2); background: rgba(27, 40, 64, .6);
-  color: var(--rhs-ink); font-size: 10.5px; font-weight: 400;
+  color: var(--rhs-ink); font-size: 11px; font-weight: 400;
   transition: border-color .15s, color .15s, background .15s;
 }
 body.rhs-v2 .flood-submodule-tabs .tab-btn:hover,
@@ -5322,25 +5352,19 @@ body.rhs-v2 .rhs-tab {
   top: 50%; margin-top: -52px; right: var(--rhs-gap);
   width: 22px; height: 104px; padding: 0;
   display: flex; align-items: center; justify-content: center;
-  border: 1px solid var(--rhs-line-2); border-radius: 7px;
-  background: rgba(19, 31, 51, .92); color: var(--rhs-ink-3);
+  /* 不要外框线：留透明边框占位，避免尺寸跳动（2026-11-27 18:25） */
+  border: 1px solid transparent; border-radius: 7px;
+  background: rgba(19, 31, 51, .92); color: var(--mod);
   backdrop-filter: blur(8px); box-shadow: 0 6px 20px rgba(0, 0, 0, .4);
   transition: right .24s ease, border-color .15s, color .15s;
 }
 body.rhs-v2 .rhs-tab span {
   writing-mode: vertical-rl; font-size: 10px; letter-spacing: 2px;
 }
-/* 竖标签取模块主题色：与标题 / 字段标签 / 收起按钮同色系（2026-11-27 17:44）
-   .rhs-tab 是各页 .xxx-sidebar 的后续兄弟，用 ~ 区分页面，纯 CSS 不动 JS */
-body.rhs-v2 .disaster-sidebar ~ .rhs-tab { color: #bae6fd; }
-body.rhs-v2 .simulate-sidebar ~ .rhs-tab { color: #d1fae5; }
-body.rhs-v2 .alert-sidebar ~ .rhs-tab { color: #fecdd3; }
-body.rhs-v2 .decision-sidebar ~ .rhs-tab { color: #e9d5ff; }
-body.rhs-v2 .disaster-sidebar ~ .rhs-tab:hover,
-body.rhs-v2 .simulate-sidebar ~ .rhs-tab:hover,
-body.rhs-v2 .alert-sidebar ~ .rhs-tab:hover,
-body.rhs-v2 .decision-sidebar ~ .rhs-tab:hover {
-  border-color: var(--rhs-ice); color: var(--rhs-ink);
+/* 竖标签取模块主题色；悬停只提亮文字与底色，不出现边框 */
+body.rhs-v2 .rhs-tab:hover {
+  border-color: transparent; color: #fff;
+  background: rgba(30, 45, 70, .98);
 }
 /* 展开时标签贴住面板真实宽度（--rhs-panel-w 由 rhs-tabs.js 同步） */
 body.rhs-v2 .disaster-sidebar.active ~ .rhs-tab,
@@ -5370,19 +5394,23 @@ body.rhs-v2 .sidepanel-head {
   margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--rhs-line-2);
 }
 body.rhs-v2 .sidepanel-head-title {
-  font-size: 12.5px; font-weight: 500; color: #eaf3ff;
+  font-size: 13px; font-weight: 500; color: var(--mod);
 }
+/* 左侧面板跟随当前页面的模块主题色（图标 / × / 展开钮同一色，均用饱和主色） */
+body.rhs-v2 .sidepanel-head-title i { color: var(--mod); }
 body.rhs-v2 .sidepanel-collapse-btn {
   width: 24px; height: 24px; border-radius: 6px;
   border: 1px solid transparent; background: transparent;
-  /* 与收起后 44×44 圆形展开钮的图标同色（@2026-11-27 17:47 用户要求） */
-  color: #7dd3fc;
+  /* 与标题 / 展开钮统一取当前模块主色 */
+  color: var(--mod);
   font-size: 18px; line-height: 1;
 }
 body.rhs-v2 .sidepanel-collapse-btn:hover {
-  border-color: var(--rhs-ice); color: var(--rhs-ink); background: rgba(59, 130, 246, .12);
+  border-color: var(--mod); color: #fff; background: var(--mod-soft);
 }
-/* .sidepanel-toggle 保持原样：44×44 圆形按钮 + fa-th-large 图标 */
+/* .sidepanel-toggle：44×44 圆形按钮 + fa-th-large 图标，用模块主色；不要外框线 */
+body.rhs-v2 .sidepanel-toggle { color: var(--mod); border-color: transparent; }
+body.rhs-v2 .sidepanel-toggle:hover { border-color: transparent; color: #fff; }
 body.rhs-v2 .sidepanel .category {
   background: var(--rhs-card); border: 1px solid var(--rhs-line);
   border-radius: 10px; margin-bottom: 8px;
@@ -5390,22 +5418,26 @@ body.rhs-v2 .sidepanel .category {
 body.rhs-v2 .sidepanel .category-header {
   padding: 8px 10px; background: transparent; border-bottom-color: var(--rhs-line);
 }
-body.rhs-v2 .sidepanel .category-header span { font-size: 11px; font-weight: 500; }
+body.rhs-v2 .sidepanel .category-header span { font-size: 12px; font-weight: 500; }
 body.rhs-v2 .sidepanel .category-header.active {
-  background: rgba(59, 130, 246, .16); color: var(--rhs-ink);
+  background: var(--mod-soft); color: var(--mod-ink);
 }
 body.rhs-v2 .sidepanel .category-content { background: transparent; }
 body.rhs-v2 .sidepanel .layer-item { padding: 5px 10px; border-bottom-color: var(--rhs-line); }
 body.rhs-v2 .sidepanel .layer-item input[type="checkbox"] {
-  width: 13px; height: 13px; margin-right: 8px; accent-color: var(--rhs-ice);
+  width: 14px; height: 14px; margin-right: 8px; accent-color: var(--mod);
 }
-body.rhs-v2 .sidepanel .layer-item label { font-size: 10.5px; font-weight: 400; }
-body.rhs-v2 .sidepanel .layer-item:hover { transform: none; background: rgba(59, 130, 246, .1); }
+body.rhs-v2 .sidepanel .layer-item label {
+  font-size: 12px; font-weight: 400; line-height: 1.4; color: var(--rhs-ink);
+}
+body.rhs-v2 .sidepanel .layer-item:hover { transform: none; background: var(--mod-soft); }
 body.rhs-v2 .sidepanel .mode-switch button {
-  padding: 5px 8px; font-size: 10.5px; border-radius: 6px;
+  padding: 5px 8px; font-size: 11px; border-radius: 6px;
   border: 1px solid var(--rhs-line-2); background: rgba(27, 40, 64, .6);
-  color: var(--rhs-ink-2);
+  /* 未选中态提亮到近白（2026-11-27 18:22 用户反馈太浅） */
+  color: var(--rhs-ink);
 }
+body.rhs-v2 .sidepanel .category-header .toggle-icon { color: var(--rhs-ink-2); }
 body.rhs-v2 .sidepanel .mode-switch button.active {
   background: #3b82f6; border-color: #3b82f6; color: #fff;
 }
@@ -5451,9 +5483,19 @@ body.rhs-v2 .disaster-source-title { font-size: 11px; }
    （11 / 11.5 / 12.5 / 13 / 14px 混用），此处按右侧栏统一口径拉回：
    分区标题 12px / 正文 11px / 徽标 10px，标题线同 1px 细线 */
 body.rhs-v2 .alert-weight-badge {
-  font-size: 10px; font-weight: 400; color: var(--rhs-ice);
-  background: rgba(59, 130, 246, .18); border-color: var(--rhs-line-2);
+  font-size: 10px; font-weight: 400; color: var(--mod-ink);
+  background: var(--mod-soft); border-color: var(--mod-line);
 }
+/* 权重面板的容器与分组卡片，从旧深色值拉回侧栏统一的卡片口径 */
+body.rhs-v2 .alert-weight-method {
+  background: rgba(27, 40, 64, .5);
+  border: 1px solid var(--rhs-line-2); border-radius: 8px;
+}
+body.rhs-v2 .alert-weight-group {
+  background: rgba(27, 40, 64, .5);
+  border: 1px solid var(--rhs-line); border-radius: 8px;
+}
+body.rhs-v2 .alert-weight-hint { border-left-width: 1px; border-radius: 4px; }
 body.rhs-v2 .alert-weight-toggle {
   font-size: 11px; font-weight: 400; color: var(--rhs-ink-2);
 }
@@ -5475,6 +5517,29 @@ body.rhs-v2 .alert-analysis-value {
 body.rhs-v2 .alert-weight-group .btn-small {
   padding: 6px 10px; font-size: 11px; border-radius: 6px;
 }
+
+/* ---------- 选中 tab / 主按钮跟随模块主题色（2026-11-27 17:50 用户选「按钮和 tab 都改绿」）----------
+   原来选中态与 .btn-primary 一律系统蓝，与侧栏主题色各说各话。
+   主按钮取比主题色深一档的版本，保证白字对比度。
+   ---------- */
+body.rhs-v2 .simulate-sidebar .flood-submodule-tabs .tab-btn.active,
+body.rhs-v2 .alert-sidebar .flood-submodule-tabs .tab-btn.active,
+body.rhs-v2 .alert-sidebar .weight-method-opt.active,
+body.rhs-v2 .sidepanel .mode-switch button.active {
+  background: var(--mod-deep); border-color: var(--mod-deep); color: #fff;
+}
+/* Bootstrap 5 的 .btn-primary 走 --bs-btn-* 变量，覆盖变量即可连 hover / active 一起生效 */
+body.rhs-v2 .simulate-sidebar .btn-primary,
+body.rhs-v2 .alert-sidebar .btn-primary {
+  --bs-btn-bg: var(--mod-deep); --bs-btn-border-color: var(--mod-deep);
+  --bs-btn-hover-bg: var(--mod-deep); --bs-btn-hover-border-color: var(--mod-deep);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-active-bg: var(--mod-deep); --bs-btn-active-border-color: var(--mod-deep);
+  --bs-btn-disabled-bg: var(--mod-deep); --bs-btn-disabled-border-color: var(--mod-deep);
+}
+/* 悬停靠亮度微降，无需再定义第二档颜色 */
+body.rhs-v2 .simulate-sidebar .btn-primary:hover,
+body.rhs-v2 .alert-sidebar .btn-primary:hover { filter: brightness(.9); }
 
 /* 洪水过程模拟的三个子模块（径流 / 洪水识别 / 淹没）内容包在
    .flood-submodule-content 里，不是 .simulate-category-sidebar-content 的直接子元素，
@@ -5503,12 +5568,11 @@ body.rhs-v2 .flood-submodule-content label {
   margin: 0 0 4px;
   font-size: 12px; font-weight: 400;
 }
-/* 字段标签取模块主题色：与侧栏标题同色系（2026-11-27 17:38 用户要求）
-   只用提亮版（风险评估 #fecdd3 / 过程模拟 #d1fae5），亮度接近白，12px 仍清楚。
+/* 字段标签取模块提亮色（亮度接近白，12px 仍清楚）
    数据库页与决策页的 label 是图层勾选项，不参与染色，避免列表花掉。 */
-body.rhs-v2 .alert-category-sidebar-content > label { color: #fecdd3; }
+body.rhs-v2 .alert-category-sidebar-content > label,
 body.rhs-v2 .simulate-category-sidebar-content > label,
-body.rhs-v2 .flood-submodule-content label { color: #d1fae5; }
+body.rhs-v2 .flood-submodule-content label { color: var(--mod-ink); }
 body.rhs-v2 .alert-category-sidebar-content > select,
 body.rhs-v2 .alert-category-sidebar-content > input[type="date"],
 body.rhs-v2 .alert-category-sidebar-content > input[type="text"],
@@ -5528,8 +5592,174 @@ body.rhs-v2 .simulate-category-sidebar .ts-wrapper.single .ts-control {
 }
 body.rhs-v2 .alert-category-sidebar .ts-wrapper .ts-control .item,
 body.rhs-v2 .simulate-category-sidebar .ts-wrapper .ts-control .item {
+  /* 框内选中的流域 / 模型名保持白色，不参与模块染色（2026-11-27 18:20 用户要求） */
   font-size: 12px !important; line-height: 20px; color: var(--rhs-ink) !important;
 }
+/* 流域 / 模型选择框：边框与下拉选中项也取模块色（2026-11-27 18:15） */
+body.rhs-v2 .alert-category-sidebar .ts-wrapper.single .ts-control,
+body.rhs-v2 .simulate-category-sidebar .ts-wrapper.single .ts-control,
+body.rhs-v2 .alert-category-sidebar-content > select,
+body.rhs-v2 .simulate-category-sidebar-content > select,
+body.rhs-v2 .flood-submodule-content select {
+  border-color: var(--mod-line);
+}
+body.rhs-v2 .ts-dropdown .option.selected {
+  color: #fff !important;
+  background: var(--mod-soft) !important;
+}
+
+/* ---------- 模拟结果区：深色卡片口径 + 模块主题色（2026-11-27 17:56）----------
+   旧样式是浅色主题遗留：td 文字 #475569、边框 #e2e8f0、hover #f1f5f9，
+   在深色侧栏里几乎看不见或刺眼；结果容器还带内联 style 的 #eee 分隔线。
+   ---------- */
+body.rhs-v2 #simulate-results,
+body.rhs-v2 #flood-results,
+body.rhs-v2 #flood-runoff-results,
+body.rhs-v2 #snowmelt-flood-results,
+body.rhs-v2 #flood-inundation-results,
+body.rhs-v2 #snow-simulate-results,
+body.rhs-v2 #ice-simulate-results,
+body.rhs-v2 #permafrost-simulate-results {
+  margin-top: 10px !important; padding: 10px 0 0 !important;
+  border-top: 1px solid var(--rhs-line) !important;
+  background: transparent; box-shadow: none;
+}
+body.rhs-v2 #simulate-results:hover { border-color: var(--rhs-line); box-shadow: none; }
+/* 结果标题取过程模拟的主题色 */
+body.rhs-v2 #simulate-results h3,
+body.rhs-v2 #flood-results h3,
+body.rhs-v2 #flood-runoff-results h3,
+body.rhs-v2 #snowmelt-flood-results h3,
+body.rhs-v2 #flood-inundation-results h3,
+body.rhs-v2 #snow-simulate-results h3,
+body.rhs-v2 #ice-simulate-results h3,
+body.rhs-v2 #permafrost-simulate-results h3 {
+  color: var(--mod-ink); border-bottom-color: var(--mod-line);
+}
+/* 结果表格深色适配（排除走 .ui-table 的主结果表，避免两套样式打架） */
+body.rhs-v2 .simulate-sidebar [id$="result-table"]:not(.ui-table),
+body.rhs-v2 .alert-sidebar [id$="result-table"]:not(.ui-table) {
+  width: 100%; border-collapse: collapse; margin: 0 0 8px;
+}
+body.rhs-v2 .simulate-sidebar [id$="result-table"]:not(.ui-table) thead th,
+body.rhs-v2 .alert-sidebar [id$="result-table"]:not(.ui-table) thead th {
+  padding: 6px 7px; text-align: left; white-space: nowrap;
+  font-size: 11px; font-weight: 500; color: var(--rhs-ink);
+}
+body.rhs-v2 .simulate-sidebar [id$="result-table"]:not(.ui-table) tbody td,
+body.rhs-v2 .alert-sidebar [id$="result-table"]:not(.ui-table) tbody td {
+  padding: 6px 7px; font-size: 11px; color: var(--rhs-ink-2);
+  border-bottom: 1px solid var(--rhs-line);
+}
+body.rhs-v2 .simulate-sidebar [id$="result-table"]:not(.ui-table) tbody tr:hover,
+body.rhs-v2 .alert-sidebar [id$="result-table"]:not(.ui-table) tbody tr:hover {
+  background: rgba(59, 130, 246, .08);
+}
+/* 表头底色取模块色 */
+body.rhs-v2 .simulate-sidebar [id$="result-table"] thead,
+body.rhs-v2 .alert-sidebar [id$="result-table"] thead { background: var(--mod-soft) !important; }
+
+/* ---------- 风险评估结果弹窗：模块色贯穿（2026-11-27 18:09）----------
+   样式源在 alert.html 内联 <style>，这里用 body.rhs-v2 提高特异性覆盖。
+   .risk-tip-danger/warning/success 是风险等级的语义色，刻意不动。 */
+body.rhs-v2 .risk-result-modal { background: var(--rhs-surface); border-color: var(--rhs-line-2); }
+body.rhs-v2 .risk-result-modal-header { border-bottom-color: var(--rhs-line); }
+body.rhs-v2 .risk-result-modal-title { color: var(--mod-ink); }
+body.rhs-v2 .risk-result-modal-sub { color: var(--rhs-ink-2); }
+body.rhs-v2 .risk-result-modal-close,
+body.rhs-v2 .risk-result-modal-min { color: var(--rhs-ink-2); }
+body.rhs-v2 .risk-result-modal-close:hover,
+body.rhs-v2 .risk-result-modal-min:hover { color: var(--mod-ink); }
+body.rhs-v2 .risk-stat-card { background: var(--rhs-card); border-color: var(--rhs-line); }
+body.rhs-v2 .risk-stat-label { color: var(--rhs-ink-2); }
+body.rhs-v2 .risk-stat-value { color: var(--mod-ink); }
+body.rhs-v2 .risk-stat-unit { color: var(--rhs-ink-3); }
+body.rhs-v2 .risk-chart-toggle-btn {
+  background: var(--rhs-card); border-color: var(--rhs-line-2); color: var(--rhs-ink-2);
+}
+body.rhs-v2 .risk-chart-toggle-btn.active {
+  background: var(--mod-deep); border-color: var(--mod-deep); color: #fff;
+}
+body.rhs-v2 .risk-hero { border-color: var(--mod-line); }
+body.rhs-v2 .risk-hero-level { color: var(--rhs-ink-3); }
+body.rhs-v2 .risk-hero-summary { color: var(--rhs-ink); }
+body.rhs-v2 .risk-tips {
+  background: var(--rhs-card); border-color: var(--rhs-line);
+  border-left: 3px solid var(--mod);
+}
+body.rhs-v2 .risk-tips-head { color: var(--mod-ink); }
+body.rhs-v2 .risk-tip-default { color: var(--rhs-ink-2); }
+body.rhs-v2 .risk-modal-reopen {
+  background: linear-gradient(135deg, var(--mod-deep) 0%, var(--mod) 100%);
+  box-shadow: 0 4px 14px var(--mod-line);
+}
+body.rhs-v2 .risk-modal-reopen:hover { box-shadow: 0 6px 20px var(--mod-line); }
+
+/* ---------- 决策页内容卡：模块紫贯穿（2026-11-27 18:09）---------- */
+body.rhs-v2 .decision-content-card {
+  background: var(--rhs-card); border-color: var(--rhs-line);
+}
+body.rhs-v2 .decision-content-card.expanded { border-color: var(--mod); }
+body.rhs-v2 .decision-content-card-head:hover { background: var(--mod-soft); }
+body.rhs-v2 .decision-content-card-icon {
+  color: var(--mod-ink);
+  background: var(--mod-soft);
+  border: 1px solid var(--mod-line);
+}
+body.rhs-v2 .decision-content-card-title { color: var(--rhs-ink); }
+body.rhs-v2 .decision-content-card-sub { color: var(--rhs-ink-2); }
+body.rhs-v2 .decision-content-card-toggle { color: var(--rhs-ink-3); }
+body.rhs-v2 .decision-content-card-detail { border-top-color: var(--rhs-line); }
+body.rhs-v2 .decision-detail-block { color: var(--rhs-ink); border-bottom-color: var(--rhs-line); }
+body.rhs-v2 .decision-detail-label { color: var(--mod-ink); }
+body.rhs-v2 .decision-detail-label i,
+body.rhs-v2 .expert-detail-label i { color: var(--mod-ink); }
+body.rhs-v2 .decision-tag {
+  color: var(--mod-ink); background: var(--mod-soft); border-color: var(--mod-line);
+}
+body.rhs-v2 .decision-source { color: var(--rhs-ink-3); }
+
+/* ---------- 清掉旧版选中态的蓝色发光环（2026-11-27 18:15）----------
+   旧规则 .disaster-layer-checkbox-sidebar:checked + label 写死了
+   border-color:var(--primary) + box-shadow:0 0 0 1px var(--primary)，
+   父容器改色压不住内层 label 自身的发光，这就是"选中后还有蓝色框线"的真凶。 */
+body.rhs-v2 .disaster-layer-checkbox-sidebar:checked + .disaster-layer-label-sidebar,
+body.rhs-v2 .alert-layer-checkbox-sidebar:checked + .alert-layer-label-sidebar,
+body.rhs-v2 .disaster-layer-label-sidebar:hover,
+body.rhs-v2 .alert-layer-label-sidebar:hover {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+/* 加载态也是蓝边框，一并改模块色 */
+body.rhs-v2 .disaster-layer-item-sidebar.loading .disaster-layer-label-sidebar {
+  border-color: var(--mod-line) !important;
+}
+
+/* ---------- 焦点态统一为模块色（2026-11-27 18:04）----------
+   点选复选框 / 输入框后，浏览器默认的蓝色 focus ring 与模块色冲突，
+   这是「选了以后还有蓝色框线」的直接来源。 */
+body.rhs-v2 .alert-layer-checkbox-sidebar:focus,
+body.rhs-v2 .disaster-layer-checkbox-sidebar:focus,
+body.rhs-v2 .sidepanel .layer-item input[type="checkbox"]:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--mod-line);
+}
+body.rhs-v2 .alert-category-sidebar-content > select:focus,
+body.rhs-v2 .alert-category-sidebar-content > input:focus,
+body.rhs-v2 .simulate-category-sidebar-content > select:focus,
+body.rhs-v2 .simulate-category-sidebar-content > input:focus,
+body.rhs-v2 .flood-submodule-content select:focus,
+body.rhs-v2 .flood-submodule-content input:focus {
+  outline: none; border-color: var(--mod);
+  box-shadow: 0 0 0 1px var(--mod-line);
+}
+/* TomSelect 聚焦态（其主题文件写死了 --primary 蓝） */
+body.rhs-v2 .ts-wrapper.focus .ts-control {
+  border-color: var(--mod) !important;
+  box-shadow: 0 0 0 1px var(--mod-line) !important;
+}
+body.rhs-v2 input[type="range"]:focus { outline: none; }
 
 @media (max-width: 900px) {
   body.rhs-v2 { --rhs-w: 300px; --rhs-panel-w: 300px; }

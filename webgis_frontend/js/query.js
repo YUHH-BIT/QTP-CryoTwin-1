@@ -866,7 +866,7 @@ class DisasterSidebarManager {
         };
         // 右侧栏标题图标代表模块本身（数据库），不随灾害类型变化
         this.titleIcon = 'fa-database';
-        this.titleColor = '#38bdf8';
+        this.titleColor = '#fbbf24';
         this.dropdown = null;
         this.toggle = null;
         this.init();

@@ -9,11 +9,11 @@
   <!-- 使用多个CDN源确保OpenLayers加载成功 -->
   <link rel="stylesheet" href="css/lib/ol.css" />
   <!-- 平台样式 -->
-  <link rel="stylesheet" href="css/styles.css?v=20261127lpanel" />
+  <link rel="stylesheet" href="css/styles.css?v=20261127noborder" />
   <link href="css/lib/font-awesome.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="css/command-palette.css?v=20261127size" />
 </head>
-<body class="rhs-v2">
+<body class="rhs-v2" data-module="disaster">
   <!-- 加载遮罩层 -->
   <div class="loading-overlay" id="loading-overlay">
     <div class="loading-spinner"></div>
@@ -96,7 +96,7 @@
   <!-- 右侧灾害侧边栏 -->
   <div class="disaster-sidebar" id="disaster-sidebar">
     <div class="disaster-sidebar-header">
-      <h2 class="disaster-sidebar-title" id="disaster-sidebar-title"><i class="fa fa-database rhs-title-icon" style="color:#38bdf8"></i>灾害数据库</h2>
+      <h2 class="disaster-sidebar-title" id="disaster-sidebar-title"><i class="fa fa-database rhs-title-icon" style="color:#fbbf24"></i>灾害数据库</h2>
       <button class="disaster-sidebar-close" id="disaster-sidebar-close">&times;</button>
     </div>
     
@@ -510,7 +510,7 @@
 
 
   <script src="js/main.js?v=20261127esc"></script>
-  <script src="js/query.js?v=20261127e"></script>
+  <script src="js/query.js?v=20261127gold"></script>
 
   <!-- 气象水文栅格查询：自包含渲染 + 查询交互（需 main.js 先初始化 map） -->
   <script src="js/geotiff-render.js"></script>
