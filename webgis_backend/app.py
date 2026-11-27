@@ -251,6 +251,12 @@ def create_app(config_name=None):
         return send_from_directory(
             os.path.join(app.config['FRONTEND_DIR'], 'css'), filename)
 
+    # 前端图片资源（导航栏系统图标 img/logo-icon.png 等）
+    @app.route('/img/<path:filename>')
+    def serve_img(filename):
+        return send_from_directory(
+            os.path.join(app.config['FRONTEND_DIR'], 'img'), filename)
+
     # Cesium 引擎静态资源（自托管 Build/Cesium：Workers/Assets/Widgets/ThirdParty）。
     # 前端需设置 window.CESIUM_BASE_URL = '/cesium/'，否则 Worker 等资源 404。
     @app.route('/cesium/<path:filename>')

@@ -58,14 +58,16 @@ body {
 }
 
 /* 顶部导航栏样式（单行：系统名 | 模块按钮 | 搜索框） */
+/* 顶部导航栏样式（三段式栅格：品牌靠左 / 模块条全宽居中 / 搜索框靠右）
+   中间列 auto、左右两列都是 1fr，宽度相等 → 模块条精确压在整条导航栏的中线上 */
 .topbar {
   height: var(--nav-height);
   background: var(--grad-topbar);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
-  display: flex;
-  flex-direction: row;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 0;
+  column-gap: 12px;
   padding: 0 20px;
   position: relative;
   /* 导航栏须高于左侧图层管理面板(z:25)、右侧侧边栏(z:30)及其遮罩(z:29)，
@@ -92,19 +94,16 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-start;
+  justify-self: start;
   flex: 0 0 auto;
   height: auto;
   margin-bottom: 0;
 }
 
-/* 第二行导航栏（单行模式下与第一行并排：模块按钮靠左、搜索框靠右） */
+/* 第二行导航栏：栅格化后自身盒子被消解（display:contents），
+   让内部的模块条与搜索框直接成为 .topbar 的栅格项，分别落在中间列和右列 */
 .topbar-row2 {
-  display: flex;
-  align-items: center;
-  flex: 1 1 auto;
-  min-width: 0;
-  height: auto;
-  justify-content: space-between;
+  display: contents;
 }
 
 /* Logo样式 - 放大 */
@@ -737,15 +736,20 @@ body {
   position: relative;
 }
 
-/* logo 前置冰晶竖条 */
+/* 系统图标（img/logo-icon.png，128×128 RGBA）：30px 圆角方，自带深蓝底，只补一点外发光 */
+.topbar .logo-img {
+  width: 30px;
+  height: 30px;
+  margin-right: 10px;
+  border-radius: 8px;
+  flex: none;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 8px rgba(37, 99, 235, 0.35));
+}
+
+/* 有了图标就不再需要前置冰晶竖条 */
 .topbar .logo::before {
-  content: '';
-  width: 3px;
-  height: 18px;
-  margin-right: 12px;
-  border-radius: 2px;
-  background: linear-gradient(180deg, var(--ice) 0%, var(--primary) 100%);
-  box-shadow: 0 0 8px rgba(125, 211, 252, 0.45);
+  display: none;
 }
 
 /* 品牌与模块之间的分隔改用「系统代号左侧的竖线」，这里不再重复画一条 */
@@ -5167,7 +5171,7 @@ position: absolute;
    原有 DOM id、.active / .collapsed 语义与全部业务事件保持不变。
    ========================================================================== */
 body.rhs-v2 {
-  --rhs-w: 320px;          /* 左侧 .sidepanel 宽度，保持原口径 */
+  --rhs-w: 268px;          /* 左侧 .sidepanel 宽度（2026-11-27 20:49 由 320 收窄） */
   --rhs-panel-w: 320px;    /* 右侧抽屉实际宽度，由 rhs-tabs.js 按内容测量后覆盖 */
   --rhs-gap: 12px;
   --rhs-surface: rgba(19, 31, 51, .92);
@@ -5523,7 +5527,7 @@ body.rhs-v2 .sidepanel {
   left: var(--rhs-gap);
   width: var(--rhs-w);
   max-height: calc(100vh - var(--nav-height) - 22px);
-  padding: 12px;
+  padding: 10px;
   background: var(--rhs-surface);
   border: 1px solid var(--rhs-line-2);
   border-radius: 10px;
@@ -5559,14 +5563,14 @@ body.rhs-v2 .sidepanel .category {
   border-radius: 10px; margin-bottom: 8px;
 }
 body.rhs-v2 .sidepanel .category-header {
-  padding: 8px 10px; background: transparent; border-bottom-color: var(--rhs-line);
+  padding: 7px 9px; background: transparent; border-bottom-color: var(--rhs-line);
 }
 body.rhs-v2 .sidepanel .category-header span { font-size: 12px; font-weight: 500; }
 body.rhs-v2 .sidepanel .category-header.active {
   background: var(--mod-soft); color: var(--mod-ink);
 }
 body.rhs-v2 .sidepanel .category-content { background: transparent; }
-body.rhs-v2 .sidepanel .layer-item { padding: 5px 10px; border-bottom-color: var(--rhs-line); }
+body.rhs-v2 .sidepanel .layer-item { padding: 4px 9px; border-bottom-color: var(--rhs-line); }
 body.rhs-v2 .sidepanel .layer-item input[type="checkbox"] {
   width: 14px; height: 14px; margin-right: 8px; accent-color: var(--mod);
 }
@@ -6087,7 +6091,7 @@ body.rhs-v2 .ts-wrapper.focus .ts-control {
 body.rhs-v2 input[type="range"]:focus { outline: none; }
 
 @media (max-width: 900px) {
-  body.rhs-v2 { --rhs-w: 300px; --rhs-panel-w: 300px; }
+  body.rhs-v2 { --rhs-w: 248px; --rhs-panel-w: 300px; }
 }
 @media (max-width: 700px) {
   body.rhs-v2 .sidepanel,
@@ -6103,28 +6107,30 @@ body.rhs-v2 input[type="range"]:focus { outline: none; }
 }
 
 /* ============ 单行导航栏自适应 ============
-   系统名 + 模块按钮 + 搜索框挤在同一行，窄屏时按 1560 / 1360 / 1120 三档逐级压缩，
-   保证模块按钮不被搜索框挤出、搜索框不被压到无法输入。 */
+   系统名 + 模块按钮 + 搜索框挤在同一行，按 1560 / 1360 / 1300 / 1180 / 1100 / 900 逐级压缩，
+   保证模块条居中时不顶到品牌区、搜索框不被压到无法输入。 */
 @media (max-width: 1560px) {
   .topbar .logo { margin-right: 14px; }
-  .topbar .logo-name { font-size: 16px; }
+  .topbar .logo-name { font-size: 15.5px; }
+  .topbar .logo-code { font-size: 10px; }
+  .topbar .logo-img { width: 28px; height: 28px; }
   .topbar .nav-links a:not(.dropdown-item) { padding: 0 10px; }
 }
 
-@media (max-width: 1360px) {
+@media (max-width: 1400px) {
   .topbar { padding: 0 14px; }
   .topbar .logo { margin-right: 10px; }
-  .topbar .logo-name { font-size: 15px; letter-spacing: 0.3px; }
-  /* 代号只在字号上退一档，不隐藏——1360 宽度下实测仍放得下 */
-  .topbar .logo-code { font-size: 10px; padding-left: 8px; margin-left: 8px; }
+  .topbar .logo-name { font-size: 14px; letter-spacing: 0.3px; }
+  .topbar .logo-code { font-size: 9px; padding-left: 8px; margin-left: 8px; }
+  .topbar .logo-img { width: 26px; height: 26px; margin-right: 8px; }
   .topbar .logo::before { height: 16px; margin-right: 9px; }
   .topbar .nav-links { padding: 3px; border-radius: 9px; }
-  .topbar .nav-links a:not(.dropdown-item) { font-size: 13px; padding: 0 8px; height: 30px; border-radius: 6px; }
+  .topbar .nav-links a:not(.dropdown-item) { font-size: 12.5px; padding: 0 7px; height: 30px; border-radius: 6px; }
   .topbar .dropdown-toggle::after { margin-left: 4px; font-size: 9px; }
-  .topbar .searchbar.cmd-mode input[type="search"] { width: 150px; font-size: 13px; }
+  .topbar .searchbar.cmd-mode input[type="search"] { width: 140px; font-size: 13px; }
 }
 
-@media (max-width: 1240px) {
+@media (max-width: 1300px) {
   /* 1200 上下是临界区：品牌 + 代号 + 六个模块 + 搜索框刚好占满，再挤就贴上了 */
   .topbar .logo-name { font-size: 14px; }
   .topbar .logo-code { font-size: 9px; letter-spacing: 0.3px; padding-left: 7px; margin-left: 7px; }
@@ -6132,11 +6138,23 @@ body.rhs-v2 input[type="range"]:focus { outline: none; }
   .topbar .searchbar.cmd-mode input[type="search"] { width: 120px; }
 }
 
-@media (max-width: 1120px) {
+@media (max-width: 1180px) {
   .topbar .logo-name { font-size: 13.5px; letter-spacing: 0; }
   .topbar .logo-code { font-size: 8.5px; letter-spacing: 0.3px; }
   .topbar .nav-links a:not(.dropdown-item) { font-size: 12.5px; padding: 0 6px; }
   .topbar .searchbar.cmd-mode input[type="search"] { width: 110px; }
+}
+
+/* 窄屏放弃「模块条居中」——空间不够时会顶到系统名，回退成靠左排布 */
+@media (max-width: 1100px) {
+  .topbar { display: flex; column-gap: 0; }
+  .topbar-row2 {
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: space-between;
+  }
 }
 
 @media (max-width: 900px) {

@@ -124,6 +124,17 @@ try {
     }
   }
 
+  // 可选：NAVIMG=<本地图片路径> 把所有 .logo-img 的 src 换成本地图（后端未重启 /img 路由未生效时预览用）
+  if (process.env.NAVIMG) {
+    const buf = fs.readFileSync(process.env.NAVIMG);
+    const mime = process.env.NAVIMG.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+    const dataUrl = `data:${mime};base64,${buf.toString('base64')}`;
+    await send('Runtime.evaluate', {
+      expression: `(()=>{document.querySelectorAll('.logo-img').forEach(i=>{i.src=${JSON.stringify(dataUrl)};});})()`,
+    });
+    await sleep(300);
+  }
+
   // 第 7 个参数：裁剪高度（默认 80 只截导航栏；传 0 截整屏）；第 8 个：缩放倍率；
   // 第 9/10 个：裁剪区左上角 x/y（默认 0），用于放大看局部（如下拉菜单）
   const clipH = process.argv[7] === undefined ? 80 : Number(process.argv[7]);
