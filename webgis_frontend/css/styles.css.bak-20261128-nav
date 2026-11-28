@@ -1,0 +1,6569 @@
+@import url('fonts/google-fonts.css');
+
+:root {
+  /* Typography —— 显示字用 Chakra Petch（监测大屏气质），正文用 Noto Sans SC */
+  --font-display: 'Chakra Petch', 'Noto Sans SC', sans-serif;
+  --font-body: 'Noto Sans SC', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+
+  /* 主色 —— 提纯的冰空蓝 */
+  --primary: #3b82f6;
+  --primary-dark: #2563eb;
+  --primary-glow: rgba(59, 130, 246, 0.45);
+
+  /* 冰晶强调色 —— 冰冻圈主题签名色 */
+  --ice: #7dd3fc;
+  --ice-bright: #bae6fd;
+  --ice-glow: rgba(125, 211, 252, 0.35);
+
+  /* 表面 —— 更冷、更深，营造高原夜空氛围 */
+  --sidebar-bg: #131f33;
+  --sidebar-border: #2a3b55;
+  --sidebar-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  --bg-color: #0a1424;
+  --card-bg: #1b2840;
+  --card-hover: #243453;
+  --border-color: #3a4a66;
+
+  /* 文本 */
+  --text-primary: #e6edf7;
+  --text-secondary: #93a4bd;
+
+  /* 强调与状态 */
+  --accent-color: #67e8f9;
+  --danger-color: #f87171;
+  --success-color: #34d399;
+  --warning-color: #fbbf24;
+
+  /* 布局 */
+  --nav-height: 62px; /* 单行导航栏总高（系统名 + 模块按钮 + 搜索框同一行） */
+  --panel-width: 360px;
+  --map-height: calc(100vh - var(--nav-height));
+
+  /* 签名渐变 */
+  --grad-logo: linear-gradient(120deg, #7dd3fc 0%, #3b82f6 55%, #2563eb 100%);
+  --grad-topbar: linear-gradient(180deg, #16243d 0%, #0f1a2e 100%);
+  --grad-accent-bar: linear-gradient(90deg, var(--ice), var(--primary));
+}
+
+body {
+  font-family: var(--font-body);
+  margin: 0;
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(125, 211, 252, 0.06), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(59, 130, 246, 0.08), transparent 55%),
+    var(--bg-color);
+  color: var(--text-primary);
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* 顶部导航栏样式（单行：系统名 | 模块按钮 | 搜索框） */
+/* 顶部导航栏样式（三段式栅格：品牌靠左 / 模块条全宽居中 / 搜索框靠右）
+   中间列 auto、左右两列都是 1fr，宽度相等 → 模块条精确压在整条导航栏的中线上 */
+.topbar {
+  height: var(--nav-height);
+  background: var(--grad-topbar);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: 12px;
+  padding: 0 20px;
+  position: relative;
+  /* 导航栏须高于左侧图层管理面板(z:25)、右侧侧边栏(z:30)及其遮罩(z:29)，
+     否则其下拉菜单会被这些面板盖住；低于全屏遮罩(z:1000+)与弹窗(z:2000+) */
+  z-index: 100;
+  border-bottom: 1px solid var(--sidebar-border);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 顶部导航底部冰晶光带 */
+.topbar::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--ice), transparent);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+/* 第一行导航栏（单行模式下并入 .topbar，仅作系统名容器） */
+.topbar-row1 {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  justify-self: start;
+  flex: 0 0 auto;
+  height: auto;
+  margin-bottom: 0;
+}
+
+/* 第二行导航栏：栅格化后自身盒子被消解（display:contents），
+   让内部的模块条与搜索框直接成为 .topbar 的栅格项，分别落在中间列和右列 */
+.topbar-row2 {
+  display: contents;
+}
+
+/* Logo样式 - 放大 */
+.topbar .logo {
+  display: flex;
+  align-items: center;
+  font-size: 24px; /* 调整字体大小 */
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: var(--primary);
+  text-shadow: 0 0 8px var(--primary-glow);
+}
+
+.topbar .logo img {
+  height: 40px; /* 放大Logo图片 */
+  margin-right: 12px;
+  filter: drop-shadow(0 0 4px var(--primary-glow));
+}
+
+/* 搜索栏样式 */
+.topbar .searchbar {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-left: auto; /* 单行导航栏：搜索框贴右，模块按钮居中留白 */
+}
+
+.topbar input[type="search"] {
+  width: 100%;
+  height: 34px;
+  max-width: 400px;
+  border: 2px solid var(--border-color);
+  border-radius: 17px;
+  padding: 0 18px;
+  font-size: 15px;
+  outline: none;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.topbar input[type="search"]:focus {
+  border-color: var(--primary);
+  background: var(--sidebar-bg);
+  box-shadow: 0 0 0 2px var(--primary-glow);
+}
+
+.topbar .searchbar button {
+  margin-left: 10px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 17px;
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  font-size: 15px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.topbar .searchbar button:hover {
+  background: var(--primary-dark);
+  transform: scale(1.05);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
+/* 导航链接 —— 「玻璃胶囊条」：整条半透明深色底 + 细描边，当前项实心渐变胶囊。
+   材质与右侧 cmd 搜索框同源（深色填充 + 1px 描边 + 内高光），整条顶栏语言统一。 */
+.topbar .nav-links {
+  display: flex;
+  gap: 2px;
+  background: rgba(30, 41, 59, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 11px;
+  padding: 4px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  flex: 0 1 auto; /* 按内容自适应，不再平分整行；右侧留白给搜索栏 */
+  min-width: 0;
+}
+
+.topbar .nav-links a:not(.dropdown-item) {
+  color: #93a4bd;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  padding: 0 12px;
+  border-radius: 7px;
+  border: 1px solid transparent; /* 占位，active 加描边时不产生尺寸抖动 */
+  box-sizing: border-box;
+  /* 统一缓动曲线：ease-out-quad 质感，切换不突兀 */
+  transition:
+    color 0.18s cubic-bezier(0.22, 0.61, 0.36, 1),
+    background-color 0.18s cubic-bezier(0.22, 0.61, 0.36, 1),
+    border-color 0.2s cubic-bezier(0.22, 0.61, 0.36, 1),
+    box-shadow 0.2s cubic-bezier(0.22, 0.61, 0.36, 1);
+  position: relative;
+  isolation: isolate; /* 让 ::before 的负 z-index 只在本项内层叠，不跑到玻璃条后面 */
+  overflow: hidden;
+  white-space: nowrap;
+  flex: 0 0 auto; /* 每项贴合文字宽度 */
+  text-align: center;
+  min-width: 0;   /* 去掉 108px 硬下限，长文字不再被拉伸 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+}
+
+/* 当前项的渐变底：渐变本身无法插值，用独立图层做 opacity/scale 过渡实现平滑淡入 */
+.topbar .nav-links a:not(.dropdown-item)::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.38), rgba(37, 99, 235, 0.26));
+  opacity: 0;
+  transform: scale(0.94);
+  transition:
+    opacity 0.22s cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+
+.topbar .nav-links a:not(.dropdown-item).active::before {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* 下拉菜单样式 */
+.dropdown-container {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto; /* 下拉项按内容宽度，不参与均分拉伸 */
+}
+
+.dropdown-toggle {
+  position: relative;
+}
+
+.dropdown-toggle::after {
+  content: '\f107'; /* FontAwesome fa-angle-down（细角箭头） */
+  font-family: 'FontAwesome';
+  margin-left: 6px;
+  font-size: 10px;
+  color: rgba(147, 164, 189, 0.75);
+  vertical-align: middle;
+  line-height: 1;
+  display: inline-block;
+  transition: transform 0.24s cubic-bezier(0.22, 0.61, 0.36, 1), color 0.18s ease;
+}
+
+/* 下拉展开时箭头旋转 180° 并高亮 */
+.dropdown-container:has(.dropdown-menu.active) .dropdown-toggle::after {
+  transform: rotate(180deg);
+  color: var(--primary);
+}
+
+/* 下拉面板 —— 与导航胶囊条同一材质：深色玻璃 + 1px 描边 + 内高光。
+   原样式有三个毛病：① 顶部小箭头写死 left:22px，和触发项对不齐、描边还在拐角处留缺口；
+   ② 悬停时 padding-left 从 14 跳到 20，文字整体右移像在抖；③ 悬停是横向渐变、选中是左侧粗条，
+   两套语言互相打架。这里统一成「淡填充 + 左侧细指示条」。 */
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 9px);
+  left: -2px; /* 抵消触发项 1px 边框 + 12px 内边距与面板 11px 内边距的差，让首项文字与按钮文字左对齐 */
+  /* 宽度逐个贴合各自最长的一项（不设大 min-width，否则会被统一撑宽：
+     min-width 作用在内容盒上，会把 4 字菜单也撑到和 8 字菜单一样宽）；
+     min-width 只留一个很小的下限，防止两字菜单窄到没法看 */
+  width: max-content;
+  min-width: 92px;
+  max-width: 260px;
+  background: rgba(17, 26, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  box-shadow:
+    0 18px 44px rgba(2, 6, 23, 0.55),
+    0 4px 12px rgba(2, 6, 23, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px) saturate(140%);
+  padding: 4px;
+  z-index: 1000;
+  /* 项数多（系统管理 8 项）或窗口矮时内部滚动，避免菜单顶到屏幕外 */
+  max-height: min(70vh, 460px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  opacity: 0;
+  transform: translateY(-4px) scale(0.985);
+  transform-origin: top left;
+  transition:
+    opacity 0.18s cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* 小箭头已移除：触发项在玻璃条内，箭头位置随视口变化对不准，且描边缺口显脏 */
+.dropdown-menu::before {
+  display: none;
+}
+
+/* 内容溢出时用细滚动条，不破坏圆角 */
+.dropdown-menu::-webkit-scrollbar { width: 6px; }
+.dropdown-menu::-webkit-scrollbar-track { background: transparent; }
+.dropdown-menu::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.28);
+  border-radius: 3px;
+}
+
+.dropdown-menu.active {
+  display: block;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  padding: 7px 11px;
+  border-radius: 8px;
+  color: #b6c4d8;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  position: relative;
+  white-space: nowrap;
+  transition:
+    background-color 0.16s cubic-bezier(0.22, 0.61, 0.36, 1),
+    color 0.16s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* 左侧指示条：绝对定位，不参与盒模型，悬停时文字不再位移。
+   位置从 2px 挪到 4px、加粗到 3px，并去掉「冰蓝→深蓝」渐变——深的一端落在深色底上直接糊没了，
+   统一用亮冰蓝 + 淡光晕，选中项一眼能看见。 */
+.dropdown-item::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 50%;
+  margin-top: -7.5px;
+  width: 3px;
+  height: 15px;
+  border-radius: 2px;
+  background: var(--ice);
+  box-shadow: 0 0 7px rgba(125, 211, 252, 0.5);
+  opacity: 0;
+  transition: opacity 0.16s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* 悬停只做填充与文字提亮，不显示竖线——左侧蓝线专属于「当前所在分类」，语义唯一 */
+.dropdown-item:hover {
+  background-color: rgba(148, 163, 184, 0.12);
+  color: #eef4fb;
+}
+
+/* 当前所在分类：淡蓝填充 + 冰蓝文字 + 实心指示条 */
+.dropdown-item.active {
+  background-color: rgba(59, 130, 246, 0.16);
+  color: #9ddcff;
+  font-weight: 600;
+}
+
+.dropdown-item.active::before {
+  opacity: 1;
+  box-shadow: 0 0 7px rgba(125, 211, 252, 0.5);
+}
+
+.dropdown-item.active:hover {
+  background-color: rgba(59, 130, 246, 0.22);
+}
+
+/* 当前选中：实心渐变胶囊 + 冰蓝描边 + 内高光（渐变底由 ::before 提供并淡入，这里只管描边与阴影） */
+.topbar .nav-links a:not(.dropdown-item).active {
+  border-color: rgba(125, 211, 252, 0.32);
+  color: #eaf6ff;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 2px 10px rgba(37, 99, 235, 0.22);
+  transform: none;
+}
+
+.topbar .nav-links a:not(.dropdown-item).active::after {
+  content: none;
+}
+
+.topbar .nav-links a:not(.dropdown-item):hover:not(.active) {
+  background-color: rgba(148, 163, 184, 0.12);
+  color: #e6edf7;
+}
+
+.topbar .nav-links a:not(.dropdown-item):focus-visible {
+  outline: 1px solid rgba(125, 211, 252, 0.55);
+  outline-offset: 1px;
+}
+
+/* 用户区域样式 */
+.topbar .user {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  color: var(--text-primary);
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+/* 隐藏天气信息组件 */
+.weather-widget {
+  display: none;
+}
+
+/* 图例容器样式 */
+.legend-container {
+  padding: 16px;
+  background: var(--sidebar-bg);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  border: 1px solid var(--sidebar-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.legend-container h3 {
+  margin-top: 0;
+  font-size: 18px;
+  color: var(--primary);
+  font-weight: 600;
+  text-align: left;
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.legend-container h3:after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -8px;
+  width: 40px;
+  height: 2px;
+  background-color: var(--primary);
+}
+
+/* 图例内容区 */
+.legend-content {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 图例项样式 */
+.legend-item {
+  display: flex;
+  align-items: center;
+  padding: 2px 0;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: background-color 0.2s;
+}
+
+.legend-item:last-child {
+  margin-bottom: 0;
+}
+
+.legend-item:hover {
+  background-color: rgba(59, 130, 246, 0.05);
+  border-radius: 4px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+/* 图例符号样式 - 线符号 */
+.legend-symbol {
+  width: 40px;
+  height: 3px;
+  margin-right: 12px;
+  border-radius: 1px;
+}
+
+/* 图例符号样式 - 点符号 */
+.legend-symbol.point-symbol {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-right: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 图例文本样式 */
+.legend-text {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* 高程图例特殊样式 */
+#elevation-legend {
+  width: 150px;
+  margin: 0;
+}
+
+#elevation-legend .legend-content {
+  padding: 8px 0;
+}
+
+/* 高程色带容器样式 */
+.elevation-colorbar-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  padding: 8px 0;
+  min-height: 180px;
+}
+
+/* 高程数值标签容器 */
+.elevation-values {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-right: 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  width: 45px;
+}
+
+/* 高程数值标签 */
+.elevation-values div {
+  margin: 3px 0;
+  line-height: 1;
+}
+
+/* 高程色带样式 */
+.elevation-colorbar {
+  width: 30px;
+  height: 180px;
+  border-radius: 4px;
+  border: 1px solid var(--sidebar-border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+/* 缩放级别提示样式 */
+.zoom-level-hint {
+  font-size: 12px;
+  text-align: center;
+  color: var(--text-secondary);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--sidebar-border);
+}
+
+/* 洪水灾害过程模拟子模块标签页样式 */
+.flood-submodule-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color);
+  background: transparent;
+  padding: 0;
+  margin-bottom: 16px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 10px 6px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 0;
+  transition: all 0.2s ease;
+  text-align: center;
+  white-space: nowrap; /* 按钮文字不换行 */
+}
+
+.tab-btn:hover {
+  background: rgba(59, 130, 246, 0.08);
+  color: #7dd3fc;
+}
+
+.tab-btn.active {
+  background: rgba(59, 130, 246, 0.1);
+  color: #7dd3fc;
+  border-bottom: 2px solid var(--primary);
+}
+
+.flood-submodule-content {
+  display: none;
+  animation: fadeIn 0.3s ease;
+}
+
+.flood-submodule-content.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 图例容器样式 */
+.legend-container {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--sidebar-border);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.legend-container h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: var(--primary);
+  font-weight: 600;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--sidebar-border);
+  position: relative;
+}
+
+.legend-container h3:after {
+  content: '';
+  position: absolute;
+  width: 40px;
+  height: 2px;
+  background: var(--primary);
+  bottom: -1px;
+  left: 0;
+}
+
+.legend-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 图例项样式 */
+.legend-item {
+  display: flex;
+  align-items: center;
+  padding: 2px 0;
+  transition: background-color 0.2s;
+}
+
+.legend-item:hover {
+  background-color: rgba(59, 130, 246, 0.05);
+  border-radius: 4px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+/* 图例符号样式 - 线符号 */
+.legend-symbol {
+  width: 40px;
+  height: 3px;
+  margin-right: 12px;
+  border-radius: 1px;
+}
+
+/* 图例符号样式 - 点符号 */
+.legend-symbol.point-symbol {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin-right: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 图例文本样式 */
+.legend-text {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+/* 确保图例在不同缩放级别下保持清晰 */
+@media (max-width: 768px) {
+  .legend-container {
+    padding: 12px;
+  }
+  
+  .legend-text {
+    font-size: 13px;
+  }
+  
+  .legend-symbol {
+    width: 35px;
+  }
+  
+  .legend-symbol.point-symbol {
+    margin-right: 23px;
+  }
+}
+
+.topbar .user:hover {
+  background: var(--card-hover);
+}
+
+/* 品牌区：纯色标题 + 冰晶竖条，右侧一道细分隔线，去掉渐变文字与发光（与搜索框的克制感统一） */
+.topbar .logo {
+  display: flex;
+  align-items: center;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: #eef4fc;
+  margin-right: 24px;
+  /* 不要给 .logo 加 text-shadow：渐变字的填充是透明的，阴影会浮在字形外圈变成脏影 */
+  filter: none;
+  position: relative;
+}
+
+/* 系统图标（img/logo-icon.png，128×128 RGBA）：30px 圆角方，自带深蓝底，只补一点外发光 */
+.topbar .logo-img {
+  width: 30px;
+  height: 30px;
+  margin-right: 10px;
+  border-radius: 8px;
+  flex: none;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 8px rgba(37, 99, 235, 0.35));
+}
+
+/* 有了图标就不再需要前置冰晶竖条 */
+.topbar .logo::before {
+  display: none;
+}
+
+/* 品牌与模块之间的分隔改用「系统代号左侧的竖线」，这里不再重复画一条 */
+.topbar .logo::after {
+  display: none;
+}
+
+/* 系统名：整串走「白 → 淡冰蓝」的左到右渐变（横跨 240px，渐变才看得出来；
+   纵向渐变在 17px 字高上跨度太小，等于没渐变）。末端用亮蓝而不是灰蓝，避免后半句发灰。
+   「冰冻圈」三字用同一色系但更亮一档，保持关键词层次又不打断整串的连续性。
+   注意 text-shadow 在 background-clip:text + 透明填充下会浮在字形外圈变成脏影，必须去掉。 */
+.topbar .logo-name {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: #eef4fc; /* 不支持 background-clip:text 时的回退色 */
+  background: linear-gradient(96deg, #ffffff 0%, #d8efff 30%, #7fcdfb 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  white-space: nowrap;
+}
+
+/* 「冰冻圈」跟随整串渐变，不再自己起一段——单独设渐变会在渐变中段插一段白，
+   反而让这三个字比周围更亮、跳出来一块。 */
+.topbar .logo-key {
+  font-style: normal;
+}
+
+/* 系统代号：Chakra Petch 是科技感拉丁字体，中文用不上、这里正好用得上 */
+.topbar .logo-code {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.8px;
+  color: #6b83a3;
+  padding-left: 10px;
+  margin-left: 10px;
+  border-left: 1px solid rgba(148, 163, 184, 0.22);
+  white-space: nowrap;
+  flex: none;
+}
+
+.topbar .logo img {
+  height: 32px;
+  margin-right: 8px;
+  filter: drop-shadow(0 0 4px var(--primary-glow));
+}
+
+.topbar .searchbar {
+  flex: 0 0 auto;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+}
+
+.topbar input[type="search"] {
+  width: 340px;
+  height: 34px;
+  border: 1px solid var(--border-color);
+  border-radius: 17px;
+  padding: 0 16px;
+  font-size: 15px;
+  outline: none;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.topbar input[type="search"]:focus {
+  border-color: var(--primary);
+  background: var(--sidebar-bg);
+  box-shadow: 0 0 0 2px var(--primary-glow);
+}
+
+/* 已统一到上方的导航栏样式中 */
+
+#map {
+  width: 100vw;
+  height: var(--map-height);
+  position: absolute;
+  top: var(--nav-height);
+  left: 0;
+  z-index: 1;
+  background: #0f172a;
+}
+
+/* 控制面板 */
+.sidepanel {
+    box-sizing: border-box;
+position: absolute;
+  top: calc(var(--nav-height) + 16px);
+  left: 16px; /* 悬浮岛：四周留白，不贴边 */
+  width: 320px;
+  max-height: calc(100vh - var(--nav-height) - 32px);
+  background: rgba(18, 30, 50, 0.9);
+  border: 1px solid rgba(125, 211, 252, 0.12);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35), 0 2px 8px rgba(0, 0, 0, 0.2);
+  z-index: 25;
+  padding: 14px 16px 16px;
+  transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease;
+  backdrop-filter: blur(14px);
+  border-radius: 16px; /* 大圆角悬浮卡片 */
+  overflow-y: auto;
+}
+
+/* 收起状态：移出左侧视口（由展开按钮唤起） */
+.sidepanel.collapsed {
+  left: -340px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 悬浮岛头部：标题「图层管理」+ 收起按钮 */
+.sidepanel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(58, 74, 102, 0.45);
+}
+.sidepanel-head-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sidepanel-head-title i {
+  color: #7dd3fc;
+  font-size: 13px;
+}
+.sidepanel-collapse-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+.sidepanel-collapse-btn:hover {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--text-primary);
+}
+
+/* 展开按钮：面板收起时显示在左侧边缘的小圆钮 */
+.sidepanel-toggle {
+  position: absolute;
+  top: calc(var(--nav-height) + 16px);
+  left: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(125, 211, 252, 0.25);
+  background: rgba(18, 30, 50, 0.92);
+  color: #7dd3fc;
+  font-size: 16px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 24;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  transition: all 0.2s ease;
+}
+.sidepanel-toggle:hover {
+  border-color: var(--primary);
+  color: #fff;
+  transform: translateY(-1px);
+}
+body.sidepanel-collapsed .sidepanel-toggle {
+  display: flex;
+}
+
+/* 右侧灾害侧边栏 */
+.disaster-sidebar {
+  scrollbar-width: none;
+    box-sizing: border-box;
+position: absolute;
+  height: calc(100vh - var(--nav-height) - 32px);
+  top: calc(var(--nav-height) + 16px);
+  right: -420px; /* 默认完全隐藏，由导航显式打开 */
+  width: 400px;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--sidebar-border);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+  z-index: 30;
+  padding: 20px;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(12px);
+  background: rgba(30, 41, 59, 0.98);
+  overflow-y: auto;
+  border-radius: 16px;
+}
+
+.disaster-sidebar.active {
+  right: 16px;
+}
+
+/* 右侧模拟侧边栏 */
+.simulate-sidebar {
+  scrollbar-width: none;
+    box-sizing: border-box;
+position: absolute;
+  height: calc(100vh - var(--nav-height) - 32px);
+  top: calc(var(--nav-height) + 16px);
+  right: -420px; /* 默认完全隐藏，由导航显式打开 */
+  width: 400px;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--sidebar-border);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+  z-index: 30;
+  padding: 20px;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(12px);
+  background: rgba(30, 41, 59, 0.98);
+  overflow-y: auto;
+  border-radius: 16px;
+}
+
+.simulate-sidebar.active {
+  right: 16px;
+}
+
+/* 右侧风险评估侧边栏 */
+.alert-sidebar {
+  scrollbar-width: none;
+    box-sizing: border-box;
+position: absolute;
+  height: calc(100vh - var(--nav-height) - 32px);
+  top: calc(var(--nav-height) + 16px);
+  right: -420px; /* 默认完全隐藏，由导航显式打开 */
+  width: 400px;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--sidebar-border);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+  z-index: 30;
+  padding: 20px;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(12px);
+  background: rgba(30, 41, 59, 0.98);
+  overflow-y: auto;
+  border-radius: 16px;
+}
+
+.alert-sidebar.active {
+  right: 16px;
+}
+
+/* 侧边栏遮罩：打开时覆盖地图区，点击关闭（与 decision-sidebar-mask 同一套行为） */
+  .disaster-sidebar-mask,
+.simulate-sidebar-mask,
+.alert-sidebar-mask {
+  position: fixed;
+  top: var(--nav-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent; /* 非模态：不遮挡地图视线 */
+  z-index: 29;
+  opacity: 0;
+  pointer-events: none; /* 非模态：不拦截地图与左侧栏操作 */
+  transition: opacity 0.25s ease;
+}
+  .disaster-sidebar-mask.active,
+.simulate-sidebar-mask.active,
+.alert-sidebar-mask.active {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.alert-sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+
+.alert-sidebar-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--primary);
+  margin: 0;
+}
+
+.alert-sidebar-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.alert-sidebar-close:hover {
+  background: var(--card-hover);
+  color: var(--text-primary);
+}
+
+.alert-category-sidebar {
+  margin-bottom: 20px;
+  background: var(--card-bg);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.alert-category-sidebar:hover {
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.alert-category-sidebar-header {
+  padding: 12px 16px;
+  background: var(--primary);
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.alert-category-sidebar-content {
+  padding: 12px 16px;
+}
+
+.alert-layer-item-sidebar {
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.alert-layer-item-sidebar:hover {
+  background: var(--card-hover);
+}
+
+.alert-layer-item-sidebar:last-child {
+  margin-bottom: 0;
+}
+
+.alert-layer-checkbox-sidebar {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--primary);
+}
+
+.alert-layer-label-sidebar {
+  flex: 1;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  transition: color 0.2s;
+}
+
+.alert-layer-label-sidebar:hover {
+  color: var(--primary);
+}
+
+.alert-layer-count-sidebar {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* 系统管理侧边栏样式 */
+.alert-section {
+  margin-bottom: 14px;
+}
+
+.alert-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--primary);
+  position: relative;
+}
+
+.alert-section-title::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 60px;
+  height: 2px;
+  background: var(--primary-dark);
+}
+
+.alert-form-group {
+  margin-bottom: 20px;
+}
+
+.alert-form-group label {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.alert-form-group input,
+.alert-form-group select,
+.alert-form-group textarea {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid var(--sidebar-border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 14px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-sizing: border-box;
+}
+
+.alert-form-group input:focus,
+.alert-form-group select:focus,
+.alert-form-group textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  background: var(--card-bg);
+  transform: translateY(-2px);
+}
+
+.alert-form-group input[type="date"] {
+  color-scheme: dark;
+}
+
+.alert-form-group textarea {
+  resize: vertical;
+  min-height: 100px;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.alert-permission-list {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.alert-permission-list label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 12px 16px;
+  background: var(--card-bg);
+  border-radius: 8px;
+  border: 2px solid var(--sidebar-border);
+  transition: all 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.alert-permission-list label:hover {
+  border-color: var(--primary);
+  background: var(--card-hover);
+  transform: translateY(-2px);
+}
+
+.alert-permission-list input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+  cursor: pointer;
+  margin: 0;
+}
+
+.alert-status-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  background: var(--card-bg);
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  border: 2px solid var(--sidebar-border);
+  transition: all 0.3s;
+}
+
+.alert-status-item:last-child {
+  margin-bottom: 0;
+}
+
+.alert-status-item:hover {
+  border-color: var(--primary);
+  background: var(--card-hover);
+  transform: translateY(-2px);
+}
+
+.alert-status-item span:first-child {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.alert-status-item span:last-child {
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.btn-small {
+  padding: 12px 24px;
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-small:hover {
+  background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3);
+}
+
+.btn-small:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+/* 按钮组样式 */
+.btn-group {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.btn-group .btn-small {
+  flex: 1;
+}
+
+/* 表格样式 */
+.alert-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+  background: var(--card-bg);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.alert-table th,
+.alert-table td {
+  padding: 14px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+
+.alert-table th {
+  background: var(--primary);
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.alert-table tr:last-child td {
+  border-bottom: none;
+}
+
+.alert-table tr:hover {
+  background: var(--card-hover);
+}
+
+/* 统计卡片 */
+.stat-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 2px solid var(--sidebar-border);
+  transition: all 0.3s;
+}
+
+.stat-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.2);
+}
+
+.stat-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.stat-card-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.stat-card-icon {
+  font-size: 24px;
+  color: var(--primary);
+}
+
+.stat-card-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.stat-card-change {
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+.stat-card-change.positive {
+  color: var(--success-color);
+}
+
+.stat-card-change.negative {
+  color: var(--danger-color);
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .disaster-sidebar,
+  .simulate-sidebar,
+  .alert-sidebar {
+    width: 320px;
+    right: -320px;
+  }
+  
+  .alert-permission-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 风险等级样式 */
+.risk-level {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.risk-level.低风险 {
+  background-color: #10b981;
+  color: white;
+}
+
+.risk-level.中等风险 {
+  background-color: #f59e0b;
+  color: white;
+}
+
+.risk-level.高风险 {
+  background-color: #f97316;
+  color: white;
+}
+
+.risk-level.极高风险 {
+  background-color: #ef4444;
+  color: white;
+}
+
+/* 风险分析项样式 */
+.alert-analysis-item {
+  margin-bottom: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(71, 85, 105, 0.3);
+}
+
+.alert-analysis-item:last-child {
+  margin-bottom: 0;
+  border-bottom: none;
+}
+
+.alert-analysis-item label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.alert-analysis-item input[type="range"] {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border-color);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.alert-analysis-item input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.alert-analysis-item input[type="range"]::-webkit-slider-thumb:hover {
+  background: var(--primary-dark);
+  transform: scale(1.2);
+}
+
+.alert-analysis-item input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.alert-analysis-item input[type="range"]::-moz-range-thumb:hover {
+  background: var(--primary-dark);
+  transform: scale(1.2);
+}
+
+.alert-analysis-item select {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s;
+}
+
+.alert-analysis-item select:hover {
+  border-color: var(--primary);
+}
+
+.alert-analysis-item select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-glow);
+}
+
+.alert-analysis-value {
+  display: inline-block;
+  margin-left: 12px;
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+/* 风险分析按钮样式 */
+.btn-small {
+  padding: 8px 16px;
+  font-size: 14px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+  font-weight: 600;
+}
+
+.btn-small:hover {
+  background: var(--primary-dark);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--primary-glow);
+}
+
+.btn-small:active {
+  transform: translateY(0);
+}
+
+/* 模拟类别侧边栏内容样式 */
+.simulate-category-sidebar-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 18px;
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.simulate-category-sidebar-header i {
+  margin-right: 8px;
+  color: var(--accent-color);
+}
+
+.simulate-category-sidebar-content label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.simulate-category-sidebar-content select,
+.simulate-category-sidebar-content input {
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  box-sizing: border-box;
+  color-scheme: dark;
+}
+.simulate-category-sidebar-content select {
+  cursor: pointer;
+  appearance: auto;
+  -webkit-appearance: auto;
+}
+.simulate-category-sidebar-content select option {
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+/* 按钮：外观由 Bootstrap(.btn-primary) 接管，这里只保留侧边栏布局 */
+.simulate-category-sidebar-content .btn {
+  width: 100%;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+.simulate-category-sidebar-content .btn:hover {
+  transform: translateY(-1px);
+}
+
+.disaster-sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+
+.disaster-sidebar-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--primary);
+  margin: 0;
+}
+
+.disaster-sidebar-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.disaster-sidebar-close:hover {
+  background: var(--card-hover);
+  color: var(--text-primary);
+}
+
+.disaster-category-sidebar {
+  margin-bottom: 20px;
+  background: var(--card-bg);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.disaster-category-sidebar:hover {
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.disaster-category-sidebar-header {
+  padding: 12px 16px;
+  background: var(--primary);
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.disaster-category-sidebar-content {
+  padding: 12px 16px;
+}
+
+/* ===== 灾害类型切换芯片（隐藏原生复选框，label 做芯片按钮） ===== */
+.disaster-layer-item-sidebar {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.disaster-layer-item-sidebar:last-child {
+  margin-bottom: 0;
+}
+
+.disaster-layer-checkbox-sidebar {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.disaster-layer-label-sidebar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+  user-select: none;
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.disaster-layer-label-sidebar:hover {
+  border-color: var(--primary);
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.disaster-layer-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.disaster-layer-count-sidebar {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(148, 163, 184, 0.15);
+  padding: 2px 8px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+/* 选中对勾角标（默认隐藏，勾选时显示） */
+.disaster-layer-check-mark {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+/* 加载中转圈（请求图层数据时显示） */
+.disaster-layer-loading {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: #7dd3fc;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* 选中态：主色边框 + 发光 */
+.disaster-layer-checkbox-sidebar:checked + .disaster-layer-label-sidebar {
+  border-color: var(--primary);
+  background: rgba(59, 130, 246, 0.12);
+  box-shadow: 0 0 0 1px var(--primary), 0 4px 16px rgba(59, 130, 246, 0.25);
+}
+
+.disaster-layer-checkbox-sidebar:checked + .disaster-layer-label-sidebar .disaster-layer-check-mark {
+  display: flex;
+}
+
+/* 加载态：转圈替代对勾（优先级高于选中态） */
+.disaster-layer-item-sidebar.loading .disaster-layer-check-mark {
+  display: none !important;
+}
+
+.disaster-layer-item-sidebar.loading .disaster-layer-loading {
+  display: flex;
+}
+
+.disaster-layer-item-sidebar.loading .disaster-layer-label-sidebar {
+  border-color: var(--primary);
+}
+
+/* 悬浮岛式：不再使用 hover 展开与文本把手（收起/展开由 sidepanel-toggle 控制） */
+
+/* 移除缩放相关的样式，因为不再需要 */
+.sidepanel:active {
+  cursor: default;
+}
+
+.sidepanel::after {
+  display: none;
+}
+
+.sidepanel > * {
+  user-select: text;
+}
+
+.sidepanel:active {
+  cursor: grabbing;
+}
+
+/* 缩放控制手柄样式 */
+.sidepanel::after {
+  content: '';
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 15px;
+  height: 15px;
+  border-right: 3px solid var(--primary);
+  border-bottom: 3px solid var(--primary);
+  cursor: se-resize;
+}
+
+/* 防止内部元素影响缩放 */
+.sidepanel > * {
+  user-select: none;
+}
+
+.sidepanel:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+.sidepanel h3 {
+  margin: 0 0 16px 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--ice-bright);
+  font-weight: 600;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--sidebar-border);
+  position: relative;
+  letter-spacing: 0.5px;
+}
+
+.sidepanel h3:after {
+  content: '';
+  position: absolute;
+  width: 44px;
+  height: 2px;
+  background: var(--grad-accent-bar);
+  bottom: -1px;
+  left: 0;
+  box-shadow: 0 0 8px var(--ice-glow);
+}
+
+.sidepanel .mode-switch {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.sidepanel .mode-switch button {
+  flex: 1;
+  padding: 8px 0;
+  border: 1px solid var(--border-color);
+  background: var(--card-bg);
+  color: var(--text-secondary);
+  font-size: 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.sidepanel .mode-switch button:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, var(--primary-glow), transparent);
+  transition: 0.5s;
+}
+
+.sidepanel .mode-switch button:hover:before {
+  left: 100%;
+}
+
+.sidepanel .mode-switch button.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
+.sidepanel .layer-switch {
+  margin: 12px 0;
+}
+
+.sidepanel .layer-switch label {
+  display: flex;
+  align-items: center;
+  margin-bottom: 7px;
+  cursor: pointer;
+  font-size: 15px;
+  color: var(--text-primary);
+  transition: color 0.2s;
+}
+
+.sidepanel .layer-switch label:hover {
+  color: var(--primary);
+}
+
+.sidepanel .layer-switch input[type="checkbox"] {
+  margin-right: 8px;
+  accent-color: var(--primary);
+  width: 16px;
+  height: 16px;
+  transition: all 0.2s;
+}
+
+.sidepanel .layer-switch input[type="checkbox"]:checked {
+  box-shadow: 0 0 0 2px var(--primary-glow);
+}
+
+.sidepanel .legend {
+  margin-top: 16px;
+}
+
+.sidepanel .legend span {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  margin-bottom: -4px;
+  box-shadow: 0 0 4px rgba(0,0,0,0.3);
+}
+
+.sidepanel .legend-row {
+  margin-bottom: 7px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
+}
+
+/* 天气组件样式 */
+.weather-widget {
+  background-color: var(--card-bg);
+  overflow-y: auto;
+  max-height: 390px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  padding: 15px;
+  margin-top: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: all 0.3s;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .weather-widget {
+    padding: 12px;
+    margin-top: 15px;
+  }
+  
+  .weather-main {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+  
+  .weather-main img {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .weather-temp {
+    font-size: 28px;
+  }
+  
+  .weather-details {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .weather-widget {
+    padding: 10px;
+    margin-top: 10px;
+  }
+  
+  .weather-widget h3 {
+    font-size: 16px;
+  }
+  
+  .weather-temp {
+    font-size: 24px;
+  }
+  
+  .weather-detail {
+    padding: 8px;
+    font-size: 13px;
+  }
+}
+
+.weather-widget:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+.weather-widget h3 {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+  color: var(--primary);
+  font-weight: 600;
+  padding-bottom: 6px;  border-bottom: 1px solid var(--border-color);
+}
+
+.weather-mode-switch {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.weather-mode-switch button {
+  flex: 1;
+  padding: 8px 0;
+  border: 1px solid var(--border-color);
+  background: var(--sidebar-bg);
+  color: var(--text-secondary);
+  font-size: 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.weather-mode-switch button.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+  box-shadow: 0 0 6px var(--primary-glow);
+}
+
+.weather-content {
+  transition: all 0.3s ease;
+}
+
+.hidden {
+  display: none;
+}
+
+.weather-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.weather-main img {
+  width: 64px;
+  height: 64px;
+  filter: drop-shadow(0 0 4px rgba(0,0,0,0.3));
+}
+
+.weather-main-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.weather-temp {
+  font-size: 32px;
+  font-weight: bold;
+  color: var(--primary);
+  letter-spacing: 1px;
+  line-height: 1;
+  text-shadow: 0 0 6px var(--primary-glow);
+}
+
+.weather-desc {
+  font-size: 16px;
+  color: var(--accent-color);
+  font-weight: 500;
+}
+
+.weather-city {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.weather-details {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.weather-detail {
+  background: var(--sidebar-bg);
+  border-radius: 6px;
+  padding: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.weather-detail:hover {
+  border-color: var(--border-color);
+  transform: translateY(-2px);
+}
+
+.weather-detail i {
+  color: var(--primary);
+  margin-right: 6px;
+}
+
+.weather-additional {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.weather-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.weather-item:last-child {
+  border-bottom: none;
+}
+
+.weather-item span:first-child {
+  color: var(--text-secondary);
+}
+
+.weather-item span:last-child {
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.forecast-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin: 12px 0 8px;
+}
+
+/* 预报滚动区域 */
+.weather-forecast-scroll,
+.daily-forecast {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: auto;
+  gap: 8px;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) transparent;
+}
+
+.weather-forecast-scroll::-webkit-scrollbar,
+.daily-forecast::-webkit-scrollbar {
+  height: 4px;
+}
+
+.weather-forecast-scroll::-webkit-scrollbar-track,
+.daily-forecast::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.weather-forecast-scroll::-webkit-scrollbar-thumb,
+.daily-forecast::-webkit-scrollbar-thumb {
+  background-color: var(--primary);
+  border-radius: 2px;
+}
+
+.forecast-card {
+  min-width: 70px;
+  overflow-y: auto;
+  background: var(--sidebar-bg);
+  border-radius: 6px;
+  padding: 8px;
+  text-align: center;
+  font-size: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.forecast-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+}
+
+.forecast-card img {
+  width: 32px;
+  height: 32px;
+  margin: 4px 0;
+  filter: drop-shadow(0 0 2px rgba(0,0,0,0.3));
+}
+
+.daily-card {
+  min-width: 70px;
+  background: var(--sidebar-bg);
+  border-radius: 6px;
+  padding: 8px;
+  text-align: center;
+  font-size: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  flex-shrink: 0;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.daily-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+}
+
+.daily-card img {
+  width: 32px;
+  height: 32px;
+  margin: 4px 0;
+  filter: drop-shadow(0 0 2px rgba(0,0,0,0.3));
+}
+
+.daily-date {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.daily-temp {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.daily-max {
+  color: var(--danger-color);
+  font-weight: 500;
+}
+
+.daily-min {
+  color: var(--text-secondary);
+}
+
+.weather-time {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-top: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.loading-overlay.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.loading-spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid rgba(59, 130, 246, 0.2);
+  border-top: 3px solid var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  position: relative;
+}
+
+.loading-spinner::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  border: 3px solid transparent;
+  border-top: 3px solid var(--accent-color);
+  border-radius: 50%;
+  animation: spin 1.5s linear infinite;
+  opacity: 0.7;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 加载文字提示样式 */
+.loading-text {
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 0.5px;
+  margin: 0;
+  padding: 0 20px;
+  animation: fadeInOut 2s ease-in-out infinite;
+}
+
+@keyframes fadeInOut {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* 按钮加载状态 */
+.loading-btn {
+  position: relative;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.loading-btn::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin: -10px 0 0 -10px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* 表格行加载状态 */
+.loading-row {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.loading-row td {
+  position: relative;
+  overflow: hidden;
+}
+
+.loading-row td::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.2), transparent);
+  animation: loadingShimmer 1.5s infinite;
+}
+
+@keyframes loadingShimmer {
+  0% { left: -100%; }
+  100% { left: 100%; }
+}
+
+.basemap-switch {
+  position: absolute;
+  top: 72px;
+  left: 38px;
+  z-index: 30;
+  background: rgba(30, 41, 59, 0.96);
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  padding: 8px 18px 8px 14px;
+  font-size: 15px;
+  color: var(--primary);
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s;
+}
+
+.basemap-switch:hover {
+  box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+.basemap-switch label {
+  font-weight: 500;
+  margin-right: 2px;
+  color: var(--text-primary);
+}
+
+.basemap-switch select {
+  font-size: 15px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 2px 8px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  transition: all 0.2s;
+}
+
+.basemap-switch select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-glow);
+  outline: none;
+}
+
+/* 隐藏灾害数据库相关元素 */
+.sidepanel h3:nth-of-type(2) {
+  display: none;
+}
+
+.sidepanel h3:nth-of-type(2) + p {
+  display: none;
+}
+
+.query-widget {
+  display: none;
+}
+
+.query-widget:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+.query-widget h3 {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+  color: var(--primary);
+  font-weight: 600;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.query-widget h4 {
+  margin: 0 0 10px 0;
+  font-size: 1.2em;
+  color: var(--text-primary);
+  font-weight: 600;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.query-widget label {
+  display: block;
+  margin: 8px 0 4px;
+  font-size: 15px;
+  font-weight: bold;
+  color: var(--text-secondary);
+}
+
+.query-widget select,
+.query-widget input[type="text"] {
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.95em;
+  background: var(--sidebar-bg);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg fill='%2394a3b8' height='18' viewBox='0 0 24 24' width='18' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+  box-sizing: border-box;
+}
+
+.query-widget input[type="date"] {
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.95em;
+  background: var(--sidebar-bg);
+  color: var(--text-primary);
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+  color-scheme: dark;
+}
+
+.query-widget select:focus,
+.query-widget input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 5px var(--primary-glow);
+  outline: none;
+}
+
+.query-widget button {
+  width: 100%;
+  background-color: var(--primary);
+  color: #fff;
+  padding: 10px 0;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.query-widget button:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: 0.5s;
+}
+
+.query-widget button:hover {
+  background-color: var(--primary-dark);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
+.query-widget button:hover:before {
+  left: 100%;
+}
+
+.loading-text {
+  margin-top: 12px;
+  font-size: 14px;
+  color: var(--primary);
+  user-select: none;
+}
+
+.query-results {
+  overflow-x: auto;
+  max-height: 250px;
+  margin-top: 12px;
+  padding: 10px;
+  background: var(--sidebar-bg);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+#result-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+}
+
+#result-table thead {
+  background-color: var(--primary);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+#result-table thead th {
+  padding: 12px;
+  text-align: left;
+  font-weight: 600;
+  color: white;
+  font-size: 0.9em;
+}
+
+#result-table tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+#result-table tbody tr:hover {
+  background-color: #f1f5f9;
+}
+
+#result-table tbody td {
+  padding: 12px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #475569;
+  font-size: 0.9em;
+}
+
+#result-table .load-btn,
+#result-table .loop-btn {
+  padding: 6px 12px;
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.8em;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+#result-table .load-btn:hover,
+#result-table .loop-btn:hover {
+  background-color: var(--primary-dark);
+}
+
+/* 模拟组件样式 */
+.simulate-widget {
+  width: 100%;
+  overflow-y: auto;
+  max-height: 420px;
+  padding: 15px;
+  background-color: var(--card-bg);
+  border: 1px solid var(--border-color);
+  box-sizing: border-box;
+  font-family: "Microsoft Yahei", sans-serif;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  margin-top: 20px;
+  transition: all 0.3s;
+}
+
+.simulate-widget:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+.simulate-widget h3 {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+  color: var(--primary);
+  font-weight: 600;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+#simulate-results h4 {
+  margin: 0 0 10px 0;
+  font-size: 1.2em;
+  color: var(--text-primary);
+  font-weight: 600;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.simulate-widget label {
+  display: block;
+  margin: 8px 0 4px;
+  font-size: 15px;
+  font-weight: bold;
+  color: var(--text-secondary);
+}
+
+.simulate-widget .form-control {
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.95em;
+  background: var(--sidebar-bg);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg fill='%2394a3b8' height='18' viewBox='0 0 24 24' width='18' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+  box-sizing: border-box;
+}
+
+.simulate-widget .form-control:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 5px var(--primary-glow);
+  outline: none;
+}
+
+.simulate-widget .btn {
+  margin-top: 20px;
+  width: 100%;
+  padding: 10px 0;
+  background-color: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.simulate-widget .btn:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: 0.5s;
+}
+
+.simulate-widget .btn:hover {
+  background-color: var(--primary-dark);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
+.simulate-widget .btn:hover:before {
+  left: 100%;
+}
+
+.simulate-widget .btn:disabled {
+  background-color: #475569;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* 加载动画样式 */
+.fa-spin {
+  animation: fa-spin 1s infinite linear;
+}
+
+@keyframes fa-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 模拟结果容器样式 */
+#simulate-results {
+  overflow-x: auto;
+  max-height: 350px;
+  margin-top: 20px;
+  padding: 20px;
+  background: var(--sidebar-bg);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+#simulate-results:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  border-color: var(--primary);
+}
+
+#simulate-results h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  color: var(--primary);
+  font-weight: 600;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--primary);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 无结果提示样式 */
+#no-result-tip {
+  display: none;
+  color: var(--text-secondary);
+  padding: 20px;
+  text-align: center;
+  background: var(--card-bg);
+  border-radius: 6px;
+  border: 1px dashed var(--border-color);
+  font-size: 14px;
+  margin: 10px 0;
+}
+
+/* 循环播放控件样式 */
+.loop-container {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--card-bg);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+
+.loop-container:hover {
+  background: var(--card-hover);
+  border-color: var(--accent-color);
+}
+
+.loop-container span {
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* ==== alert-widget 样式统一 ==== */
+.sidepanel .alert-widget {
+  background-color: var(--card-bg);
+  overflow-y: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  max-height: 400px;
+  padding: 15px;
+  margin-top: 20px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: all 0.3s;
+}
+
+.sidepanel .alert-widget:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+.alert-widget h3 {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+  color: var(--primary);
+  font-weight: 600;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.alert-widget label {
+  display: block;
+  margin: 8px 0 4px;
+  font-size: 15px;
+  font-weight: bold;
+  color: var(--text-secondary);
+}
+
+.alert-widget select,
+.alert-widget input[type="text"],
+.alert-widget input[type="date"] {
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.95em;
+  background: var(--sidebar-bg);
+  color: var(--text-primary);
+  transition: all 0.3s ease;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg fill='%2394a3b8' height='18' viewBox='0 0 24 24' width='18' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 14px;
+  box-sizing: border-box;
+}
+
+.alert-widget input[type="date"] {
+  background-image: none;
+  color-scheme: dark;
+}
+
+.alert-widget select:focus,
+.alert-widget input[type="text"]:focus,
+.alert-widget input[type="date"]:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 5px var(--primary-glow);
+  outline: none;
+}
+
+.alert-widget button {
+  width: 100%;
+  background-color: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 0;
+  font-size: 0.95em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.alert-widget button:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: 0.5s;
+}
+
+.alert-widget button:hover {
+  background-color: var(--primary-dark);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
+.alert-widget button:hover:before {
+  left: 100%;
+}
+
+.alert-widget button:disabled {
+  background-color: #475569;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ==== 灾害弹窗样式 ==== */
+.disaster-popup-container {
+  background-color: var(--card-bg);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  padding: 15px;
+  max-width: 300px;
+  transition: all 0.3s;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+}
+
+.disaster-popup-container:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  border-color: rgba(14, 165, 233, 0.3);
+}
+
+.disaster-popup h3 {
+  margin: 0 0 10px 0;
+  font-size: 18px;
+  color: var(--primary);
+  font-weight: 600;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.disaster-popup p {
+  margin: 6px 0;
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.disaster-popup strong {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+/* 弹窗头部样式 */
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.popup-header h3 {
+  margin: 0;
+  flex: 1;
+}
+
+.close-popup {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.close-popup:hover {
+  color: var(--danger-color);
+  background-color: rgba(248, 113, 113, 0.1);
+}
+
+.alert-results {
+  overflow-x: auto;
+  max-height: 250px;
+  margin-top: 12px;
+  padding: 10px;
+  background: var(--sidebar-bg);
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+}
+
+@media (max-width: 700px) {
+  .sidepanel {
+    width: calc(100vw - 40px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 16px 20px;
+  }
+
+  .topbar .searchbar input {
+    width: 180px;
+  }
+
+  .basemap-switch {
+    left: 20px;
+    top: 70px;
+    padding: 6px 12px;
+    font-size: 14px;
+  }
+  
+  /* 模拟结果响应式样式 */
+  #simulate-results {
+    max-height: 200px;
+    padding: 15px;
+    margin-top: 15px;
+  }
+  
+  #result-table {
+    font-size: 13px;
+  }
+  
+  #result-table th,
+  #result-table td {
+    padding: 8px 10px;
+  }
+  
+  #result-table th {
+    font-size: 11px;
+  }
+  
+  #result-table .load-btn {
+    padding: 4px 8px;
+  }
+}
+
+@media (max-width: 768px) {
+  #result-table {
+    font-size: 12px;
+  }
+  
+  .query-widget {
+    max-height: none;
+    overflow-y: visible;
+  }
+}
+
+@media (max-width: 480px) {
+  /* 更小屏幕的响应式样式 */
+  .sidepanel {
+    width: calc(100vw - 20px);
+    padding: 12px 16px;
+  }
+  
+  #simulate-results {
+    max-height: 180px;
+    padding: 12px;
+    margin-top: 12px;
+  }
+  
+  #result-table {
+    font-size: 12px;
+  }
+  
+  #result-table th,
+  #result-table td {
+    padding: 6px 8px;
+  }
+  
+  #simulate-results h3 {
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+  
+  /* 表格滚动优化 */
+  .query-widget, .simulate-widget {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* 自定义滚动条样式（主题化） */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f1a2e;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a3b55;
+  border-radius: 4px;
+  border: 1px solid #0f1a2e;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: var(--ice);
+}
+
+.overflow-auto-container::-webkit-scrollbar-track {
+  background: #0f1a2e;
+}
+
+.overflow-auto-container::-webkit-scrollbar-thumb {
+  background: #2a3b55;
+}
+
+/* 分类折叠展开样式 */
+.category-container {
+  margin-bottom: 16px;
+}
+
+.category {
+  margin-bottom: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  background: var(--sidebar-bg);
+  transition: all 0.3s ease;
+}
+
+.category:hover {
+  border-color: var(--primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: var(--card-bg);
+  border-bottom: 1px solid transparent;
+  user-select: none;
+}
+
+.category-header:hover {
+  background: var(--card-hover);
+}
+
+.category-header.active {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  color: #fff;
+  border-bottom-color: rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 -2px 0 var(--ice-glow);
+}
+
+.category-header .toggle-icon {
+  transition: transform 0.3s ease;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.category-header.active .toggle-icon {
+  transform: rotate(180deg);
+  color: white;
+}
+
+.category-header span {
+  font-weight: 600;
+  font-size: 15px;
+  display: flex;
+  align-items: center;
+}
+
+.category-header span i {
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.category-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+  background: var(--sidebar-bg);
+}
+
+.category-content.expanded {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.layer-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 16px;
+  transition: all 0.2s ease;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.layer-item:hover {
+  background: var(--card-hover);
+  transform: translateX(2px);
+}
+
+.layer-item:last-child {
+  border-bottom: none;
+}
+
+.layer-item input[type="checkbox"] {
+  margin-right: 12px;
+  accent-color: var(--primary);
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.layer-item label {
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-primary);
+  flex: 1;
+  transition: color 0.2s;
+  font-weight: 500;
+}
+
+.layer-item:hover label {
+  color: var(--primary);
+}
+
+.layer-item input[type="checkbox"]:checked + label {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* 空分类提示 */
+.category-content:empty::before {
+  content: "暂无图层";
+  display: block;
+  padding: 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-style: italic;
+  font-size: 14px;
+}
+
+/* 灾害弹窗样式 */
+.disaster-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.disaster-modal-overlay.active {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.disaster-modal {
+  background: var(--sidebar-bg);
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow: hidden;
+  transform: scale(0.9);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.disaster-modal-overlay.active .disaster-modal {
+  transform: scale(1);
+}
+
+.disaster-modal-header {
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid var(--sidebar-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.disaster-modal-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--primary);
+  margin: 0;
+}
+
+.disaster-modal-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 24px;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.disaster-modal-close:hover {
+  background: var(--card-bg);
+  color: var(--danger-color);
+}
+
+.disaster-modal-content {
+  padding: 0 24px 24px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.disaster-category {
+  margin-bottom: 0;
+}
+
+.disaster-category-header {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.disaster-category-header:hover {
+  background: var(--card-bg);
+}
+
+/* 右侧决策支持侧边栏 */
+.decision-sidebar {
+  scrollbar-width: none;
+    box-sizing: border-box;
+position: absolute;
+  height: calc(100vh - var(--nav-height) - 32px);
+  top: calc(var(--nav-height) + 16px);
+  right: -420px; /* 默认完全隐藏，由导航/遮罩显式打开 */
+  width: 400px;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--sidebar-border);
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+  z-index: 30;
+  padding: 20px;
+  transition: right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(12px);
+  background: rgba(30, 41, 59, 0.98);
+  overflow-y: auto;
+  border-radius: 16px;
+  /* 纵向弹性布局：大模型面板可占满剩余高度，输入框固定底部 */
+  display: flex;
+  flex-direction: column;
+}
+
+.decision-sidebar.active {
+  right: 16px;
+}
+
+/* 侧边栏遮罩：打开时覆盖地图区，点击关闭 */
+  .decision-sidebar-mask {
+  position: fixed;
+  top: var(--nav-height);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent; /* 非模态：不遮挡地图视线 */
+  z-index: 29;
+  opacity: 0;
+  pointer-events: none; /* 非模态：不拦截地图与左侧栏操作 */
+  transition: opacity 0.25s ease;
+}
+  .decision-sidebar-mask.active {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .simulate-sidebar {
+    width: 320px;
+    right: -320px;
+  }
+  
+  .decision-sidebar {
+    width: 320px;
+    right: -320px;
+  }
+}
+
+.simulate-sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+
+.decision-sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--sidebar-border);
+}
+
+.simulate-sidebar-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--primary);
+  margin: 0;
+}
+
+.decision-sidebar-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--primary);
+  margin: 0;
+}
+
+.simulate-sidebar-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 24px;
+  color: var(--text-secondary);
+  padding: 0;
+  transition: color 0.2s ease;
+}
+
+.simulate-sidebar-close:hover {
+  color: var(--primary);
+}
+
+.decision-sidebar-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.simulate-sidebar-close:hover {
+  background: var(--card-hover);
+  color: var(--text-primary);
+}
+
+.simulate-category-sidebar {
+  margin-bottom: 20px;
+  background: var(--card-bg);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.decision-category-sidebar {
+  /* 决策内容容器：透明，标题统一由抽屉头部展示 */
+  margin-bottom: 4px;
+}
+
+.simulate-category-sidebar:hover {
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.simulate-category-sidebar-header {
+  padding: 12px 16px;
+  background: var(--primary);
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.simulate-category-sidebar-content {
+  padding: 12px 16px;
+}
+
+.simulate-category-sidebar-content label,
+.decision-category-sidebar-content label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.simulate-category-sidebar-content select,
+.simulate-category-sidebar-content input[type="date"],
+.decision-category-sidebar-content input[type="text"],
+.decision-category-sidebar-content input[type="checkbox"] + label {
+  width: 100%;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--sidebar-bg);
+  color: var(--text-primary);
+  box-sizing: border-box;
+  color-scheme: dark;
+}
+
+/* 按钮：外观由 Bootstrap(.btn-primary) 接管，这里只保留侧边栏布局 */
+.simulate-category-sidebar-content .btn,
+.decision-category-sidebar-content .btn {
+  width: 100%;
+  transition: all 0.2s ease;
+}
+
+.simulate-category-sidebar-content .btn:hover,
+.decision-category-sidebar-content .btn:hover {
+  transform: translateY(-1px);
+}
+
+.disaster-category-header i {
+  color: var(--warning-color);
+  font-size: 18px;
+}
+
+.disaster-category-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.disaster-category-toggle {
+  color: var(--text-secondary);
+  transition: transform 0.3s ease;
+}
+
+.disaster-category.expanded .disaster-category-toggle {
+  transform: rotate(180deg);
+}
+
+.disaster-category-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.disaster-category.expanded .disaster-category-content {
+  max-height: 300px;
+}
+
+.disaster-layer-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.disaster-layer-item:last-child {
+  border-bottom: none;
+}
+
+.disaster-layer-checkbox {
+  margin-right: 12px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+.disaster-layer-label {
+  flex: 1;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.disaster-layer-count {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-left: 8px;
+}
+
+.disaster-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--sidebar-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.disaster-modal-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.disaster-modal-btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.disaster-modal-btn-primary:hover {
+  background: var(--primary-dark);
+}
+
+.disaster-modal-btn-secondary {
+  background: var(--card-bg);
+  color: var(--text-primary);
+}
+
+.disaster-modal-btn-secondary:hover {
+  background: var(--border-color);
+}
+
+/* 分类图标颜色 —— 统一冰冻圈主题色系 */
+.category-header .fa-map-o {
+  color: var(--ice);
+}
+
+.category-header .fa-building {
+  color: #fbbf24;
+}
+
+.category-header .fa-flag {
+  color: #34d399;
+}
+
+.category-header .fa-tint {
+  color: #38bdf8;
+}
+
+.category-header.active .fa-map-o,
+.category-header.active .fa-building,
+.category-header.active .fa-flag,
+.category-header.active .fa-tint {
+  color: #fff;
+}
+
+/* 洪水淹没动画控制样式 */
+#animation-container img {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 2px solid var(--border-color);
+}
+
+#animation-controls {
+  margin-top: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+#animation-play, #animation-pause {
+  padding: 6px 12px;
+  font-size: 12px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+#animation-play:hover, #animation-pause:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+#animation-status {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+/* 循环播放进度条样式 */
+.loop-progress {
+  width: 100%;
+  height: 4px;
+  background: var(--border-color);
+  border-radius: 2px;
+  margin: 8px 0;
+  overflow: hidden;
+}
+
+.loop-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--accent-color));
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+/* 循环播放状态指示器 */
+.loop-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 8px;
+}
+
+.loop-status .loop-time {
+  font-weight: 500;
+}
+
+.loop-status .loop-state {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.loop-status .loop-state.playing {
+  background: var(--success-color);
+  color: white;
+}
+
+.loop-status .loop-state.paused {
+  background: var(--warning-color);
+  color: white;
+}
+
+.loop-status .loop-state.stopped {
+  background: var(--danger-color);
+  color: white;
+}
+
+/* 冰冻圈分类样式 */
+.category-header .fa-snowflake-o {
+  color: #00bfff;
+}
+
+.category-header.active .fa-snowflake-o {
+  color: white;
+}
+
+/* 积雪数据子类型样式 */
+.snow-data-item {
+  position: relative;
+}
+
+.subtypes-container {
+  margin-top: 8px;
+  margin-left: 30px;
+  border-left: 2px solid var(--primary);
+  padding-left: 12px;
+  transition: all 0.3s ease;
+  max-height: 0;
+  overflow: hidden;
+}
+
+.subtypes-container.expanded {
+  max-height: 300px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.subtype-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: rgba(59, 130, 246, 0.05);
+}
+
+.subtype-item:hover {
+  background: rgba(59, 130, 246, 0.1);
+  transform: translateX(2px);
+}
+
+.subtype-item.active {
+  background: var(--primary);
+  color: white;
+}
+
+.subtype-label {
+  font-size: 13px;
+  font-weight: 500;
+  flex: 1;
+}
+
+.subtype-options {
+  display: flex;
+  gap: 6px;
+  margin-left: 8px;
+}
+
+.option {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.option:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 导航栏高亮样式 */
+.nav-links a.cryosphere-active {
+  position: relative;
+}
+
+.nav-links a.cryosphere-active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80%;
+  height: 3px;
+  background: #ff0000;
+  border-radius: 2px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { opacity: 0.7; }
+  50% { opacity: 1; }
+  100% { opacity: 0.7; }
+}
+
+/* 隐藏类 */
+.hidden {
+  display: none !important;
+}
+
+/* 灾害影响区域控制样式 */
+.disaster-buffer-controls {
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+}
+
+.disaster-buffer-controls h4 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.buffer-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.buffer-btn, .buffer-btn-clear {
+  padding: 6px 10px;
+  font-size: 12px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 50px;
+}
+
+.buffer-btn:hover, .buffer-btn-clear:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.buffer-btn.active {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+/* ============ 冰冻圈灾害大模型（LLM 聊天） ============ */
+
+/* 侧边栏卡片：科技感渐变边框 */
+.llm-sidebar {
+  /* 与其他决策分类一致的透明容器；科技感由内部 llm-agent-header 体现
+     弹性布局：占满抽屉剩余高度，输入框固定在底部始终可见 */
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 大模型头部信息栏 */
+.llm-agent-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.16), rgba(125, 211, 252, 0.05));
+  border-bottom: 1px solid rgba(125, 211, 252, 0.18);
+  position: relative;
+  overflow: hidden;
+}
+
+.llm-agent-header::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 160px;
+  height: 100%;
+  background: radial-gradient(circle at 100% 0%, rgba(125, 211, 252, 0.18), transparent 70%);
+  pointer-events: none;
+}
+
+/* 头像：芯片图标 + 发光光环 */
+.llm-agent-avatar {
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  color: var(--ice-bright);
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  box-shadow: 0 0 0 1px rgba(125, 211, 252, 0.35), 0 4px 14px var(--primary-glow);
+}
+
+.llm-agent-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.llm-agent-name {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--ice-bright);
+  text-shadow: 0 0 12px var(--ice-glow);
+  white-space: nowrap;
+}
+
+.llm-agent-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  letter-spacing: 0.3px;
+}
+
+.llm-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success-color);
+  box-shadow: 0 0 8px var(--success-color);
+  animation: llm-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes llm-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.8); }
+}
+
+/* 聊天主体容器 */
+.llm-chat-wrap {
+  padding: 14px 14px 16px;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.llm-chat-history {
+  flex: 1 1 320px; /* 基准 320px：打开即饱满；有空间时自动填满 */
+  min-height: 220px;
+  height: auto; /* 覆盖固定高度：自适应剩余空间 */
+  overflow-y: auto;
+  padding: 12px;
+  background: rgba(10, 20, 36, 0.55);
+  border: 1px solid rgba(58, 74, 102, 0.5);
+  border-radius: 10px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color-scheme: dark;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-dark) transparent;
+}
+
+.llm-chat-history::-webkit-scrollbar {
+  width: 5px;
+}
+
+.llm-chat-history::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--primary), var(--primary-dark));
+  border-radius: 3px;
+}
+
+.llm-chat-history::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 消息行：头像 + 气泡 */
+.llm-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 100%;
+  animation: llm-msg-in 0.25s ease;
+}
+
+.llm-msg-user {
+  flex-direction: row-reverse;
+}
+
+@keyframes llm-msg-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 消息头像 */
+.llm-msg-avatar {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.llm-msg-assistant .llm-msg-avatar {
+  color: var(--ice-bright);
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+
+.llm-msg-user .llm-msg-avatar {
+  color: var(--text-primary);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+}
+
+/* 消息内容 */
+.llm-msg-main {
+  display: flex;
+  flex-direction: column;
+  max-width: 82%;
+  min-width: 0;
+}
+
+.llm-msg-user .llm-msg-main {
+  align-items: flex-end;
+}
+
+.llm-msg-role {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-bottom: 3px;
+  padding: 0 3px;
+  letter-spacing: 0.3px;
+}
+
+.llm-msg-body {
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid transparent;
+}
+
+.llm-msg-user .llm-msg-body {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #fff;
+  border-top-right-radius: 3px;
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.35);
+}
+
+.llm-msg-assistant .llm-msg-body {
+  background: linear-gradient(180deg, rgba(27, 40, 64, 0.9), rgba(19, 31, 51, 0.92));
+  color: var(--text-primary);
+  border-color: rgba(58, 74, 102, 0.6);
+  border-top-left-radius: 3px;
+}
+
+.llm-msg-typing .llm-msg-body {
+  color: var(--text-secondary);
+  font-style: italic;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ===================== Markdown 渲染（仅 assistant 气泡） =====================
+   渲染后的内容由块级元素控制间距，必须取消 pre-wrap，
+   否则 innerHTML 里的换行会在元素之间撑出多余空行。 */
+.llm-msg-body.llm-md {
+  white-space: normal;
+}
+
+.llm-msg-body.llm-md > *:first-child { margin-top: 0; }
+.llm-msg-body.llm-md > *:last-child { margin-bottom: 0; }
+
+.llm-msg-body.llm-md p {
+  margin: 0 0 7px;
+}
+
+.llm-msg-body.llm-md h3,
+.llm-msg-body.llm-md h4,
+.llm-msg-body.llm-md h5,
+.llm-msg-body.llm-md h6 {
+  margin: 12px 0 6px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #cfe4ff;
+}
+
+.llm-msg-body.llm-md h3 { font-size: 14px; }
+.llm-msg-body.llm-md h4 { font-size: 13.5px; }
+.llm-msg-body.llm-md h5,
+.llm-msg-body.llm-md h6 { font-size: 13px; opacity: 0.92; }
+
+.llm-msg-body.llm-md ul,
+.llm-msg-body.llm-md ol {
+  margin: 0 0 7px;
+  padding-left: 20px;
+}
+
+.llm-msg-body.llm-md li {
+  margin: 2px 0;
+}
+
+.llm-msg-body.llm-md strong {
+  color: #eaf3ff;
+  font-weight: 600;
+}
+
+.llm-msg-body.llm-md em {
+  font-style: italic;
+  color: #d6e6ff;
+}
+
+.llm-msg-body.llm-md del { opacity: 0.65; }
+
+.llm-msg-body.llm-md a {
+  color: #7dd3fc;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.llm-msg-body.llm-md code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(125, 211, 252, 0.12);
+  border: 1px solid rgba(125, 211, 252, 0.2);
+  font-family: Consolas, Monaco, monospace;
+  font-size: 12px;
+  color: #9fdcff;
+}
+
+.llm-msg-body.llm-md pre {
+  margin: 0 0 7px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(6, 14, 26, 0.75);
+  border: 1px solid rgba(58, 74, 102, 0.6);
+  overflow-x: auto;
+}
+
+.llm-msg-body.llm-md pre code {
+  padding: 0;
+  background: none;
+  border: none;
+  color: #b8d8f0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.llm-msg-body.llm-md blockquote {
+  margin: 0 0 7px;
+  padding: 4px 10px;
+  border-left: 3px solid rgba(125, 211, 252, 0.45);
+  background: rgba(125, 211, 252, 0.06);
+  border-radius: 0 4px 4px 0;
+  color: var(--text-secondary);
+}
+
+.llm-msg-body.llm-md hr {
+  height: 1px;
+  margin: 10px 0;
+  border: none;
+  background: rgba(58, 74, 102, 0.7);
+}
+
+/* 表格：气泡宽度有限，横向滚动而不是硬挤压内容 */
+.llm-md-table-wrap {
+  margin: 0 0 8px;
+  overflow-x: auto;
+  border-radius: 6px;
+  border: 1px solid rgba(58, 74, 102, 0.6);
+}
+
+.llm-msg-body.llm-md table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+}
+
+.llm-msg-body.llm-md th,
+.llm-msg-body.llm-md td {
+  padding: 5px 8px;
+  text-align: left;
+  border-bottom: 1px solid rgba(58, 74, 102, 0.5);
+  vertical-align: top;
+  white-space: normal;
+}
+
+.llm-msg-body.llm-md th {
+  background: rgba(59, 130, 246, 0.14);
+  color: #cfe4ff;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.llm-msg-body.llm-md tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* 横排三点弹跳加载动画 */
+.llm-typing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+}
+
+.llm-typing-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  animation: llm-dot-bounce 1.2s ease-in-out infinite;
+}
+
+.llm-typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.llm-typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes llm-dot-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.45; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* 输入区：毛玻璃 + 发光 */
+.llm-chat-input {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: rgba(10, 20, 36, 0.7);
+  border: 1px solid rgba(58, 74, 102, 0.6);
+  border-radius: 10px;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  flex-shrink: 0; /* 输入框不被压缩，始终完整可见 */
+}
+
+.llm-chat-input:focus-within {
+  border-color: rgba(125, 211, 252, 0.5);
+  box-shadow: 0 0 14px rgba(59, 130, 246, 0.18);
+}
+
+.llm-chat-input input {
+  flex: 1;
+  margin-bottom: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  outline: none;
+  font-size: 13px;
+  padding: 6px 4px;
+  color-scheme: dark;
+}
+
+.llm-chat-input input::placeholder {
+  color: var(--text-secondary);
+}
+
+.llm-chat-input .btn {
+  width: auto;
+  white-space: nowrap;
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  border-radius: 8px;
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.35);
+}
+
+.llm-chat-input .btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4f8efb, #2b6ef0);
+  transform: translateY(-1px);
+}
+
+.llm-chat-input .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ============================================================
+   院士专家名录（决策支持 - 专家咨询）
+   ============================================================ */
+.expert-sidebar-content {
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 免责声明 */
+.expert-disclaimer {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #c9d6ec;
+  background: rgba(250, 204, 21, 0.08);
+  border: 1px solid rgba(250, 204, 21, 0.28);
+  border-radius: 8px;
+}
+.expert-disclaimer i {
+  color: #facc15;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.expert-disclaimer strong {
+  color: #fde68a;
+}
+
+/* 搜索框 */
+.expert-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: border-color 0.2s ease;
+}
+.expert-search:focus-within {
+  border-color: var(--primary);
+}
+.expert-search i {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+.expert-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.expert-search input::placeholder {
+  color: #7c8aa5;
+}
+.decision-content-sidebar .expert-search { margin: 10px 0 6px; }
+
+/* 领域筛选 chips */
+.expert-field-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.expert-chip {
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.expert-chip:hover {
+  border-color: var(--primary);
+  color: var(--text-primary);
+}
+.expert-chip.active {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* 名录列表 */
+.expert-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-dark) transparent;
+}
+.expert-roster::-webkit-scrollbar {
+  width: 4px;
+}
+.expert-roster::-webkit-scrollbar-thumb {
+  background: var(--primary-dark);
+  border-radius: 2px;
+}
+.expert-roster-loading,
+.expert-roster-empty {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 12px 4px;
+  text-align: center;
+}
+
+/* 专家卡片 */
+.expert-card {
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+.expert-card.expanded {
+  border-color: var(--primary);
+}
+.expert-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.expert-card-head:hover {
+  background: rgba(59, 130, 246, 0.08);
+}
+.expert-card-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.expert-card-meta {
+  flex: 1;
+  min-width: 0;
+}
+.expert-card-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.expert-card-title {
+  font-size: 11px;
+  color: #facc15;
+  margin-top: 1px;
+  line-height: 1.45;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.expert-card-field {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.expert-card-toggle {
+  color: var(--text-secondary);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+/* 专家多标签（各类冰冻圈灾害 + 研究方向） */
+.expert-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.expert-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  line-height: 1.5;
+  padding: 1px 7px;
+  border-radius: 10px;
+  color: #e2e8f0;
+  background: rgba(59, 130, 246, 0.16);
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  white-space: nowrap;
+}
+.expert-tag i {
+  font-size: 9px;
+  color: #7dd3fc;
+}
+
+/* 专家详情 */
+.expert-card-detail {
+  padding: 0 12px 12px;
+  border-top: 1px dashed rgba(58, 74, 102, 0.6);
+}
+.expert-detail-block {
+  padding: 8px 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  border-bottom: 1px dashed rgba(58, 74, 102, 0.4);
+}
+.expert-detail-block:last-child {
+  border-bottom: none;
+}
+.expert-detail-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #7dd3fc;
+  margin-bottom: 3px;
+}
+
+/* 联系方式 */
+.expert-contact-block {
+  background: rgba(59, 130, 246, 0.06);
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 4px;
+  border-bottom: none;
+}
+.expert-contact-line {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+.expert-contact-k {
+  flex-shrink: 0;
+  min-width: 32px;
+  color: #facc15;
+  font-weight: 600;
+}
+.expert-contact-line a {
+  color: #7dd3fc;
+  text-decoration: none;
+}
+.expert-contact-line a:hover {
+  text-decoration: underline;
+}
+.expert-contact-note {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* 信息来源 */
+.expert-sources {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.expert-source {
+  font-size: 10px;
+  color: #8ba0bd;
+  word-break: break-all;
+  line-height: 1.5;
+}
+
+/* ============================================================
+   决策支持内容（防灾实例 / 工程措施 / 非工程措施）
+   ============================================================ */
+.decision-content-sidebar {
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 内容说明条 */
+.decision-content-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #c9d6ec;
+  background: rgba(59, 130, 246, 0.07);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: 8px;
+}
+.decision-content-note i {
+  color: #7dd3fc;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+/* 分类筛选 chips */
+.decision-content-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.decision-chip {
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.decision-chip:hover {
+  border-color: var(--primary);
+  color: var(--text-primary);
+}
+.decision-chip.active {
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  color: #fff;
+  border-color: var(--primary);
+}
+
+/* 内容列表 */
+.decision-content-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-dark) transparent;
+}
+.decision-content-list::-webkit-scrollbar {
+  width: 4px;
+}
+.decision-content-list::-webkit-scrollbar-thumb {
+  background: var(--primary-dark);
+  border-radius: 2px;
+}
+.decision-content-empty {
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 12px 4px;
+  text-align: center;
+}
+
+/* 内容卡片 */
+.decision-content-card {
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.2s ease;
+}
+.decision-content-card.expanded {
+  border-color: var(--primary);
+}
+.decision-content-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+.decision-content-card-head:hover {
+  background: rgba(59, 130, 246, 0.08);
+}
+.decision-content-card-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #7dd3fc;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.05));
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+.decision-content-card-meta {
+  flex: 1;
+  min-width: 0;
+}
+.decision-content-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+.decision-content-card-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 3px;
+  flex-wrap: wrap;
+}
+.decision-content-year {
+  color: #facc15;
+  font-weight: 600;
+}
+.decision-content-card-toggle {
+  color: var(--text-secondary);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+/* 卡片详情 */
+.decision-content-card-detail {
+  display: none;
+  padding: 0 12px 12px;
+  border-top: 1px dashed rgba(58, 74, 102, 0.6);
+}
+.decision-detail-block {
+  padding: 8px 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  border-bottom: 1px dashed rgba(58, 74, 102, 0.4);
+}
+.decision-detail-block:last-child {
+  border-bottom: none;
+}
+.decision-detail-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #7dd3fc;
+  margin-bottom: 3px;
+}
+.decision-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.decision-tag {
+  font-size: 10px;
+  color: #facc15;
+  background: rgba(250, 204, 21, 0.1);
+  border: 1px solid rgba(250, 204, 21, 0.3);
+  padding: 1px 8px;
+  border-radius: 10px;
+}
+.decision-source {
+  font-size: 10px;
+  color: #8ba0bd;
+  word-break: break-all;
+  line-height: 1.6;
+}
+
+/* 详情标签图标统一间距 */
+.decision-detail-label i,
+.expert-detail-label i {
+  margin-right: 5px;
+  width: 14px;
+  text-align: center;
+  color: #7dd3fc;
+}
+
+/* ============================================================
+   通用单选下拉增强组件（Enhanced Select）
+   ============================================================ */
+.es-select {
+  position: relative;
+  width: 100%;
+  margin-bottom: 8px;
+}
+.es-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-sizing: border-box;
+  text-align: left;
+}
+.es-trigger:hover {
+  border-color: var(--primary);
+}
+.es-select.open .es-trigger {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+.es-value {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+}
+.es-select.es-has-value .es-value {
+  color: var(--text-primary);
+}
+.es-arrow {
+  color: var(--text-secondary);
+  font-size: 12px;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+.es-select.open .es-arrow {
+  transform: rotate(180deg);
+  color: var(--primary);
+}
+
+/* 下拉菜单 */
+.es-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: rgba(16, 26, 44, 0.98);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 50;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-dark) transparent;
+}
+.es-select.open .es-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+.es-option {
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--text-primary);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.es-option:hover,
+.es-option.hover {
+  background: rgba(59, 130, 246, 0.18);
+  color: #fff;
+}
+.es-option.selected {
+  color: #7dd3fc;
+  font-weight: 600;
+}
+.es-option.selected::after {
+  content: '\f00c';
+  font-family: 'FontAwesome';
+  float: right;
+  font-size: 11px;
+  color: var(--primary);
+}
+.es-option.disabled {
+  color: #5a6a85;
+  cursor: not-allowed;
+  background: none;
+}
+.es-group-label {
+  padding: 6px 10px 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7dd3fc;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.disaster-sidebar::-webkit-scrollbar,
+.simulate-sidebar::-webkit-scrollbar,
+.alert-sidebar::-webkit-scrollbar,
+.decision-sidebar::-webkit-scrollbar {
+  display: none;
+}
+
+.mega-col {
+  flex: 1;
+  min-width: 0;
+}
+.mega-col + .mega-col {
+  border-left: 1px solid var(--border-color);
+  padding-left: 14px;
+}
+.mega-col-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #7dd3fc;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px dashed rgba(58, 74, 102, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 0.5px;
+}
+.mega-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: background 0.2s ease;
+  margin-bottom: 2px;
+}
+.mega-item:hover {
+  background: rgba(59, 130, 246, 0.14);
+}
+.mega-item.active {
+  background: rgba(59, 130, 246, 0.18);
+  color: #fff;
+}
+.mega-item-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #7dd3fc;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+.mega-item-text {
+  min-width: 0;
+}
+.mega-item-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.mega-item-desc {
+  display: block;
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+/* ============ 气象水文查询子面板（meteo-query.js） ============ */
+.meteo-subpanel {
+  padding: 6px 0 6px 24px;
+  border-left: 2px solid var(--ice-glow);
+  margin: 4px 0 6px 0;
+}
+.meteo-subpanel[hidden] { display: none; }
+.meteo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  flex-wrap: wrap;
+}
+.meteo-row label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.meteo-row input[type="date"] {
+  padding: 4px 6px;
+  background: var(--card-bg);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 12px;
+  width: 132px;
+  box-sizing: border-box;
+}
+.meteo-radio { cursor: pointer; }
+.meteo-radio input { accent-color: var(--primary); margin: 0; }
+.meteo-hint {
+  color: var(--text-secondary);
+  font-size: 11px;
+  margin-left: auto;
+}
+.meteo-btn {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .2s;
+}
+.meteo-btn:hover:not(:disabled) { background: var(--primary-dark); }
+.meteo-btn:disabled { background: var(--card-hover); color: var(--text-secondary); cursor: default; }
+.meteo-result-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+  font-size: 12px;
+}
+.meteo-result-table th,
+.meteo-result-table td {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--border-color);
+  text-align: left;
+}
+.meteo-result-table th {
+  color: var(--ice-bright);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.meteo-result-table td { color: var(--text-primary); }
+.meteo-load-btn {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background .2s;
+}
+.meteo-load-btn:hover:not(:disabled) { background: var(--primary-dark); }
+.meteo-load-btn:disabled {
+  background: var(--card-hover);
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+
+/* ==================== 三维示范区（Cesium） ==================== */
+/* Cesium 容器：挂在 #map 内的绝对定位覆盖层，z-index 继承 #map(1)，
+   天然位于左侧图层面板(25)与右侧决策侧栏(30)之下。
+   注意：不隐藏 .cesium-viewer-bottom（Cesium/数据署名条，需保留）。 */
+.cesium-container {
+  position: absolute;
+  inset: 0;
+  display: none;
+  background: #0f172a;
+}
+
+.scene3d-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.scene3d-control-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scene3d-control-row > label {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.scene3d-control-row select {
+  background: var(--input-bg, rgba(15, 23, 42, 0.6));
+  color: var(--text-primary);
+  border: 1px solid var(--sidebar-border);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.scene3d-control-row .mode-switch button {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.scene3d-camera-btns {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.scene3d-camera-btns button {
+  flex: 1;
+  min-width: 80px;
+  padding: 6px 8px;
+  font-size: 12px;
+  border: 1px solid var(--sidebar-border);
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.12);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.scene3d-camera-btns button:hover {
+  background: rgba(56, 189, 248, 0.28);
+}
+
+.scene3d-layer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.scene3d-layer-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.scene3d-layer-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.scene3d-control-row input[type="range"] {
+  width: 100%;
+  accent-color: var(--primary);
+}
+
+.scene3d-status {
+  margin-top: 12px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid var(--sidebar-border);
+  border-radius: 8px;
+  min-height: 20px;
+}
+
+.scene3d-status.error {
+  color: #fca5a5;
+  border-color: rgba(248, 113, 113, 0.45);
+}
+
+/* 说明条里的文字整体作为单一 flex 子项：否则 <strong> 会把文本拆成多个
+   flex 子项，各自被压到 1-2 个字宽，渲染成竖排窄条 */
+.decision-content-note > span {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 三维视图自绘署名条（替代 Cesium 默认 creditContainer，后者含 ion 云服务默认署名） */
+.scene3d-credit {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  z-index: 2;
+  font-size: 11px;
+  line-height: 1.4;
+  color: rgba(226, 232, 240, 0.78);
+  background: rgba(10, 17, 31, 0.6);
+  border: 1px solid rgba(125, 211, 252, 0.18);
+  border-radius: 6px;
+  padding: 3px 8px;
+  pointer-events: none;
+  max-width: 60%;
+}
+
+/* 三维场景状态覆盖层：初始化中 / 失败时必须显眼，
+   否则 Cesium 没起来时用户看到的是底下那张二维地图，只会觉得"这根本不是三维" */
+.scene3d-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 24px;
+  text-align: center;
+  font-size: 15px;
+  line-height: 1.9;
+  color: #dbeafe;
+  background: rgba(8, 14, 26, 0.88);
+}
+
+.scene3d-overlay.error {
+  color: #fecaca;
+}
+
+.scene3d-overlay .sub {
+  font-size: 12px;
+  color: rgba(203, 213, 225, 0.85);
+}
+
+.scene3d-overlay.error .sub {
+  color: rgba(252, 202, 202, 0.85);
+}
+
+/* ==========================================================================
+   右侧栏统一口径（2026-11-27）
+   参照 terrain3d/demo：半透明深蓝卡片 + 边缘竖标签折叠 + 10px 圆角。
+   仅对四个业务页（body.rhs-v2）生效；导航 / 地图 / 其他页面不受影响。
+   原有 DOM id、.active / .collapsed 语义与全部业务事件保持不变。
+   ========================================================================== */
+body.rhs-v2 {
+  --rhs-w: 268px;          /* 左侧 .sidepanel 宽度（2026-11-27 20:49 由 320 收窄） */
+  --rhs-panel-w: 320px;    /* 右侧抽屉实际宽度，由 rhs-tabs.js 按内容测量后覆盖 */
+  --rhs-gap: 12px;
+  --rhs-surface: rgba(19, 31, 51, .92);
+  --rhs-card: rgba(27, 40, 64, .58);
+  --rhs-line: #22344e;
+  --rhs-line-2: #2f4564;
+  --rhs-ink: #e6edf7;
+  --rhs-ink-2: #b7c6dc;
+  --rhs-ink-3: #8496b0;
+  --rhs-ice: #7dd3fc;
+}
+
+/* ---------- 模块主题色变量（2026-11-27 18:04）----------
+   --mod     模块主色：勾选标记 / 焦点环 / 表头底 / 按钮底
+   --mod-ink 提亮版：标题 / 竖标签 / 收起按钮 / 字段标签（小字要亮，才看得清）
+   --mod-soft 半透明底：选中行 / 表头
+   --mod-line 半透明线：选中行边框 / 标题下划线
+   首页与系统管理不加载 rhs-v2，继续用系统主色。 */
+body.rhs-v2[data-module="disaster"] {
+  --mod: #fbbf24; --mod-ink: #fef3c7; --mod-deep: #d97706;
+  --mod-soft: rgba(251, 191, 36, .12); --mod-line: rgba(251, 191, 36, .45);
+}
+body.rhs-v2[data-module="simulate"] {
+  --mod: #4ade80; --mod-ink: #d1fae5; --mod-deep: #16a34a;
+  --mod-soft: rgba(74, 222, 128, .12); --mod-line: rgba(74, 222, 128, .45);
+}
+body.rhs-v2[data-module="alert"] {
+  --mod: #fb7185; --mod-ink: #fecdd3; --mod-deep: #e11d48;
+  --mod-soft: rgba(251, 113, 133, .12); --mod-line: rgba(251, 113, 133, .45);
+}
+body.rhs-v2[data-module="decision"] {
+  --mod: #c084fc; --mod-ink: #e9d5ff; --mod-deep: #9333ea;
+  --mod-soft: rgba(192, 132, 252, .12); --mod-line: rgba(192, 132, 252, .45);
+}
+
+/* ---------- 滑出式分类抽屉：尺寸 / 表面 / 开合 ---------- */
+body.rhs-v2 .disaster-sidebar,
+body.rhs-v2 .simulate-sidebar,
+body.rhs-v2 .alert-sidebar,
+body.rhs-v2 .decision-sidebar {
+  position: absolute;
+  top: calc(var(--nav-height) + var(--rhs-gap));
+  right: calc(0px - var(--rhs-panel-w) - 24px);
+  /* 宽高都按内容自适应，各设上下限；超出上限时内部滚动 */
+  width: fit-content;
+  min-width: 280px;
+  max-width: min(420px, 44vw);
+  height: auto;
+  min-height: 120px;
+  max-height: calc(100vh - var(--nav-height) - 22px);
+  box-sizing: border-box;
+  padding: 12px;
+  background: var(--rhs-surface);
+  border: 1px solid var(--rhs-line-2);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .38);
+  backdrop-filter: blur(10px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(125, 211, 252, .32) transparent;
+  transition: right .24s ease, opacity .2s ease;
+}
+body.rhs-v2 .decision-sidebar { display: flex; flex-direction: column; }
+/* 灾害数据库：图层名带灾害类型与计数，fit-content 会把面板撑到 420px。
+   收窄到 300px，靠高度换宽度（图层名允许折两行，见下方 .disaster-layer-name）。 */
+body.rhs-v2 .disaster-sidebar {
+  min-width: 264px;
+  max-width: min(300px, 44vw);
+}
+/* 风险评估：四个子模块选项卡一行排开把面板撑到 420px。
+   收窄到 340px，选项卡改 2×2，用一行高度换 80px 宽度。 */
+body.rhs-v2 .alert-sidebar {
+  min-width: 296px;
+  max-width: min(340px, 44vw);
+}
+body.rhs-v2 .alert-sidebar .flood-submodule-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  border-bottom: 0;
+  margin-bottom: 12px;
+}
+body.rhs-v2 .disaster-sidebar.active,
+body.rhs-v2 .simulate-sidebar.active,
+body.rhs-v2 .alert-sidebar.active,
+body.rhs-v2 .decision-sidebar.active { right: var(--rhs-gap); }
+body.rhs-v2 .disaster-sidebar::-webkit-scrollbar,
+body.rhs-v2 .simulate-sidebar::-webkit-scrollbar,
+body.rhs-v2 .alert-sidebar::-webkit-scrollbar,
+body.rhs-v2 .decision-sidebar::-webkit-scrollbar { width: 5px; display: block; }
+body.rhs-v2 .disaster-sidebar::-webkit-scrollbar-thumb,
+body.rhs-v2 .simulate-sidebar::-webkit-scrollbar-thumb,
+body.rhs-v2 .alert-sidebar::-webkit-scrollbar-thumb,
+body.rhs-v2 .decision-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(125, 211, 252, .28); border-radius: 3px;
+}
+
+/* 抽屉头部：一行标题 + 收起按钮，不再占 24px 大留白 */
+body.rhs-v2 .disaster-sidebar-header,
+body.rhs-v2 .simulate-sidebar-header,
+body.rhs-v2 .alert-sidebar-header,
+body.rhs-v2 .decision-sidebar-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  flex: 0 0 auto; margin: 0 2px 10px; padding: 0 0 9px;
+  border-bottom: 1px solid var(--rhs-line-2);
+}
+body.rhs-v2 .disaster-sidebar-title,
+body.rhs-v2 .simulate-sidebar-title,
+body.rhs-v2 .alert-sidebar-title,
+body.rhs-v2 .decision-sidebar-title {
+  margin: 0; font-size: 13px; font-weight: 500; letter-spacing: .2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* 标题用饱和的模块主色（2026-11-27 18:19 用户反馈提亮版太浅） */
+body.rhs-v2 .disaster-sidebar-title,
+body.rhs-v2 .simulate-sidebar-title,
+body.rhs-v2 .alert-sidebar-title,
+body.rhs-v2 .decision-sidebar-title { color: var(--mod); }
+/* 右侧栏标题前的类别图标：颜色由 JS 按类别内联设置 */
+body.rhs-v2 .rhs-title-icon { margin-right: 8px; font-size: 13px; vertical-align: -1px; }
+body.rhs-v2 .disaster-sidebar-close,
+body.rhs-v2 .simulate-sidebar-close,
+body.rhs-v2 .alert-sidebar-close,
+body.rhs-v2 .decision-sidebar-close {
+  flex: 0 0 auto; width: 26px; height: 26px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid transparent; border-radius: 6px;
+  background: transparent;
+  font-size: 18px; line-height: 1;
+  transition: border-color .15s, color .15s, background .15s;
+}
+/* 收起（最小化）按钮取模块主题色 */
+body.rhs-v2 .disaster-sidebar-close,
+body.rhs-v2 .simulate-sidebar-close,
+body.rhs-v2 .alert-sidebar-close,
+body.rhs-v2 .decision-sidebar-close { color: var(--mod-ink); }
+body.rhs-v2 .disaster-sidebar-close:hover,
+body.rhs-v2 .simulate-sidebar-close:hover,
+body.rhs-v2 .alert-sidebar-close:hover,
+body.rhs-v2 .decision-sidebar-close:hover {
+  border-color: var(--mod); color: #fff; background: var(--mod-soft);
+}
+
+/* 内容分区：示范页 .card 的口径 */
+body.rhs-v2 .alert-category-sidebar,
+body.rhs-v2 .simulate-category-sidebar,
+body.rhs-v2 .disaster-category-sidebar,
+body.rhs-v2 .decision-category-sidebar {
+  margin: 0 0 8px; padding: 0;
+  background: transparent; border: 0; border-radius: 0;
+  box-shadow: none; overflow: visible; transform: none;
+}
+body.rhs-v2 .alert-category-sidebar-content,
+body.rhs-v2 .simulate-category-sidebar-content,
+body.rhs-v2 .disaster-category-sidebar-content,
+body.rhs-v2 .decision-content-sidebar,
+body.rhs-v2 .expert-sidebar-content {
+  background: var(--rhs-card);
+  border: 1px solid var(--rhs-line);
+  border-radius: 10px;
+  padding: 10px 11px;
+  margin-bottom: 8px;
+}
+body.rhs-v2 .alert-category-sidebar-header,
+body.rhs-v2 .simulate-category-sidebar-header {
+  padding: 0 0 7px; margin-bottom: 8px;
+  background: transparent; color: var(--rhs-ice);
+  border-bottom: 1px solid var(--rhs-line);
+  font-size: 11px; font-weight: 500;
+}
+
+/* 灾害数据库 / 风险评估的图层行 */
+body.rhs-v2 .alert-layer-item-sidebar,
+body.rhs-v2 .disaster-layer-item-sidebar {
+  display: flex; align-items: center; gap: 8px;
+  margin: 0 0 5px; padding: 6px 8px;
+  background: rgba(27, 40, 64, .5);
+  border: 1px solid transparent; border-radius: 7px;
+  transition: border-color .15s, background .15s;
+}
+body.rhs-v2 .alert-layer-item-sidebar:hover,
+body.rhs-v2 .disaster-layer-item-sidebar:hover { border-color: var(--rhs-line-2); }
+/* 选中行高亮取模块色 */
+body.rhs-v2 .disaster-layer-item-sidebar:has(input:checked),
+body.rhs-v2 .alert-layer-item-sidebar:has(input:checked) {
+  border-color: var(--mod-line); background: var(--mod-soft);
+}
+body.rhs-v2 .alert-layer-checkbox-sidebar,
+body.rhs-v2 .disaster-layer-checkbox-sidebar {
+  width: 14px; height: 14px; margin: 0; cursor: pointer;
+  accent-color: var(--mod);
+}
+body.rhs-v2 .alert-layer-label-sidebar,
+body.rhs-v2 .disaster-layer-label-sidebar {
+  flex: 1; min-width: 0; padding: 0; margin: 0;
+  border: 0; background: transparent; box-shadow: none;
+  font-size: 12px; font-weight: 400; line-height: 1.4; color: var(--rhs-ink);
+}
+body.rhs-v2 .disaster-layer-label-sidebar:hover,
+body.rhs-v2 .alert-layer-label-sidebar:hover {
+  background: transparent; border: 0; box-shadow: none; color: var(--mod-ink);
+}
+/* 勾选后文字用模块主题色 */
+body.rhs-v2 .disaster-layer-checkbox-sidebar:checked + .disaster-layer-label-sidebar,
+body.rhs-v2 .alert-layer-checkbox-sidebar:checked + .alert-layer-label-sidebar { color: var(--mod-ink); }
+/* 收窄面板后图层名允许多行，最多两行，超出省略（用高度换宽度） */
+body.rhs-v2 .disaster-layer-name {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: normal;
+  word-break: break-word;
+}
+body.rhs-v2 .alert-layer-count-sidebar,
+body.rhs-v2 .disaster-layer-count-sidebar {
+  flex: 0 0 auto; font-size: 10px; font-weight: 400; color: var(--rhs-ink-2);
+  padding: 1px 5px; border-radius: 8px;
+}
+body.rhs-v2 .disaster-layer-check-mark {
+  width: 14px; height: 14px; font-size: 9px; background: var(--mod);
+}
+
+/* 灾害数据库：分类图层列表下方的数据来源说明 */
+.disaster-source-note {
+  margin: 8px 0 0;
+  padding: 9px 11px;
+  background: rgba(27, 40, 64, .5);
+  border: 1px solid var(--rhs-line, rgba(125, 211, 252, .18));
+  border-radius: 8px;
+}
+.disaster-source-title {
+  display: flex; align-items: center; gap: 6px;
+  margin: 0 0 5px;
+  font-size: 10.5px; font-weight: 500; color: var(--mod-ink, #fef3c7);
+}
+.disaster-source-title i { font-size: 10px; opacity: .85; }
+.disaster-source-note p {
+  margin: 0;
+  font-size: 11px; line-height: 1.6; color: var(--rhs-ink-2, #b7c6dc);
+  overflow-wrap: anywhere;
+}
+
+/* 表单 / 标签 / 按钮：紧凑单轴，不再用大号白底控件 */
+body.rhs-v2 .alert-category-sidebar-content > label,
+body.rhs-v2 .simulate-category-sidebar-content > label,
+body.rhs-v2 .alert-category-sidebar-content > .alert-section label {
+  display: block; margin: 0 0 5px;
+  font-size: 11px; font-weight: 400; color: var(--rhs-ink);
+}
+body.rhs-v2 .alert-category-sidebar-content > select,
+body.rhs-v2 .alert-category-sidebar-content > input[type="date"],
+body.rhs-v2 .alert-category-sidebar-content > input[type="text"],
+body.rhs-v2 .simulate-category-sidebar-content > select,
+body.rhs-v2 .simulate-category-sidebar-content > input[type="date"],
+body.rhs-v2 .simulate-category-sidebar-content > input[type="text"] {
+  width: 100%; box-sizing: border-box;
+  padding: 6px 8px; margin: 0 0 9px;
+  background: rgba(10, 20, 36, .7); border: 1px solid var(--rhs-line-2);
+  border-radius: 6px; color: var(--rhs-ink); font-size: 11px; color-scheme: dark;
+}
+body.rhs-v2 .flood-submodule-tabs .tab-btn,
+body.rhs-v2 .weight-method-opt,
+body.rhs-v2 .decision-chip {
+  padding: 5px 8px; border-radius: 6px;
+  border: 1px solid var(--rhs-line-2); background: rgba(27, 40, 64, .6);
+  color: var(--rhs-ink); font-size: 11px; font-weight: 400;
+  transition: border-color .15s, color .15s, background .15s;
+}
+body.rhs-v2 .flood-submodule-tabs .tab-btn:hover,
+body.rhs-v2 .weight-method-opt:hover,
+body.rhs-v2 .decision-chip:hover { border-color: var(--mod); color: var(--rhs-ink); }
+/* 选中态的模块色统一由下方「选中 tab / 主按钮」段接管，此处不再写死蓝色 */
+body.rhs-v2 .alert-section { margin-bottom: 10px; }
+body.rhs-v2 .alert-section-title {
+  margin: 0 0 8px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--rhs-line);
+  font-size: 11px; font-weight: 500; color: var(--rhs-ink);
+}
+body.rhs-v2 .alert-sidebar .btn,
+body.rhs-v2 .simulate-sidebar .btn,
+body.rhs-v2 .decision-sidebar .btn {
+  padding: 7px 10px; border-radius: 6px; font-size: 11px;
+}
+body.rhs-v2 #simulate-results thead,
+body.rhs-v2 #flood-results thead { background: rgba(27, 40, 64, .9) !important; }
+body.rhs-v2 #no-result-tip,
+body.rhs-v2 #no-flood-result-tip { color: var(--rhs-ink-2) !important; }
+body.rhs-v2 .decision-content-note {
+  padding: 8px 9px; font-size: 11px; line-height: 1.55;
+}
+body.rhs-v2 .decision-content-sidebar { gap: 8px; }
+
+/* ---------- 边缘竖标签：替换原滑出抽屉的「无入口」状态 ---------- */
+body.rhs-v2 .rhs-tab {
+  /* fixed + 50% + translateY(-50%)：不受任何父容器影响，永远是视口右缘正中
+     （原先按右侧栏垂直中点算，比屏幕中心偏下约 30px，2026-11-27 21:19 修正） */
+  position: fixed; z-index: 31;
+  top: 50%; right: 0; transform: translateY(-50%);
+  /* 高度随文字长度自适应（「灾害过程模拟」6 字比 4 字长一截），min-height 保底 */
+  width: 34px; height: auto; min-height: 116px; padding: 14px 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 8px;
+  border: 0; border-radius: 10px 0 0 10px;
+  background: linear-gradient(180deg, rgba(25, 39, 62, .97) 0%, rgba(15, 25, 43, .97) 100%);
+  color: var(--mod);
+  /* 左侧一条模块色内高光 + 顶部一道白色微光，代替外框线 */
+  box-shadow:
+    inset 1px 0 0 var(--mod-line),
+    inset 0 1px 0 rgba(255, 255, 255, .06),
+    0 6px 20px rgba(0, 0, 0, .4);
+  cursor: pointer; outline: none;
+  transition: transform .22s ease, opacity .22s ease, box-shadow .2s ease, color .15s ease;
+}
+/* 模块图标：数据库 / 过程模拟 / 风险评估 / 决策支持 */
+body.rhs-v2 .rhs-tab::before {
+  font: normal normal normal 13px/1 FontAwesome;
+  color: var(--mod);
+  transition: color .15s ease, text-shadow .2s ease;
+}
+body.rhs-v2[data-module="disaster"] .rhs-tab::before { content: "\f1c0"; }
+/* 与标题图标统一为 fa-play-circle（\f144），原 \f0c3 是 fa-flask，两边不一致 */
+body.rhs-v2[data-module="simulate"] .rhs-tab::before { content: "\f144"; }
+body.rhs-v2[data-module="alert"] .rhs-tab::before { content: "\f071"; }
+body.rhs-v2[data-module="decision"] .rhs-tab::before { content: "\f0eb"; }
+body.rhs-v2 .rhs-tab span {
+  writing-mode: vertical-rl; font-size: 11px; letter-spacing: 3px;
+  transition: color .15s ease;
+}
+/* 悬停：整块向左滑出 3px，暗示"可以拉开" */
+body.rhs-v2 .rhs-tab:hover {
+  transform: translate(-3px, -50%);
+  color: #fff;
+  box-shadow:
+    inset 1px 0 0 var(--mod),
+    inset 0 1px 0 rgba(255, 255, 255, .08),
+    0 8px 24px rgba(0, 0, 0, .48);
+}
+body.rhs-v2 .rhs-tab:hover::before {
+  color: #fff;
+  text-shadow: 0 0 10px var(--mod-line);
+}
+/* 面板展开时把手隐藏：竖条只属于「收起态」，滑出屏幕右侧（2026-11-27 21:09 用户要求）
+   收起后靠 right:0 + top:50% 回到屏幕右缘中心。 */
+body.rhs-v2 .disaster-sidebar.active ~ .rhs-tab,
+body.rhs-v2 .simulate-sidebar.active ~ .rhs-tab,
+body.rhs-v2 .alert-sidebar.active ~ .rhs-tab,
+body.rhs-v2 .decision-sidebar.active ~ .rhs-tab {
+  opacity: 0;
+  transform: translate(100%, -50%);
+  pointer-events: none;
+}
+
+/* ---------- 图层管理浮层（main.js 的 .sidepanel / .sidepanel-toggle） ---------- */
+body.rhs-v2 .sidepanel {
+  top: calc(var(--nav-height) + var(--rhs-gap));
+  left: var(--rhs-gap);
+  width: var(--rhs-w);
+  max-height: calc(100vh - var(--nav-height) - 22px);
+  padding: 10px;
+  background: var(--rhs-surface);
+  border: 1px solid var(--rhs-line-2);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .38);
+  backdrop-filter: blur(10px);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(125, 211, 252, .32) transparent;
+  /* 收起状态与展开按钮沿用原规则：left:-340px + 44px 圆形图标钮，不改成竖标签 */
+}
+body.rhs-v2 .sidepanel-head {
+  margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--rhs-line-2);
+}
+body.rhs-v2 .sidepanel-head-title {
+  font-size: 13px; font-weight: 500; color: var(--mod);
+}
+/* 左侧面板跟随当前页面的模块主题色（图标 / × / 展开钮同一色，均用饱和主色） */
+body.rhs-v2 .sidepanel-head-title i { color: var(--mod); }
+body.rhs-v2 .sidepanel-collapse-btn {
+  width: 24px; height: 24px; border-radius: 6px;
+  border: 1px solid transparent; background: transparent;
+  /* 与标题 / 展开钮统一取当前模块主色 */
+  color: var(--mod);
+  font-size: 18px; line-height: 1;
+}
+body.rhs-v2 .sidepanel-collapse-btn:hover {
+  border-color: var(--mod); color: #fff; background: var(--mod-soft);
+}
+/* .sidepanel-toggle：44×44 圆形按钮 + fa-th-large 图标，用模块主色；不要外框线 */
+body.rhs-v2 .sidepanel-toggle { color: var(--mod); border-color: transparent; }
+body.rhs-v2 .sidepanel-toggle:hover { border-color: transparent; color: #fff; }
+body.rhs-v2 .sidepanel .category {
+  background: var(--rhs-card); border: 1px solid var(--rhs-line);
+  border-radius: 10px; margin-bottom: 8px;
+}
+body.rhs-v2 .sidepanel .category-header {
+  padding: 7px 9px; background: transparent; border-bottom-color: var(--rhs-line);
+}
+body.rhs-v2 .sidepanel .category-header span { font-size: 12px; font-weight: 500; }
+body.rhs-v2 .sidepanel .category-header.active {
+  background: var(--mod-soft); color: var(--mod-ink);
+}
+body.rhs-v2 .sidepanel .category-content { background: transparent; }
+body.rhs-v2 .sidepanel .layer-item { padding: 4px 9px; border-bottom-color: var(--rhs-line); }
+body.rhs-v2 .sidepanel .layer-item input[type="checkbox"] {
+  width: 14px; height: 14px; margin-right: 8px; accent-color: var(--mod);
+}
+body.rhs-v2 .sidepanel .layer-item label {
+  font-size: 12px; font-weight: 400; line-height: 1.4; color: var(--rhs-ink);
+}
+body.rhs-v2 .sidepanel .layer-item:hover { transform: none; background: var(--mod-soft); }
+body.rhs-v2 .sidepanel .mode-switch button {
+  padding: 5px 8px; font-size: 11px; border-radius: 6px;
+  border: 1px solid var(--rhs-line-2); background: rgba(27, 40, 64, .6);
+  /* 未选中态提亮到近白（2026-11-27 18:22 用户反馈太浅） */
+  color: var(--rhs-ink);
+}
+body.rhs-v2 .sidepanel .category-header .toggle-icon { color: var(--rhs-ink-2); }
+/* .sidepanel .mode-switch button.active 的模块色由下方合并规则统一接管 */
+
+/* ---------- 右侧栏标题层级统一（2026-11-27）----------
+   一级 = 侧栏顶部 h2：13px + 模块提亮色（保持原样）
+   二级 = 分区标题：12px + 近白 + 1px 同色细线，去掉旧版双线 / 2px 蓝线
+   三级 = 数据来源小标题：11px + 冰蓝 + 无下划线
+   ---------- */
+body.rhs-v2 .disaster-sidebar-header,
+body.rhs-v2 .simulate-sidebar-header,
+body.rhs-v2 .alert-sidebar-header,
+body.rhs-v2 .decision-sidebar-header { border-bottom: 1px solid var(--rhs-line); }
+body.rhs-v2 .alert-section-title,
+body.rhs-v2 .alert-category-sidebar-header,
+body.rhs-v2 .simulate-category-sidebar-header,
+body.rhs-v2 .simulate-sidebar h3,
+body.rhs-v2 .alert-sidebar h3,
+body.rhs-v2 .decision-sidebar h3 {
+  margin: 0 0 8px; padding: 0 0 6px; display: block;
+  font-size: 12px; font-weight: 500; line-height: 1.4;
+  color: var(--rhs-ink);
+  border-bottom: 1px solid var(--rhs-line);
+}
+/* ID 选择器优先级高于上面的类规则，需单独拉回「模拟结果」等 18px 蓝色标题 */
+body.rhs-v2 #simulate-results h3 {
+  margin: 0 0 8px; padding: 0 0 6px; display: block;
+  font-size: 12px; font-weight: 500; line-height: 1.4;
+  color: var(--rhs-ink);
+  border-bottom: 1px solid var(--rhs-line);
+}
+body.rhs-v2 .simulate-sidebar h4,
+body.rhs-v2 .alert-sidebar h4,
+body.rhs-v2 .decision-sidebar h4 {
+  margin: 0 0 6px; padding: 0; border-bottom: 0;
+  font-size: 11px; font-weight: 500; color: var(--rhs-ink-2) !important;
+}
+/* 旧版 60px 双线装饰不再保留 */
+body.rhs-v2 .alert-section-title::after { display: none !important; }
+body.rhs-v2 .disaster-source-title { font-size: 11px; }
+
+/* 洪水灾害风险评估：权重面板字号来自 alert.html 内联 <style> 旧口径
+   （11 / 11.5 / 12.5 / 13 / 14px 混用），此处按右侧栏统一口径拉回：
+   分区标题 12px / 正文 11px / 徽标 10px，标题线同 1px 细线 */
+body.rhs-v2 .alert-weight-badge {
+  font-size: 10px; font-weight: 400; color: var(--mod-ink);
+  background: var(--mod-soft); border-color: var(--mod-line);
+}
+/* 权重面板的容器与分组卡片，从旧深色值拉回侧栏统一的卡片口径 */
+body.rhs-v2 .alert-weight-method {
+  background: rgba(27, 40, 64, .5);
+  border: 1px solid var(--rhs-line-2); border-radius: 8px;
+}
+body.rhs-v2 .alert-weight-group {
+  background: rgba(27, 40, 64, .5);
+  border: 1px solid var(--rhs-line); border-radius: 8px;
+}
+body.rhs-v2 .alert-weight-hint { border-left-width: 1px; border-radius: 4px; }
+/* 自定义权重面板补漏（2026-11-27 18:47）：开关复选框 / 合计数值 / 熵权说明竖线 / 小按钮 */
+body.rhs-v2 .alert-weight-toggle input { accent-color: var(--mod); }
+body.rhs-v2 .alert-weight-sum b { color: var(--mod-ink); }
+body.rhs-v2 .alert-weight-entropy-note p { border-left-color: var(--mod-line); }
+body.rhs-v2 .alert-weight-group .btn-small {
+  background: var(--mod-deep); color: #fff;
+}
+body.rhs-v2 .alert-weight-group .btn-small:hover {
+  background: var(--mod-deep);
+  filter: brightness(1.1);
+  box-shadow: 0 4px 12px var(--mod-line);
+}
+body.rhs-v2 .alert-weight-toggle {
+  font-size: 11px; font-weight: 400; color: var(--rhs-ink-2);
+}
+body.rhs-v2 .alert-weight-group-title {
+  margin: 0 0 6px; padding: 0 0 5px;
+  font-size: 12px; font-weight: 500; color: var(--rhs-ink);
+  border-left: 0; border-bottom: 1px solid var(--rhs-line);
+}
+body.rhs-v2 .alert-weight-sum,
+body.rhs-v2 .alert-weight-hint,
+body.rhs-v2 .alert-weight-entropy-note,
+body.rhs-v2 .entropy-hybrid-note,
+body.rhs-v2 .alert-analysis-item label {
+  font-size: 11px; font-weight: 400; color: var(--rhs-ink-2); line-height: 1.55;
+}
+body.rhs-v2 .alert-analysis-value {
+  font-size: 11px; font-weight: 600; color: var(--mod-ink);
+}
+body.rhs-v2 .alert-weight-group .btn-small {
+  padding: 6px 10px; font-size: 11px; border-radius: 6px;
+}
+
+/* ---------- 选中 tab / 主按钮跟随模块主题色（2026-11-27 17:50 用户选「按钮和 tab 都改绿」）----------
+   原来选中态与 .btn-primary 一律系统蓝，与侧栏主题色各说各话。
+   主按钮取比主题色深一档的版本，保证白字对比度。
+   ---------- */
+body.rhs-v2 .simulate-sidebar .flood-submodule-tabs .tab-btn.active,
+body.rhs-v2 .alert-sidebar .flood-submodule-tabs .tab-btn.active,
+body.rhs-v2 .alert-sidebar .weight-method-opt.active,
+body.rhs-v2 .sidepanel .mode-switch button.active {
+  background: var(--mod-deep); border-color: var(--mod-deep); color: #fff;
+}
+/* Bootstrap 5 的 .btn-primary 走 --bs-btn-* 变量，覆盖变量即可连 hover / active 一起生效 */
+body.rhs-v2 .simulate-sidebar .btn-primary,
+body.rhs-v2 .alert-sidebar .btn-primary {
+  --bs-btn-bg: var(--mod-deep); --bs-btn-border-color: var(--mod-deep);
+  --bs-btn-hover-bg: var(--mod-deep); --bs-btn-hover-border-color: var(--mod-deep);
+  --bs-btn-hover-color: #fff;
+  --bs-btn-active-bg: var(--mod-deep); --bs-btn-active-border-color: var(--mod-deep);
+  --bs-btn-disabled-bg: var(--mod-deep); --bs-btn-disabled-border-color: var(--mod-deep);
+}
+/* 悬停靠亮度微降，无需再定义第二档颜色 */
+body.rhs-v2 .simulate-sidebar .btn-primary:hover,
+body.rhs-v2 .alert-sidebar .btn-primary:hover { filter: brightness(.9); }
+
+/* 洪水过程模拟的三个子模块（径流 / 洪水识别 / 淹没）内容包在
+   .flood-submodule-content 里，不是 .simulate-category-sidebar-content 的直接子元素，
+   上面的 > label / > select 选择器命不中，回退到默认 14px 白字。
+   这里补齐，与风险评估页表单口径一致：label / 输入框 11px。 */
+body.rhs-v2 .flood-submodule-content label {
+  display: block; margin: 0 0 5px;
+  font-size: 11px; font-weight: 400; color: var(--rhs-ink);
+}
+body.rhs-v2 .flood-submodule-content select,
+body.rhs-v2 .flood-submodule-content input[type="date"],
+body.rhs-v2 .flood-submodule-content input[type="text"] {
+  width: 100%; box-sizing: border-box;
+  padding: 6px 8px; margin: 0 0 9px;
+  background: rgba(10, 20, 36, .7); border: 1px solid var(--rhs-line-2);
+  border-radius: 6px; color: var(--rhs-ink); font-size: 11px; color-scheme: dark;
+}
+
+/* ---------- 表单视觉配平（2026-11-27 17:28 用户选「配平字级+压框高」）----------
+   问题：label 11px 灰字配 38px 高的 13px 白字输入框，头轻脚重。
+   口径：label 12px 近白、框内 12px、框高 34px、间距收紧。
+   ---------- */
+body.rhs-v2 .alert-category-sidebar-content > label,
+body.rhs-v2 .simulate-category-sidebar-content > label,
+body.rhs-v2 .flood-submodule-content label {
+  margin: 0 0 4px;
+  font-size: 12px; font-weight: 400;
+}
+/* 字段标签取模块提亮色（亮度接近白，12px 仍清楚）
+   数据库页与决策页的 label 是图层勾选项，不参与染色，避免列表花掉。 */
+body.rhs-v2 .alert-category-sidebar-content > label,
+body.rhs-v2 .simulate-category-sidebar-content > label,
+body.rhs-v2 .flood-submodule-content label { color: var(--mod-ink); }
+body.rhs-v2 .alert-category-sidebar-content > select,
+body.rhs-v2 .alert-category-sidebar-content > input[type="date"],
+body.rhs-v2 .alert-category-sidebar-content > input[type="text"],
+body.rhs-v2 .simulate-category-sidebar-content > select,
+body.rhs-v2 .simulate-category-sidebar-content > input[type="date"],
+body.rhs-v2 .simulate-category-sidebar-content > input[type="text"],
+body.rhs-v2 .flood-submodule-content select,
+body.rhs-v2 .flood-submodule-content input[type="date"],
+body.rhs-v2 .flood-submodule-content input[type="text"] {
+  height: 34px; padding: 6px 9px; margin: 0 0 8px;
+  font-size: 12px; line-height: 20px;
+}
+/* TomSelect 渲染出来的控件（原 select 被隐藏），须单独压高与字级 */
+body.rhs-v2 .alert-category-sidebar .ts-wrapper.single .ts-control,
+body.rhs-v2 .simulate-category-sidebar .ts-wrapper.single .ts-control {
+  min-height: 34px !important; padding: 5px 9px !important;
+}
+body.rhs-v2 .alert-category-sidebar .ts-wrapper .ts-control .item,
+body.rhs-v2 .simulate-category-sidebar .ts-wrapper .ts-control .item {
+  /* 框内选中的流域 / 模型名保持白色，不参与模块染色（2026-11-27 18:20 用户要求） */
+  font-size: 12px !important; line-height: 20px; color: var(--rhs-ink) !important;
+}
+/* 流域 / 模型选择框：边框与下拉选中项也取模块色（2026-11-27 18:15） */
+body.rhs-v2 .alert-category-sidebar .ts-wrapper.single .ts-control,
+body.rhs-v2 .simulate-category-sidebar .ts-wrapper.single .ts-control,
+body.rhs-v2 .alert-category-sidebar-content > select,
+body.rhs-v2 .simulate-category-sidebar-content > select,
+body.rhs-v2 .flood-submodule-content select {
+  border-color: var(--mod-line);
+}
+/* 下拉展开态：悬停 / 键盘高亮 / 已选项 / 小箭头 / 边框全部取模块色
+   （tom-select-dark.css 的原规则带 !important 且特异性 0,4,0，这里必须 0,4,1 才压得住） */
+body.rhs-v2 .ts-dropdown .ts-dropdown-content .option:hover,
+body.rhs-v2 .ts-dropdown .ts-dropdown-content .option.active {
+  background: var(--mod-soft) !important;
+  color: #fff !important;
+}
+body.rhs-v2 .ts-dropdown .ts-dropdown-content .option.selected {
+  color: #fff !important;
+  background: var(--mod-soft) !important;
+}
+body.rhs-v2 .ts-dropdown { border-color: var(--rhs-line-2) !important; }
+body.rhs-v2 .ts-wrapper.single.dropdown-active::after {
+  border-color: transparent transparent var(--mod) !important;
+}
+
+/* ---------- 模拟结果区：深色卡片口径 + 模块主题色（2026-11-27 17:56）----------
+   旧样式是浅色主题遗留：td 文字 #475569、边框 #e2e8f0、hover #f1f5f9，
+   在深色侧栏里几乎看不见或刺眼；结果容器还带内联 style 的 #eee 分隔线。
+   ---------- */
+body.rhs-v2 #simulate-results,
+body.rhs-v2 #flood-results,
+body.rhs-v2 #flood-runoff-results,
+body.rhs-v2 #snowmelt-flood-results,
+body.rhs-v2 #flood-inundation-results,
+body.rhs-v2 #snow-simulate-results,
+body.rhs-v2 #ice-simulate-results,
+body.rhs-v2 #permafrost-simulate-results {
+  margin-top: 10px !important; padding: 10px 0 0 !important;
+  border-top: 1px solid var(--rhs-line) !important;
+  background: transparent; box-shadow: none;
+}
+body.rhs-v2 #simulate-results:hover { border-color: var(--rhs-line); box-shadow: none; }
+/* 结果标题取过程模拟的主题色 */
+body.rhs-v2 #simulate-results h3,
+body.rhs-v2 #flood-results h3,
+body.rhs-v2 #flood-runoff-results h3,
+body.rhs-v2 #snowmelt-flood-results h3,
+body.rhs-v2 #flood-inundation-results h3,
+body.rhs-v2 #snow-simulate-results h3,
+body.rhs-v2 #ice-simulate-results h3,
+body.rhs-v2 #permafrost-simulate-results h3 {
+  color: var(--mod-ink); border-bottom-color: var(--mod-line);
+}
+/* 结果表格深色适配（排除走 .ui-table 的主结果表，避免两套样式打架） */
+body.rhs-v2 .simulate-sidebar [id$="result-table"]:not(.ui-table),
+body.rhs-v2 .alert-sidebar [id$="result-table"]:not(.ui-table) {
+  width: 100%; border-collapse: collapse; margin: 0 0 8px;
+}
+body.rhs-v2 .simulate-sidebar [id$="result-table"]:not(.ui-table) thead th,
+body.rhs-v2 .alert-sidebar [id$="result-table"]:not(.ui-table) thead th {
+  padding: 6px 7px; text-align: left; white-space: nowrap;
+  font-size: 11px; font-weight: 500; color: var(--rhs-ink);
+}
+body.rhs-v2 .simulate-sidebar [id$="result-table"]:not(.ui-table) tbody td,
+body.rhs-v2 .alert-sidebar [id$="result-table"]:not(.ui-table) tbody td {
+  padding: 6px 7px; font-size: 11px; color: var(--rhs-ink-2);
+  border-bottom: 1px solid var(--rhs-line);
+}
+body.rhs-v2 .simulate-sidebar [id$="result-table"]:not(.ui-table) tbody tr:hover,
+body.rhs-v2 .alert-sidebar [id$="result-table"]:not(.ui-table) tbody tr:hover {
+  background: var(--mod-soft);
+}
+/* 表头底色取模块色 */
+body.rhs-v2 .simulate-sidebar [id$="result-table"] thead,
+body.rhs-v2 .alert-sidebar [id$="result-table"] thead { background: var(--mod-soft) !important; }
+
+/* ---------- 风险评估结果弹窗：模块色贯穿（2026-11-27 18:09）----------
+   样式源在 alert.html 内联 <style>，这里用 body.rhs-v2 提高特异性覆盖。
+   .risk-tip-danger/warning/success 是风险等级的语义色，刻意不动。 */
+body.rhs-v2 .risk-result-modal { background: var(--rhs-surface); border-color: var(--rhs-line-2); }
+body.rhs-v2 .risk-result-modal-header { border-bottom-color: var(--rhs-line); }
+body.rhs-v2 .risk-result-modal-title { color: var(--mod-ink); }
+body.rhs-v2 .risk-result-modal-sub { color: var(--rhs-ink-2); }
+body.rhs-v2 .risk-result-modal-close { color: var(--rhs-ink-2); }
+body.rhs-v2 .risk-result-modal-close:hover { color: var(--mod-ink); }
+body.rhs-v2 .risk-stat-card { background: var(--rhs-card); border-color: var(--rhs-line); }
+body.rhs-v2 .risk-stat-label { color: var(--rhs-ink-2); }
+body.rhs-v2 .risk-stat-value { color: var(--mod-ink); }
+body.rhs-v2 .risk-stat-unit { color: var(--rhs-ink-3); }
+body.rhs-v2 .risk-chart-toggle-btn {
+  background: var(--rhs-card); border-color: var(--rhs-line-2); color: var(--rhs-ink-2);
+}
+body.rhs-v2 .risk-chart-toggle-btn.active {
+  background: var(--mod-deep); border-color: var(--mod-deep); color: #fff;
+}
+body.rhs-v2 .risk-hero { border-color: var(--mod-line); }
+body.rhs-v2 .risk-hero-level { color: var(--rhs-ink-3); }
+body.rhs-v2 .risk-hero-summary { color: var(--rhs-ink); }
+body.rhs-v2 .risk-tips {
+  background: var(--rhs-card); border-color: var(--rhs-line);
+  border-left: 3px solid var(--mod);
+}
+body.rhs-v2 .risk-tips-head { color: var(--mod-ink); }
+body.rhs-v2 .risk-tip-default { color: var(--rhs-ink-2); }
+body.rhs-v2 .risk-modal-reopen {
+  background: linear-gradient(135deg, var(--mod-deep) 0%, var(--mod) 100%);
+  box-shadow: 0 4px 14px var(--mod-line);
+}
+body.rhs-v2 .risk-modal-reopen:hover { box-shadow: 0 6px 20px var(--mod-line); }
+
+/* ---------- 专家免责声明：由警示黄改为模块紫（2026-11-28 15:00 用户要求统一）---------- */
+body.rhs-v2 .expert-disclaimer {
+  color: var(--rhs-ink);
+  background: var(--mod-soft);
+  border-color: var(--mod-line);
+}
+body.rhs-v2 .expert-disclaimer i { color: #d8b4fe; }
+/* 强调字用明显的亮紫（#f5f3ff 太接近白，看不出紫色） */
+body.rhs-v2 .expert-disclaimer strong { color: #d8b4fe; }
+
+/* ---------- 决策页说明条 / 列表滚动条：模块紫（2026-11-28 14:57）---------- */
+body.rhs-v2 .decision-content-note {
+  color: var(--rhs-ink);
+  background: var(--mod-soft);
+  border-color: var(--mod-line);
+}
+body.rhs-v2 .decision-content-note i { color: var(--mod-ink); }
+body.rhs-v2 .decision-content-list { scrollbar-color: var(--mod-line) transparent; }
+body.rhs-v2 .decision-content-list::-webkit-scrollbar-thumb { background: var(--mod-line); }
+/* 分类筛选 chips：active 原来是蓝色渐变，18:09 删旧规则时漏了补位 */
+body.rhs-v2 .decision-chip {
+  background: var(--rhs-card); border-color: var(--rhs-line-2); color: var(--rhs-ink-2);
+}
+body.rhs-v2 .decision-chip:hover { border-color: var(--mod); color: var(--rhs-ink); }
+body.rhs-v2 .decision-chip.active {
+  background: linear-gradient(135deg, var(--mod-deep), var(--mod));
+  border-color: var(--mod); color: #fff;
+}
+
+/* ---------- 决策页内容卡：模块紫贯穿（2026-11-27 18:09）---------- */
+body.rhs-v2 .decision-content-card {
+  background: var(--rhs-card); border-color: var(--rhs-line);
+}
+body.rhs-v2 .decision-content-card.expanded { border-color: var(--mod); }
+body.rhs-v2 .decision-content-card-head:hover { background: var(--mod-soft); }
+body.rhs-v2 .decision-content-card-icon {
+  color: var(--mod-ink);
+  background: var(--mod-soft);
+  border: 1px solid var(--mod-line);
+}
+body.rhs-v2 .decision-content-card-title { color: var(--rhs-ink); }
+body.rhs-v2 .decision-content-card-sub { color: var(--rhs-ink-2); }
+body.rhs-v2 .decision-content-card-toggle { color: var(--rhs-ink-3); }
+body.rhs-v2 .decision-content-card-detail { border-top-color: var(--rhs-line); }
+body.rhs-v2 .decision-detail-block { color: var(--rhs-ink); border-bottom-color: var(--rhs-line); }
+body.rhs-v2 .decision-detail-label { color: var(--mod-ink); }
+body.rhs-v2 .decision-detail-label i,
+body.rhs-v2 .expert-detail-label i { color: var(--mod-ink); }
+body.rhs-v2 .decision-tag {
+  color: var(--mod-ink); background: var(--mod-soft); border-color: var(--mod-line);
+}
+body.rhs-v2 .decision-source { color: var(--rhs-ink-3); }
+
+/* ---------- 清掉旧版选中态的蓝色发光环（2026-11-27 18:15）----------
+   旧规则 .disaster-layer-checkbox-sidebar:checked + label 写死了
+   border-color:var(--primary) + box-shadow:0 0 0 1px var(--primary)，
+   父容器改色压不住内层 label 自身的发光，这就是"选中后还有蓝色框线"的真凶。 */
+body.rhs-v2 .disaster-layer-checkbox-sidebar:checked + .disaster-layer-label-sidebar,
+body.rhs-v2 .alert-layer-checkbox-sidebar:checked + .alert-layer-label-sidebar,
+body.rhs-v2 .disaster-layer-label-sidebar:hover,
+body.rhs-v2 .alert-layer-label-sidebar:hover {
+  border-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+/* 加载态也是蓝边框，一并改模块色 */
+body.rhs-v2 .disaster-layer-item-sidebar.loading .disaster-layer-label-sidebar {
+  border-color: var(--mod-line) !important;
+}
+
+/* ---------- 通用组件 ui-table 跟随模块色（2026-11-27 18:35）----------
+   表头原来是 rgba(37,99,235) 蓝色渐变 + 冰蓝字，是侧栏里面积最大的一块蓝。 */
+body.rhs-v2 .ui-table {
+  background: rgba(19, 31, 51, .5); border-color: var(--rhs-line);
+}
+body.rhs-v2 .ui-table thead th {
+  background: var(--mod-soft);
+  color: var(--mod-ink);
+  border-bottom: 1px solid var(--rhs-line);
+}
+body.rhs-v2 .ui-table tbody td {
+  color: var(--rhs-ink);
+  border-bottom-color: var(--rhs-line);
+}
+body.rhs-v2 .ui-table tbody tr:hover { background: var(--mod-soft); }
+
+/* ---------- 专家卡 / 专家搜索 / 权重滑块：跟随模块紫（2026-11-27 18:35 全面检查补漏）----------
+   注意：.expert-card-avatar 的背景是按专家姓名生成的彩色标识（JS 内联），刻意不覆盖。 */
+body.rhs-v2 .expert-card { background: var(--rhs-card); border-color: var(--rhs-line); }
+body.rhs-v2 .expert-card.expanded { border-color: var(--mod); }
+body.rhs-v2 .expert-card-head:hover { background: var(--mod-soft); }
+body.rhs-v2 .expert-card-name { color: var(--rhs-ink); }
+body.rhs-v2 .expert-card-title,
+body.rhs-v2 .expert-card-field { color: var(--rhs-ink-2); }
+body.rhs-v2 .expert-card-toggle { color: var(--mod-ink); }
+body.rhs-v2 .expert-card-detail { border-top-color: var(--rhs-line); }
+body.rhs-v2 .expert-search { background: rgba(10, 20, 36, .7); border-color: var(--rhs-line); }
+body.rhs-v2 .expert-search:focus-within {
+  border-color: var(--mod); box-shadow: 0 0 0 1px var(--mod-line);
+}
+body.rhs-v2 .expert-search input { color: var(--rhs-ink); }
+body.rhs-v2 .expert-search input::placeholder { color: var(--rhs-ink-3); }
+/* 权重滑块两套伪元素（WebKit / Firefox） */
+body.rhs-v2 .alert-analysis-item input[type="range"]::-webkit-slider-thumb { background: var(--mod); }
+body.rhs-v2 .alert-analysis-item input[type="range"]::-moz-range-thumb { background: var(--mod); }
+body.rhs-v2 .alert-analysis-item input[type="range"]::-webkit-slider-thumb:hover { background: var(--mod-deep); }
+body.rhs-v2 .alert-analysis-item input[type="range"]::-moz-range-thumb:hover { background: var(--mod-deep); }
+body.rhs-v2 .alert-analysis-item input[type="range"] { accent-color: var(--mod); }
+
+/* ---------- 大模型聊天面板：模块紫贯穿（2026-11-27 18:29）----------
+   原来整块是蓝色渐变（头像 / 消息头像 / 用户气泡 / 发送按钮 / 聚焦光晕），
+   与决策支持的紫色主题脱节。这里统一走 --mod 变量。 */
+body.rhs-v2 .llm-agent-header {
+  flex: 0 0 auto; padding: 10px 12px;
+  border-bottom: 1px solid var(--rhs-line);
+  background: linear-gradient(135deg, rgba(192, 132, 252, .10), rgba(19, 31, 51, .55));
+}
+body.rhs-v2 .llm-agent-header::after {
+  background: radial-gradient(circle at 100% 0%, var(--mod-soft), transparent 70%);
+}
+body.rhs-v2 .llm-agent-avatar {
+  width: 34px; height: 34px; border-radius: 9px; font-size: 16px;
+  color: #fff;
+  background: linear-gradient(135deg, var(--mod-deep), var(--mod));
+  box-shadow: 0 2px 10px var(--mod-line);
+}
+body.rhs-v2 .llm-agent-status { font-size: 11px; color: var(--rhs-ink-2); }
+body.rhs-v2 .llm-agent-hint { font-size: 10.5px; color: var(--rhs-ink-3); margin-top: 2px; }
+body.rhs-v2 .llm-clear-btn {
+  margin-left: auto; width: 26px; height: 26px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 6px; background: transparent;
+  color: var(--rhs-ink-3); font-size: 13px; cursor: pointer;
+  transition: color .15s, background .15s;
+}
+body.rhs-v2 .llm-clear-btn:hover { color: var(--mod-ink); background: var(--mod-soft); }
+
+/* 消息气泡与头像 */
+body.rhs-v2 .llm-msg-assistant .llm-msg-avatar {
+  color: #fff;
+  background: linear-gradient(135deg, var(--mod-deep), var(--mod));
+  box-shadow: 0 0 8px var(--mod-line);
+}
+body.rhs-v2 .llm-msg-assistant .llm-msg-body {
+  background: rgba(27, 40, 64, .8);
+  border-color: var(--rhs-line);
+  color: var(--rhs-ink);
+}
+body.rhs-v2 .llm-msg-user .llm-msg-body {
+  background: linear-gradient(135deg, var(--mod-deep), var(--mod));
+  box-shadow: 0 3px 10px var(--mod-line);
+}
+body.rhs-v2 .llm-msg-role { color: var(--rhs-ink-3); }
+
+/* 消息区 */
+body.rhs-v2 .llm-chat-history {
+  flex: 1 1 auto; min-height: 0;
+  background: rgba(10, 20, 36, .5);
+  border-color: var(--rhs-line);
+  scrollbar-color: var(--mod-line) transparent;
+}
+body.rhs-v2 .llm-chat-history::-webkit-scrollbar-thumb { background: var(--mod-line); }
+
+/* 输入区：多行 textarea + 图标发送按钮 */
+body.rhs-v2 .llm-chat-input { border-color: var(--rhs-line); background: rgba(10, 20, 36, .7); }
+body.rhs-v2 .llm-chat-input:focus-within {
+  border-color: var(--mod);
+  box-shadow: 0 0 0 1px var(--mod-line);
+}
+body.rhs-v2 .llm-chat-input textarea {
+  flex: 1; min-height: 20px; max-height: 96px;
+  margin: 0; padding: 6px 4px;
+  border: 0; background: transparent; outline: none; resize: none;
+  color: var(--rhs-ink); font-size: 13px; line-height: 1.5;
+  font-family: inherit; color-scheme: dark;
+}
+body.rhs-v2 .llm-chat-input textarea::placeholder { color: var(--rhs-ink-3); }
+body.rhs-v2 .llm-chat-input .btn {
+  width: 34px; height: 34px; padding: 0; margin: 0; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px; font-size: 13px;
+  /* 原规则直接写死 background 渐变，不读 --bs-btn-* 变量，必须显式覆盖 */
+  background: linear-gradient(135deg, var(--mod-deep), var(--mod));
+  border: 0; color: #fff;
+  box-shadow: 0 3px 10px var(--mod-line);
+}
+body.rhs-v2 .llm-chat-input .btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--mod), var(--mod-deep));
+  transform: translateY(-1px);
+}
+body.rhs-v2 .llm-chat-input .btn:disabled {
+  opacity: .5; cursor: not-allowed; transform: none;
+}
+
+/* 空态：欢迎语 + 快捷提问 */
+body.rhs-v2 .llm-empty { margin: auto; text-align: center; padding: 6px 4px; }
+body.rhs-v2 .llm-empty-icon {
+  width: 40px; height: 40px; margin: 0 auto 10px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; color: var(--mod-ink);
+  background: var(--mod-soft); border: 1px solid var(--mod-line);
+}
+body.rhs-v2 .llm-empty-text {
+  margin: 0 0 14px; font-size: 12px; line-height: 1.7; color: var(--rhs-ink-2);
+}
+body.rhs-v2 .llm-empty-label {
+  font-size: 10.5px; color: var(--rhs-ink-3);
+  margin-bottom: 8px; letter-spacing: .3px;
+}
+body.rhs-v2 .llm-suggest { display: flex; flex-direction: column; gap: 6px; }
+body.rhs-v2 .llm-suggest-chip {
+  padding: 7px 10px; border-radius: 8px; text-align: left;
+  font-size: 11.5px; color: var(--rhs-ink);
+  background: rgba(27, 40, 64, .7); border: 1px solid var(--rhs-line-2);
+  cursor: pointer; font-family: inherit;
+  transition: border-color .15s, background .15s, color .15s;
+}
+body.rhs-v2 .llm-suggest-chip:hover {
+  border-color: var(--mod); background: var(--mod-soft); color: #fff;
+}
+
+/* 回到底部 */
+body.rhs-v2 .llm-chat-wrap { position: relative; }
+body.rhs-v2 .llm-scroll-bottom {
+  position: absolute; right: 22px; bottom: 66px; z-index: 3;
+  width: 30px; height: 30px; border-radius: 50%;
+  display: none; align-items: center; justify-content: center;
+  background: rgba(27, 40, 64, .96); border: 1px solid var(--mod-line);
+  color: var(--mod-ink); font-size: 12px; cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .35);
+}
+body.rhs-v2 .llm-scroll-bottom.show { display: flex; }
+
+/* ---------- 焦点态统一为模块色（2026-11-27 18:04）----------
+   点选复选框 / 输入框后，浏览器默认的蓝色 focus ring 与模块色冲突，
+   这是「选了以后还有蓝色框线」的直接来源。 */
+body.rhs-v2 .alert-layer-checkbox-sidebar:focus,
+body.rhs-v2 .disaster-layer-checkbox-sidebar:focus,
+body.rhs-v2 .sidepanel .layer-item input[type="checkbox"]:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--mod-line);
+}
+body.rhs-v2 .alert-category-sidebar-content > select:focus,
+body.rhs-v2 .alert-category-sidebar-content > input:focus,
+body.rhs-v2 .simulate-category-sidebar-content > select:focus,
+body.rhs-v2 .simulate-category-sidebar-content > input:focus,
+body.rhs-v2 .flood-submodule-content select:focus,
+body.rhs-v2 .flood-submodule-content input:focus {
+  outline: none; border-color: var(--mod);
+  box-shadow: 0 0 0 1px var(--mod-line);
+}
+/* TomSelect 聚焦态（其主题文件写死了 --primary 蓝） */
+body.rhs-v2 .ts-wrapper.focus .ts-control {
+  border-color: var(--mod) !important;
+  box-shadow: 0 0 0 1px var(--mod-line) !important;
+}
+body.rhs-v2 input[type="range"]:focus { outline: none; }
+
+@media (max-width: 900px) {
+  body.rhs-v2 { --rhs-w: 248px; --rhs-panel-w: 300px; }
+}
+@media (max-width: 700px) {
+  body.rhs-v2 .sidepanel,
+  body.rhs-v2 .disaster-sidebar,
+  body.rhs-v2 .simulate-sidebar,
+  body.rhs-v2 .alert-sidebar,
+  body.rhs-v2 .decision-sidebar {
+    width: calc(100vw - 24px);
+    min-width: 0;
+    max-width: none;
+  }
+  body.rhs-v2 .rhs-tab { display: none; }
+}
+
+/* ============ 单行导航栏自适应 ============
+   系统名 + 模块按钮 + 搜索框挤在同一行，按 1560 / 1360 / 1300 / 1180 / 1100 / 900 逐级压缩，
+   保证模块条居中时不顶到品牌区、搜索框不被压到无法输入。 */
+@media (max-width: 1560px) {
+  .topbar .logo { margin-right: 14px; }
+  .topbar .logo-name { font-size: 15.5px; }
+  .topbar .logo-code { font-size: 10px; }
+  .topbar .logo-img { width: 28px; height: 28px; }
+  .topbar .nav-links a:not(.dropdown-item) { padding: 0 10px; }
+}
+
+@media (max-width: 1400px) {
+  .topbar { padding: 0 14px; }
+  .topbar .logo { margin-right: 10px; }
+  .topbar .logo-name { font-size: 14px; letter-spacing: 0.3px; }
+  .topbar .logo-code { font-size: 9px; padding-left: 8px; margin-left: 8px; }
+  .topbar .logo-img { width: 26px; height: 26px; margin-right: 8px; }
+  .topbar .logo::before { height: 16px; margin-right: 9px; }
+  .topbar .nav-links { padding: 3px; border-radius: 9px; }
+  .topbar .nav-links a:not(.dropdown-item) { font-size: 12.5px; padding: 0 7px; height: 30px; border-radius: 6px; }
+  .topbar .dropdown-toggle::after { margin-left: 4px; font-size: 9px; }
+  .topbar .searchbar.cmd-mode input[type="search"] { width: 140px; font-size: 13px; }
+}
+
+@media (max-width: 1300px) {
+  /* 1200 上下是临界区：品牌 + 代号 + 六个模块 + 搜索框刚好占满，再挤就贴上了 */
+  .topbar .logo-name { font-size: 14px; }
+  .topbar .logo-code { font-size: 9px; letter-spacing: 0.3px; padding-left: 7px; margin-left: 7px; }
+  .topbar .nav-links a:not(.dropdown-item) { font-size: 12.5px; padding: 0 6px; }
+  .topbar .searchbar.cmd-mode input[type="search"] { width: 120px; }
+}
+
+@media (max-width: 1180px) {
+  .topbar .logo-name { font-size: 13.5px; letter-spacing: 0; }
+  .topbar .logo-code { font-size: 8.5px; letter-spacing: 0.3px; }
+  .topbar .nav-links a:not(.dropdown-item) { font-size: 12.5px; padding: 0 6px; }
+  .topbar .searchbar.cmd-mode input[type="search"] { width: 110px; }
+}
+
+/* 窄屏放弃「模块条居中」——空间不够时会顶到系统名，回退成靠左排布 */
+@media (max-width: 1100px) {
+  .topbar { display: flex; column-gap: 0; }
+  .topbar-row2 {
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    min-width: 0;
+    justify-content: space-between;
+  }
+}
+
+@media (max-width: 900px) {
+  /* 极小宽度下系统名换行会撑高单行导航，直接单行省略 */
+  .topbar .logo { white-space: nowrap; overflow: hidden; max-width: 34vw; }
+  .topbar .logo-name { overflow: hidden; text-overflow: ellipsis; }
+  .topbar .logo-code { display: none; } /* 到这一步才真正放不下代号 */
+  .topbar .logo::after { display: none; }
+  /* 不能给 nav-links 设 overflow（会造成滚动容器），否则绝对定位的下拉菜单会被裁掉 */
+  .topbar .nav-links { overflow: visible; }
+  .topbar .nav-links a:not(.dropdown-item) { font-size: 12px; padding: 0 5px; }
+  .topbar input[type="search"] { width: 120px; }
+}
+
+/* ============ 切页与状态的平滑过渡 ============
+   1) 多页应用每次跳转都是硬闪：用跨文档 View Transitions（Chrome / Edge 126+）让内容区淡入淡出；
+   2) 顶栏 7 个页面结构完全一致，单独命名并禁用动画，切页时视觉上保持连续，观感接近单页应用；
+   3) 不支持的浏览器会自动忽略这些规则，属渐进增强，无副作用。 */
+@view-transition {
+  navigation: auto;
+}
+
+.topbar {
+  view-transition-name: app-topbar;
+}
+
+::view-transition-old(root) {
+  animation: vt-fade-out 0.14s ease both;
+}
+::view-transition-new(root) {
+  animation: vt-fade-in 0.24s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+/* 顶栏不参与淡化与位移 */
+::view-transition-group(app-topbar),
+::view-transition-old(app-topbar),
+::view-transition-new(app-topbar) {
+  animation: none;
+}
+
+@keyframes vt-fade-out {
+  to { opacity: 0; }
+}
+@keyframes vt-fade-in {
+  from { opacity: 0; }
+}
+
+/* 系统设置了「减少动效」时全部退化为瞬切 */
+@media (prefers-reduced-motion: reduce) {
+  .topbar .nav-links a:not(.dropdown-item),
+  .topbar .nav-links a:not(.dropdown-item)::before,
+  .dropdown-menu,
+  .dropdown-toggle::after,
+  .dropdown-item {
+    transition-duration: 0.01ms !important;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}
+
+/* ============ 顶栏右侧：搜索框 + 身份区（2026-11-28） ============
+   原「系统管理」一级导航项已撤销，改由右上角身份区承载：
+   未登录 → 「登录」按钮；已登录 → 头像 + 显示名称下拉（系统管理 / 退出登录）。
+   .topbar-right 把搜索框与身份区收进同一栅格列，保持顶栏「品牌 / 模块条 / 右侧」
+   三段布局不变（模块条仍精确压在整条导航栏中线上）。 */
+
+.topbar .topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: end;
+  min-width: 0;
+}
+
+.topbar-user {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+/* 未登录 / 已登录共用胶囊：材质与 nav-links 玻璃条、搜索框同源 */
+.topbar-user .tu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 17px;
+  background: rgba(30, 41, 59, 0.55);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  color: #cfe0f5;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease, color 0.18s ease;
+}
+
+.topbar-user .tu-btn:hover {
+  border-color: rgba(125, 211, 252, 0.42);
+  background: rgba(59, 130, 246, 0.18);
+  color: #eaf4ff;
+}
+
+.topbar-user .tu-btn:focus-visible {
+  outline: 2px solid var(--ice);
+  outline-offset: 2px;
+}
+
+.topbar-user .tu-btn > i { font-size: 13px; color: var(--ice); }
+
+/* 头像即按钮：只留圆形头像，姓名走 title 提示，给导航条让出横向空间 */
+.topbar-user .tu-btn-avatar {
+  width: 34px;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.topbar-user .tu-btn-avatar .tu-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 13px;
+}
+
+.topbar-user .tu-avatar {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: linear-gradient(160deg, #2563eb, #1b3f7a);
+  color: #eaf4ff;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.topbar-user .tu-name {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-user .tu-caret {
+  color: var(--text-secondary);
+  font-size: 11px;
+  transition: transform 0.18s ease;
+}
+
+.topbar-user.open .tu-caret { transform: rotate(180deg); }
+
+/* 下拉：独立命名空间，不复用 .dropdown-menu，避免与 main.js 的全局开关互相干扰 */
+.topbar-user .tu-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 210;
+  min-width: 192px;
+  padding: 6px;
+  background: rgba(19, 31, 51, 0.98);
+  border: 1px solid var(--sidebar-border);
+  border-radius: 10px;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.5);
+  display: none;
+}
+
+.topbar-user.open .tu-menu { display: block; }
+
+.tu-menu-meta {
+  padding: 7px 10px 9px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.tu-menu-meta .n {
+  display: block;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.tu-menu-meta .r {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.tu-menu a,
+.tu-menu button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 7px;
+  background: none;
+  color: #cfe0f5;
+  font-family: var(--font-body);
+  font-size: 13px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.tu-menu a:hover,
+.tu-menu button:hover {
+  background: rgba(59, 130, 246, 0.18);
+  color: #fff;
+}
+
+.tu-menu i {
+  width: 14px;
+  font-size: 12px;
+  color: var(--ice);
+  text-align: center;
+}
+
+.tu-menu .tu-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.tu-menu .tu-danger,
+.tu-menu .tu-danger i { color: #f8a5a5; }
+
+.tu-menu .tu-danger:hover { background: rgba(248, 113, 113, 0.14); }
+
+/* 窄屏：收起用户名与搜索框宽度，避免右侧列把模块条挤出中线 */
+@media (max-width: 1360px) {
+  .topbar-user .tu-name { display: none; }
+  .topbar input[type="search"] { width: 240px; }
+}

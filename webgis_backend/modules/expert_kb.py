@@ -11,9 +11,12 @@
 3. 县域数据    data/raw/geo/socioeconomic/economy_counties.geojson + data/raw/economy/GDP_data.csv
                + data/processed/economy/county_population_latest.csv
 4. 基础设施    data/raw/geo/infrastructure/GDW_reservoirs.geojson / GDW_barriers.geojson / powerplant.geojson
-5. 流域概览    data/raw/geo/cryosphere/TP_China_glaciers.geojson / TP_China_Lake.geojson / river.geojson
-               / TP_China_permafrost.geojson / XianCh_point.geojson / roa_4m.geojson / rai_4m.geojson
-6. ERA5 气象索引 data/processed/db/era5_index.db / TibetanPlateau_index.db（数据现状统计）
+5. 流域概览    data/raw/geo/cryosphere/TP_China_glaciers.geojson / TP_China_permafrost.geojson
+               data/raw/geo/hydrology/TP_China_Lake.geojson / river.geojson
+               data/raw/geo/settlement/XianCh_point.geojson
+               data/raw/geo/infrastructure/roa_4m.geojson / rai_4m.geojson
+6. ERA5 气象索引 data/processed/db/TibetanPlateau_index.db（活动库）
+               era5_index.db 已于 2026-09-07 移入 db/_backup_20260907/，仅作历史归档，后端不读取
 7. 风险评估方法学（摘自《洪水灾害风险评估技术文档.md》）
 
 科研规范：
@@ -482,14 +485,17 @@ def _build_sources(cur):
         ('县域人口', os.path.join(PROCESSED_DIR, 'economy', 'county_population_latest.csv'), '县域人口'),
         ('水库', os.path.join(GEO_DIR, 'infrastructure', 'GDW_reservoirs.geojson'), '全球大坝水库数据（裁剪）'),
         ('水坝', os.path.join(GEO_DIR, 'infrastructure', 'GDW_barriers.geojson'), '全球大坝数据（裁剪）'),
-        ('能源站点', os.path.join(GEO_DIR, 'powerplant.geojson'), '全球电站数据库（裁剪）'),
-        ('冰川分布', os.path.join(GEO_DIR, 'TP_China_glaciers.geojson'), '中国冰川分布'),
-        ('湖泊分布', os.path.join(GEO_DIR, 'TP_China_Lake.geojson'), '青藏高原湖泊'),
-        ('河网水系', os.path.join(GEO_DIR, 'river.geojson'), '河网水系'),
-        ('多年冻土', os.path.join(GEO_DIR, 'TP_China_permafrost.geojson'), '多年冻土分布'),
-        ('ERA5 气象索引', os.path.join(DB_DIR, 'era5_index.db'), 'ERA5 再分析栅格索引（10万+）'),
+        # 以下 5 项按 2026-09-07 的 geo 语义分层修正到真实子目录；
+        # 原先误写为 geo/ 根目录，导致状态页误报「缺失」（构建函数本身路径一直正确）。
+        ('能源站点', os.path.join(GEO_DIR, 'infrastructure', 'powerplant.geojson'), '全球电站数据库（裁剪）'),
+        ('冰川分布', os.path.join(GEO_DIR, 'cryosphere', 'TP_China_glaciers.geojson'), '中国冰川分布'),
+        ('湖泊分布', os.path.join(GEO_DIR, 'hydrology', 'TP_China_Lake.geojson'), '青藏高原湖泊'),
+        ('河网水系', os.path.join(GEO_DIR, 'hydrology', 'river.geojson'), '河网水系'),
+        ('多年冻土', os.path.join(GEO_DIR, 'cryosphere', 'TP_China_permafrost.geojson'), '多年冻土分布'),
+        # era5_index.db 的活动库已于 2026-09-07 删除，仅备份留存；标为历史归档而非缺失。
+        ('ERA5 气象索引（历史归档）', os.path.join(DB_DIR, '_backup_20260907', 'era5_index.db'), 'ERA5 再分析栅格索引；已移入备份，后端不读取'),
         ('青藏高原气象索引', os.path.join(DB_DIR, 'TibetanPlateau_index.db'), '青藏高原气象栅格索引'),
-        ('风险评估方法学', os.path.join(BASE_DIR, '洪水灾害风险评估技术文档.md'), 'R=H×E×V 方法与分级标准'),
+        ('风险评估方法学', os.path.join(BASE_DIR, 'docs', '02_模块技术说明', '01_洪水灾害风险评估技术文档.md'), 'R=H×E×V 方法与分级标准'),
         ('LSTM 径流模型', os.path.join(BASE_DIR, 'data', 'raw', 'models', 'lstm_runoff_model.pt'), '径流模拟模型'),
         ('洪水阈值场', os.path.join(BASE_DIR, 'data', 'raw', 'thresholds'), '10p-99p 百分位阈值栅格'),
     ]

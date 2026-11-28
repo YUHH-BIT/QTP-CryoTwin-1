@@ -8,11 +8,13 @@
   <!-- 使用多个CDN源确保OpenLayers加载成功 -->
   <link rel="stylesheet" href="css/lib/ol.css" />
   <!-- 移除高德地图API引用 -->
-  <link rel="stylesheet" href="css/styles.css?v=20261128c" />
+  <link rel="stylesheet" href="css/styles.css?v=20261128d" />
+  <!-- UI.confirm / UI.modal / UI.toast 的样式在 components.css，缺了会变成裸 DOM 堆在页面底部 -->
+  <link rel="stylesheet" href="css/components.css?v=20261128a" />
   <style>
     /* ============ 系统管理面板 ============ */
     .admin-overlay { position: fixed; inset: 0; background: rgba(7, 17, 31, .78); z-index: 9000; display: flex; align-items: center; justify-content: center; padding: 20px; }
-    .admin-panel { width: min(1180px, 96vw); height: min(780px, 94vh); background: #f4f7fb; border: 1px solid #2a3b55; border-radius: 12px; box-shadow: 0 24px 70px rgba(0,0,0,.55); display: flex; flex-direction: column; overflow: hidden; animation: adminIn .18s ease-out; }
+    .admin-panel { width: min(1180px, 96vw); height: min(780px, 94vh); background: #0f1b2e; border: 1px solid #2a3b55; border-radius: 12px; box-shadow: 0 24px 70px rgba(0,0,0,.55); display: flex; flex-direction: column; overflow: hidden; animation: adminIn .18s ease-out; }
     @keyframes adminIn { from { opacity: 0; transform: translateY(12px);} to { opacity: 1; transform: none;} }
     .admin-panel-header { background: linear-gradient(135deg, #0a1424, #14345a); color: #e8f1ff; padding: 12px 18px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2a3b55; }
     .admin-panel-title { font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
@@ -22,8 +24,8 @@
     .admin-btn:hover { background: #2f6fd8; }
     .admin-btn-ghost { background: rgba(125,211,252,.14); color: #cfe6ff; }
     .admin-btn-ghost:hover { background: rgba(125,211,252,.24); }
-    .admin-content .admin-btn-ghost { background: #eef3fa; color: #3c4f66; }
-    .admin-content .admin-btn-ghost:hover { background: #dfe9f7; }
+    .admin-content .admin-btn-ghost { background: #1b2840; color: #a9bad2; }
+    .admin-content .admin-btn-ghost:hover { background: #253456; }
     .admin-btn-danger { background: transparent; color: #f87171; box-shadow: inset 0 0 0 1px rgba(248,113,113,.55); }
     .admin-btn-danger:hover { background: rgba(248,113,113,.14); }
     .admin-btn-sm { padding: 4px 10px; font-size: 12px; border-radius: 4px; }
@@ -33,85 +35,201 @@
     .admin-nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 4px; border-radius: 8px; color: #a9bad2; cursor: pointer; font-size: 14px; text-decoration: none; transition: background .15s, color .15s; }
     .admin-nav-item:hover { background: #1b2840; color: #e8f1ff; }
     .admin-nav-item.active { background: #3b82f6; color: #fff; }
-    .admin-content { flex: 1; padding: 18px 22px; overflow: auto; min-width: 0; background: #fff; }
+    .admin-content { flex: 1; padding: 18px 22px; overflow: auto; min-width: 0; background: #0f1b2e; }
     .admin-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
-    .admin-toolbar h3 { margin: 0; font-size: 16px; color: #143b66; margin-right: auto; }
-    .admin-search { padding: 6px 10px; border: 1px solid #cdd8e6; border-radius: 6px; font-size: 13px; width: 200px; background: #fff; color: #243b53; }
+    .admin-toolbar h3 { margin: 0; font-size: 16px; color: #7dd3fc; margin-right: auto; }
+    .admin-toolbar-gap { flex: 1; }
+    .admin-search { padding: 6px 10px; border: 1px solid #334563; border-radius: 6px; font-size: 13px; width: 200px; background: #101c2f; color: #dbe7f6; }
     .admin-search:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
-    .admin-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(16,42,67,.08); }
-    .admin-table th { background: #eef3fa; color: #3c4f66; font-weight: 600; padding: 8px 10px; font-size: 13px; text-align: left; border-bottom: 2px solid #dbe4f0; white-space: nowrap; }
-    .admin-table td { padding: 7px 10px; font-size: 13px; border-bottom: 1px solid #eef1f5; color: #33475b; vertical-align: middle; }
-    .admin-table tr:hover td { background: #f2f7ff; }
+    .admin-table { width: 100%; border-collapse: collapse; background: #131f33; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(16,42,67,.08); }
+    .admin-table th { background: #1b2840; color: #a9bad2; font-weight: 600; padding: 8px 10px; font-size: 13px; text-align: left; border-bottom: 2px solid #2a3b55; white-space: nowrap; }
+    .admin-table td { padding: 7px 10px; font-size: 13px; border-bottom: 1px solid #233450; color: #dbe7f6; vertical-align: middle; }
+    .admin-table tr:hover td { background: #1b2840; }
     .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; }
-    .badge-ok { background: #e3f5e9; color: #1e7e34; }
-    .badge-off { background: #fdeaea; color: #c0392b; }
-    .badge-blue { background: #e7f0fa; color: #1b5e9e; }
-    .badge-gray { background: #eef1f5; color: #5b6b7c; }
-    .admin-empty { text-align: center; color: #8a99a8; padding: 40px 0; font-size: 14px; }
+    .badge-ok { background: rgba(74,222,128,.15); color: #4ade80; }
+    .badge-off { background: rgba(248,113,113,.15); color: #f87171; }
+    .badge-blue { background: rgba(125,211,252,.15); color: #7dd3fc; }
+    .badge-gray { background: #22314a; color: #9fb0c8; }
+    .admin-empty { text-align: center; color: #7d90ac; padding: 40px 0; font-size: 14px; }
     .admin-modal-overlay { position: fixed; inset: 0; background: rgba(7,17,31,.65); z-index: 9500; display: flex; align-items: center; justify-content: center; }
-    .admin-modal { background: #fff; border-radius: 10px; width: min(520px, 92vw); max-height: 88vh; overflow: auto; box-shadow: 0 16px 50px rgba(0,0,0,.4); }
+    .admin-modal { background: #131f33; border-radius: 10px; width: min(520px, 92vw); max-height: 88vh; overflow: auto; box-shadow: 0 16px 50px rgba(0,0,0,.4); }
     .admin-modal-head { background: linear-gradient(135deg,#0a1424,#14345a); color: #e8f1ff; padding: 12px 16px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
     .admin-modal-head button { background: none; border: none; color: #e8f1ff; font-size: 20px; cursor: pointer; }
     .admin-modal-body { padding: 16px 18px; }
     .admin-form-row { margin-bottom: 12px; }
-    .admin-form-row label { display: block; font-size: 13px; color: #4a5b70; margin-bottom: 5px; }
-    .admin-form-row input, .admin-form-row select, .admin-form-row textarea { width: 100%; padding: 7px 10px; border: 1px solid #cdd8e6; border-radius: 6px; font-size: 13px; box-sizing: border-box; background: #fff; color: #243b53; }
-    .admin-modal-foot { padding: 12px 18px; border-top: 1px solid #eef1f5; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
-    .admin-btn-cancel { background: #eef1f5; color: #33475b; }
-    .admin-btn-cancel:hover { background: #e2e8f0; }
-    .admin-perm-group-title { margin: 10px 0 4px; font-weight: 600; color: #3c4f66; font-size: 13px; border-left: 3px solid #3b82f6; padding-left: 8px; }
+    .admin-form-row label { display: block; font-size: 13px; color: #8fa3bd; margin-bottom: 5px; }
+    .admin-form-row input, .admin-form-row select, .admin-form-row textarea { width: 100%; padding: 7px 10px; border: 1px solid #334563; border-radius: 6px; font-size: 13px; box-sizing: border-box; background: #101c2f; color: #dbe7f6; }
+    .admin-modal-foot { padding: 12px 18px; border-top: 1px solid #2a3b55; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+    .admin-btn-cancel { background: #1b2840; color: #a9bad2; }
+    .admin-btn-cancel:hover { background: #22314a; }
+    .admin-perm-group-title { margin: 10px 0 4px; font-weight: 600; color: #a9bad2; font-size: 13px; border-left: 3px solid #3b82f6; padding-left: 8px; }
     .admin-perm-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 20px; margin: 4px 0 2px; }
-    .admin-perm-grid label { font-size: 13px; display: flex; align-items: center; gap: 8px; color: #33475b; padding: 4px 0; line-height: 1.4; }
+    .admin-perm-grid label { font-size: 13px; display: flex; align-items: center; gap: 8px; color: #dbe7f6; padding: 4px 0; line-height: 1.4; }
     .admin-perm-grid label input[type="checkbox"] { width: 16px; height: 16px; margin: 0; flex: 0 0 auto; vertical-align: middle; }
     .admin-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-    .admin-stat { background: #f4f8fd; border: 1px solid #dbe4f0; border-radius: 10px; padding: 14px 16px; min-height: 64px; }
-    .admin-stat .v { font-size: 22px; font-weight: 700; color: #143b66; line-height: 1.2; word-break: break-all; }
-    .admin-stat .k { font-size: 12px; color: #6b7f96; margin-top: 4px; }
+    .admin-stat { background: #16233a; border: 1px solid #2a3b55; border-radius: 10px; padding: 14px 16px; min-height: 64px; }
+    /* word-break: break-all 会把「2026-11-28 16:53:42」拆成「16:5 / 3:42」这种断法，
+       改成优先在空格处折行，只有整段放不下才在词内断开 */
+    .admin-stat .v { font-size: 21px; font-weight: 700; color: #7dd3fc; line-height: 1.25; word-break: normal; overflow-wrap: anywhere; }
+    .admin-stat .k { font-size: 12px; color: #8fa3bd; margin-top: 4px; }
     .admin-stat-section { margin-bottom: 18px; }
-    .admin-stat-section-title { font-size: 13px; color: #143b66; font-weight: 600; margin: 0 0 10px; padding-left: 10px; border-left: 3px solid #3b82f6; }
-    .admin-status-row { display: flex; justify-content: space-between; padding: 9px 4px; border-bottom: 1px dashed #eef1f5; font-size: 13px; }
-    .admin-status-row .k { color: #6b7f96; }
-    .admin-status-row .v { color: #33475b; font-weight: 500; }
+    .admin-stat-section-title { font-size: 13px; color: #7dd3fc; font-weight: 600; margin: 0 0 10px; padding-left: 10px; border-left: 3px solid #3b82f6; }
+    .admin-status-row { display: flex; justify-content: space-between; padding: 9px 4px; border-bottom: 1px dashed #2a3b55; font-size: 13px; }
+    .admin-status-row .k { color: #8fa3bd; }
+    .admin-status-row .v { color: #dbe7f6; font-weight: 500; }
     .admin-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; margin-bottom: 16px; }
-    .admin-chart-box { border: 1px solid #dbe4f0; border-radius: 10px; padding: 10px; background: #fbfcfe; }
-    .admin-chart-box h4 { margin: 0 0 6px; font-size: 13px; color: #3c4f66; }
+    .admin-chart-box { border: 1px solid #2a3b55; border-radius: 10px; padding: 10px; background: #131f33; }
+    .admin-chart-box h4 { margin: 0 0 6px; font-size: 13px; color: #a9bad2; }
     .admin-chart-box .chart { height: 220px; }
-    .admin-pager { display: flex; align-items: center; gap: 10px; margin-top: 12px; justify-content: flex-end; font-size: 13px; color: #4a5b70; }
-    .admin-pager button { padding: 4px 12px; border: 1px solid #cdd8e6; background: #fff; border-radius: 6px; cursor: pointer; }
+    .admin-pager { display: flex; align-items: center; gap: 10px; margin-top: 12px; justify-content: flex-end; font-size: 13px; color: #8fa3bd; }
+    .admin-pager button { padding: 4px 12px; border: 1px solid #334563; background: #131f33; border-radius: 6px; cursor: pointer; }
     .admin-pager button:disabled { opacity: .45; cursor: not-allowed; }
     .data-folder-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
-    .data-folder-card { background: #f4f8fd; border: 1px solid #dbe4f0; border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: .15s; }
-    .data-folder-card:hover { border-color: #3b82f6; box-shadow: 0 4px 12px rgba(16,42,67,.12); }
-    .data-folder-icon { font-size: 26px; color: #eab308; margin-bottom: 6px; }
-    .data-folder-name { font-size: 14px; color: #243b53; font-weight: 600; }
-    .data-folder-meta { font-size: 12px; color: #6b7f96; margin-top: 4px; }
-    .admin-path { font-size: 12px; color: #6b7f96; }
+    .data-folder-card { background: #16233a; border: 1px solid #2a3b55; border-radius: 10px; padding: 14px 16px; cursor: pointer; transition: .15s; }
+    .data-folder-card:hover { border-color: #3b82f6; box-shadow: 0 4px 12px rgba(0,0,0,.35); }
+    .data-folder-icon { font-size: 26px; color: #fbbf24; margin-bottom: 6px; }
+    .data-folder-name { font-size: 14px; color: #dbe7f6; font-weight: 600; }
+    .data-folder-meta { font-size: 12px; color: #8fa3bd; margin-top: 4px; }
+    .admin-path { font-size: 12px; color: #8fa3bd; }
+    .data-crumb { font-size: 14px; color: #dbe7f6; font-weight: 600; }
+    .data-dir-link { color: #7dd3fc; cursor: pointer; }
+    .data-dir-link:hover { text-decoration: underline; }
+    /* ===== 设置页：冰冻圈灾害大模型（2026-11-28） ===== */
+    .setting-intro {
+      display: flex; align-items: center; gap: 14px;
+      background: #16233a; border: 1px solid #2a3b55; border-radius: 10px;
+      padding: 14px 18px; margin-bottom: 18px;
+    }
+    .setting-intro-icon {
+      flex: 0 0 auto; width: 42px; height: 42px; border-radius: 10px;
+      background: rgba(59,130,246,.15); color: #7dd3fc;
+      display: flex; align-items: center; justify-content: center; font-size: 20px;
+    }
+    .setting-intro-title { font-size: 16px; font-weight: 600; color: #e8f1ff; }
+    .setting-intro-desc { font-size: 12px; color: #8fa3bd; margin-top: 4px; line-height: 1.6; }
+    .setting-warning {
+      margin-top: 10px; padding: 8px 12px; border-radius: 6px;
+      background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.3);
+      color: #fbbf24; font-size: 12px;
+    }
+    .setting-prompt-wrap {
+      background: #16233a; border: 1px solid #2a3b55; border-radius: 10px;
+      padding: 14px 18px;
+    }
+    .setting-prompt-wrap .admin-form-row { margin-bottom: 0; }
+    .setting-prompt {
+      width: 100%; padding: 10px; border: 1px solid #334563; border-radius: 8px;
+      background: #101c2f; color: #dbe7f6; font-family: inherit;
+      font-size: 13px; line-height: 1.7; box-sizing: border-box; resize: vertical;
+    }
+    .setting-prompt:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,.15); }
+    .setting-prompt-meta { float: right; font-size: 12px; color: #7d90ac; font-weight: 400; }
+    .setting-prompt-actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .setting-prompt-hint { font-size: 12px; color: #7d90ac; }
+    .setting-footnote { font-size: 12px; color: #7d90ac; margin-top: 10px; line-height: 1.6; }
+    /* ===== 数据资产中心（2026-11-28） ===== */
+    .asset-overview {
+      display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+      background: #16233a; border: 1px solid #2a3b55; border-radius: 10px;
+      padding: 14px 18px; margin-bottom: 18px;
+    }
+    .asset-overview-num { font-size: 26px; font-weight: 700; color: #7dd3fc; line-height: 1; }
+    .asset-overview-num span { font-size: 15px; color: #8fa3bd; font-weight: 500; }
+    .asset-overview-label { font-size: 14px; color: #dbe7f6; font-weight: 600; }
+    .asset-overview-note { font-size: 12px; color: #8fa3bd; margin-left: auto; }
+    .asset-group { margin-bottom: 22px; }
+    .asset-group-head { margin-bottom: 10px; padding-left: 10px; border-left: 3px solid #3b82f6; }
+    .asset-group-title { font-size: 14px; color: #7dd3fc; font-weight: 600; }
+    .asset-group-title i { margin-right: 5px; }
+    .asset-group-desc { font-size: 12px; color: #8fa3bd; margin-top: 2px; }
+    .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(248px, 1fr)); gap: 12px; }
+    .asset-card {
+      background: #16233a; border: 1px solid #2a3b55; border-left: 3px solid var(--tone, #3b82f6);
+      border-radius: 10px; padding: 12px 14px; cursor: pointer;
+      transition: transform .15s, border-color .15s, background .15s;
+    }
+    .asset-card:hover { background: #1b2840; border-color: var(--tone, #3b82f6); transform: translateY(-2px); }
+    .asset-card.tone-blue   { --tone: #3b82f6; }
+    .asset-card.tone-ice    { --tone: #7dd3fc; }
+    .asset-card.tone-amber  { --tone: #fbbf24; }
+    .asset-card.tone-green  { --tone: #34d399; }
+    .asset-card.tone-coral  { --tone: #fb7185; }
+    .asset-card.tone-purple { --tone: #a78bfa; }
+    .asset-card.is-missing { opacity: .5; cursor: not-allowed; border-left-color: #5b6b7c; }
+    .asset-card.is-missing:hover { transform: none; background: #16233a; }
+    .asset-card-top { display: flex; align-items: center; gap: 9px; }
+    .asset-icon { width: 30px; height: 30px; flex: 0 0 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--tone, #3b82f6) 16%, transparent); color: var(--tone, #3b82f6); font-size: 15px; }
+    .asset-name { font-size: 14px; color: #e8f1ff; font-weight: 600; }
+    .asset-status { margin-left: auto; font-size: 11px; color: #f87171; border: 1px solid rgba(248,113,113,.5); border-radius: 10px; padding: 1px 7px; }
+    .asset-scale { font-size: 12px; color: #a9bad2; margin: 9px 0 3px 39px; }
+    .asset-usage { font-size: 11.5px; color: #7f93ae; margin-left: 39px; }
+    .asset-enter { font-size: 11px; color: #7dd3fc; text-align: right; margin-top: 10px; opacity: .75; }
+    .asset-card:hover .asset-enter { opacity: 1; }
     .admin-batch { position: relative; }
     .admin-batch summary { list-style: none; cursor: pointer; }
     .admin-batch summary::-webkit-details-marker { display: none; }
-    .admin-batch-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 130px; background: #fff; border: 1px solid #dbe4f0; border-radius: 6px; box-shadow: 0 8px 20px rgba(16,42,67,.16); padding: 4px; }
-    .admin-batch-menu button { display: block; width: 100%; text-align: left; border: none; background: none; padding: 7px 10px; font-size: 13px; color: #33475b; border-radius: 4px; cursor: pointer; }
-    .admin-batch-menu button:hover { background: #f2f7ff; }
+    .admin-batch-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 130px; background: #131f33; border: 1px solid #2a3b55; border-radius: 6px; box-shadow: 0 8px 20px rgba(0,0,0,.45); padding: 4px; }
+    .admin-batch-menu button { display: block; width: 100%; text-align: left; border: none; background: none; padding: 7px 10px; font-size: 13px; color: #dbe7f6; border-radius: 4px; cursor: pointer; }
+    .admin-batch-menu button:hover { background: #1b2840; }
     .admin-batch-menu button.danger { color: #dc4c4c; }
     .admin-role-perm-list { display: grid; gap: 12px; margin-bottom: 18px; }
-    .admin-role-perm { border: 1px solid #dbe4f0; border-radius: 10px; padding: 12px 14px; background: #fbfcfe; }
-    .admin-role-perm-head { display: flex; align-items: center; justify-content: space-between; color: #243b53; font-size: 14px; cursor: pointer; list-style: none; }
+    .admin-role-perm { border: 1px solid #2a3b55; border-radius: 10px; padding: 12px 14px; background: #131f33; }
+    .admin-role-perm-head { display: flex; align-items: center; justify-content: space-between; color: #dbe7f6; font-size: 14px; cursor: pointer; list-style: none; }
     .admin-role-perm-head::-webkit-details-marker { display: none; }
     details[open] > .admin-role-perm-head { margin-bottom: 8px; }
-    .admin-role-perm-head .admin-badge-code { color: #6b7f96; font-size: 12px; margin-left: 8px; font-weight: normal; }
-    .admin-role-perm-foot { margin-top: 10px; }</style>
+    .admin-role-perm-head .admin-badge-code { color: #8fa3bd; font-size: 12px; margin-left: 8px; font-weight: normal; }
+    .admin-role-perm-foot { margin-top: 10px; }
+    /* ===== 独立后台页布局（2026-11-28） =====
+       以前是「首页整页 + 全屏遮罩弹窗」，遮罩把顶栏和地图都盖住，底图白加载。
+       现在在顶栏之下直接铺一块后台卡片：无地图、无侧栏、无关闭按钮。 */
+    .admin-stage {
+      position: fixed;
+      top: var(--nav-height);
+      left: 0; right: 0; bottom: 0;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    .admin-overlay {
+      position: static;
+      inset: auto;
+      padding: 0;
+      background: none;
+      width: 100%;
+      height: 100%;
+    }
+    .admin-panel {
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+      box-shadow: none;
+    }
+    /* 头部栏已删（刷新/退出不再放在这里），侧栏顶部补一个标题标明所在位置。
+       字号略大于菜单项，颜色用系统主题的冰蓝 --ice，与顶部品牌字同源。 */
+    .admin-nav-title {
+      padding: 4px 12px 12px;
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      color: var(--ice);
+    }
+    /* 内容区加载态：复用系统 .loading-spinner / .loading-text 的双圈转轮与呼吸文字，
+       只做局部容器，不套全屏 .loading-overlay（顶栏与侧栏要继续可见）。 */
+    .admin-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: min(420px, 58vh);
+    }
+    .admin-loading .loading-spinner { width: 42px; height: 42px; }
+    .admin-loading .loading-text { font-size: 14px; letter-spacing: 1px; }
+    .admin-loading .loading-content { gap: 16px; }</style>
   <!-- 使用多个CDN源确保Font Awesome加载成功 -->
   <link href="css/lib/font-awesome.min.css" rel="stylesheet">
   <link rel="stylesheet" href="css/command-palette.css?v=20261128nokbd" />
 </head>
-<body>
-  <!-- 加载遮罩层 -->
-  <div class="loading-overlay" id="loading-overlay">
-    <div class="loading-spinner"></div>
-    <div class="loading-text" id="loading-text">系统正在加载中，请稍候...</div>
-  </div>
-
-  <!-- 顶部导航 -->
+<body class="page-admin">
+<!-- 顶部导航 -->
   <div class="topbar">
     <div class="topbar-row1">
       <div class="logo"><img class="logo-img" src="img/logo-icon.png" alt="" width="30" height="30" /><span class="logo-name">青藏高原<em class="logo-key">冰冻圈</em>灾害数字孪生系统</span><span class="logo-code">QTP-CryoTwin</span></div>
@@ -166,269 +284,69 @@
           <input type="search" id="place-search" placeholder="搜索地点或流域…" />
           <button id="search-btn" title="搜索">🔍</button>
         </div>
-        <!-- 身份区：未登录为「登录」，登录后为头像下拉（js/user-menu.js 渲染） -->
+        <!-- 身份区（js/user-menu.js 渲染） -->
         <div class="topbar-user" id="topbar-user"></div>
       </div>
     </div>
   </div>
 
-  <!-- 地图 -->
-  <div id="map" class="map-container">
-  </div>
-
-  <!-- 右侧浮动控制面板 -->
-  <div class="sidepanel">
-    <h3>查看选项</h3>
-    <div class="mode-switch">
-      <button class="active" id="btn-map">普通地图</button>
-      <button id="btn-mix">卫星地图</button>
-    </div>
-    
-    <!-- 图层控制分类 -->
-    <div class="category-container">
-      <!-- 基础地理 -->
-      <div class="category">
-        <div class="category-header">
-          <span>
-            <i class="fa fa-map-o"></i>
-            基础地理
-          </span>
-          <i class="fa fa-chevron-down toggle-icon"></i>
+  <!-- 系统管理：后台页，不再需要底图 -->
+  <div class="admin-stage">
+    <div class="admin-overlay" id="admin-overlay">
+      <div class="admin-panel">
+        <div class="admin-body">
+          <div class="admin-nav">
+            <div class="admin-nav-title">系统管理</div>
+            <a class="admin-nav-item active" data-cat="status"><i class="fa fa-dashboard"></i>系统状态</a>
+            <a class="admin-nav-item" data-cat="data"><i class="fa fa-database"></i>数据管理</a>
+            <a class="admin-nav-item" data-cat="user"><i class="fa fa-users"></i>用户管理</a>
+            <a class="admin-nav-item" data-cat="role"><i class="fa fa-key"></i>角色与权限</a>
+            <a class="admin-nav-item" data-cat="log"><i class="fa fa-history"></i>系统日志</a>
+            <a class="admin-nav-item" data-cat="kb"><i class="fa fa-book"></i>知识库管理</a>
+            <a class="admin-nav-item" data-cat="setting"><i class="fa fa-cog"></i>设置</a>
+          </div>
+          <div class="admin-content" id="admin-content"><div class="admin-empty">正在验证登录状态…</div></div>
         </div>
-        <div class="category-content">
-          <div class="layer-item">
-            <input type="checkbox" id="layer-basin" class="layer-checkbox">
-            <label for="layer-basin">一级流域边界</label>
-          </div>
-          <div class="layer-item">
-            <input type="checkbox" id="layer-basin-5" class="layer-checkbox">
-            <label for="layer-basin-5">五级流域边界</label>
-          </div>
-          <div class="layer-item">
-            <input type="checkbox" id="layer-river" class="layer-checkbox">
-            <label for="layer-river">河网水系</label>
-          </div>
-          <div class="layer-item">
-            <input type="checkbox" id="layer-lake" class="layer-checkbox">
-            <label for="layer-lake">湖泊分布</label>
-          </div>
-        </div>
-      </div>
-      
-      <!-- 行政区划 -->
-      <div class="category">
-        <div class="category-header">
-          <span>
-            <i class="fa fa-flag"></i>
-            行政区划
-          </span>
-          <i class="fa fa-chevron-down toggle-icon"></i>
-        </div>
-        <div class="category-content">
-          <!-- 行政中心 -->
-          <div class="layer-item">
-            <input type="checkbox" id="layer-capital-settlement" class="layer-checkbox">
-            <label for="layer-capital-settlement">省级行政中心</label>
-          </div>
-          <div class="layer-item">
-            <input type="checkbox" id="layer-city-settlement" class="layer-checkbox">
-            <label for="layer-city-settlement">地市级行政中心</label>
-          </div>
-          <div class="layer-item">
-            <input type="checkbox" id="layer-settlement" class="layer-checkbox">
-            <label for="layer-settlement">县级行政中心</label>
-          </div>
-          
-          <!-- 行政边界 -->
-          <div class="layer-item">
-            <input type="checkbox" id="layer-boundary-country" class="layer-checkbox">
-            <label for="layer-boundary-country">国界</label>
-          </div>
-          <div class="layer-item">
-            <input type="checkbox" id="layer-boundary-province" class="layer-checkbox">
-            <label for="layer-boundary-province">省界</label>
-          </div>
-          <div class="layer-item">
-            <input type="checkbox" id="layer-boundary-city" class="layer-checkbox">
-            <label for="layer-boundary-city">地级行政界线</label>
-          </div>
-          <div class="layer-item">
-            <input type="checkbox" id="layer-boundary-county" class="layer-checkbox">
-            <label for="layer-boundary-county">县级行政界线</label>
-          </div>
-        </div>
-      </div>
-      
-      <!-- 气象水文 -->
-      <div class="category">
-        <div class="category-header">
-          <span>
-            <i class="fa fa-tint"></i>
-            气象水文
-          </span>
-          <i class="fa fa-chevron-down toggle-icon"></i>
-        </div>
-        <div class="category-content">
-          <div class="layer-item">
-            <input type="checkbox" id="layer-temperature" class="layer-checkbox">
-            <label for="layer-temperature">温度数据</label>
-          </div>
-          <div class="layer-item">
-            <input type="checkbox" id="layer-precipitation" class="layer-checkbox">
-            <label for="layer-precipitation">降水数据</label>
-          </div>
-          <!-- 积雪数据（气象水文：固态降水） -->
-          <div class="category-item" data-type="snow-data">
-            <div class="layer-item">
-              <input type="checkbox" id="layer-snow-data" class="layer-checkbox">
-              <label for="layer-snow-data">积雪数据</label>
-            </div>
-          </div>
-
-          <div class="layer-item">
-            <input type="checkbox" id="layer-hydrology" class="layer-checkbox">
-            <label for="layer-hydrology">水文站点</label>
-          </div>
-          <div class="layer-item">
-            <input type="checkbox" id="layer-weather-station" class="layer-checkbox">
-            <label for="layer-weather-station">气象站点</label>
-          </div>
-        </div>
-      </div>
-
-      <!-- 冰冻圈 -->
-      <div class="category" id="cryosphere-category">
-        <div class="category-header">
-          <span>
-            <i class="fa fa-snowflake-o"></i>
-            冰冻圈
-          </span>
-          <i class="fa fa-chevron-down toggle-icon"></i>
-        </div>
-        <div class="category-content">
-          <!-- 冻土分布 -->
-          <div class="category-item" data-type="permafrost">
-            <div class="layer-item">
-              <input type="checkbox" id="layer-cryo-permafrost" class="layer-checkbox">
-              <label for="layer-cryo-permafrost">冻土分布</label>
-            </div>
-          </div>
-          
-          <!-- 冰川分布 -->
-          <div class="category-item" data-type="glacier">
-            <div class="layer-item">
-              <input type="checkbox" id="layer-cryo-glacier" class="layer-checkbox">
-              <label for="layer-cryo-glacier">冰川分布</label>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- 社会经济 -->
-      <div class="category">
-        <div class="category-header">
-          <span>
-            <i class="fa fa-building"></i>
-            社会经济
-          </span>
-          <i class="fa fa-chevron-down toggle-icon"></i>
-        </div>
-        <div class="category-content">
-          <div class="layer-item">
-            <input type="checkbox" id="layer-economy" class="layer-checkbox">
-            <label for="layer-economy">GDP</label>
-          </div>
-          <div class="layer-item">
-            <input type="checkbox" id="layer-railway" class="layer-checkbox">
-            <label for="layer-railway">铁路网络</label>
-          </div>
-          <div class="layer-item">
-            <input type="checkbox" id="layer-road" class="layer-checkbox">
-            <label for="layer-road">公路网络</label>
-          </div>
-          <div class="layer-item">
-            <input type="checkbox" id="layer-powerplant" class="layer-checkbox">
-            <label for="layer-powerplant">能源站点</label>
-          </div>
-          <div class="layer-item">
-            <input type="checkbox" id="layer-dam" class="layer-checkbox">
-            <label for="layer-dam">水坝</label>
-          </div>
-          <div class="layer-item">
-            <input type="checkbox" id="layer-reservoir" class="layer-checkbox">
-            <label for="layer-reservoir">水库</label>
-          </div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-
-  <!-- 系统管理面板：默认即显示（封面骨架先出现，避免登录跳转后空闪地图页），
-       未登录时由 admin.js 校验后 401 跳登录页 -->
-  <div class="admin-overlay" id="admin-overlay">
-    <div class="admin-panel">
-      <div class="admin-panel-header">
-        <div class="admin-panel-title">
-          <i class="fa fa-cogs"></i>
-          <span>系统管理</span>
-          <span class="admin-user-badge" id="admin-current-user"></span>
-        </div>
-        <div class="admin-panel-actions">
-          <button class="admin-btn admin-btn-ghost" id="admin-refresh-btn" title="刷新"><i class="fa fa-refresh"></i> 刷新</button>
-          <button class="admin-btn admin-btn-danger" id="admin-logout-btn" title="退出登录"><i class="fa fa-sign-out"></i> 退出</button>
-          <button class="admin-btn admin-btn-ghost" id="admin-close-btn" title="关闭">&times;</button>
-        </div>
-      </div>
-      <div class="admin-body">
-        <div class="admin-nav">
-          <a class="admin-nav-item active" data-cat="user"><i class="fa fa-users"></i>用户管理</a>
-          <a class="admin-nav-item" data-cat="role"><i class="fa fa-user-circle"></i>角色管理</a>
-          <a class="admin-nav-item" data-cat="permission"><i class="fa fa-key"></i>权限管理</a>
-          <a class="admin-nav-item" data-cat="log"><i class="fa fa-history"></i>系统日志</a>
-          <a class="admin-nav-item" data-cat="data"><i class="fa fa-database"></i>数据管理</a>
-          <a class="admin-nav-item" data-cat="agent"><i class="fa fa-comments"></i>大模型设置</a>
-          <a class="admin-nav-item" data-cat="setting"><i class="fa fa-cog"></i>系统设置</a>
-          <a class="admin-nav-item" data-cat="status"><i class="fa fa-dashboard"></i>系统状态</a>
-        </div>
-        <div class="admin-content" id="admin-content"><div class="admin-empty">正在验证登录状态…</div></div>
       </div>
     </div>
   </div>
 
-  <!-- 使用多个CDN源确保OpenLayers加载成功 -->
-  <script src="js/lib/ol.js"></script>
-
-  <!-- 添加资源加载错误处理 -->
+  <!-- 后台页不引入 main.js（那是地图初始化），顶栏下拉在这里内置一份等价逻辑 -->
   <script>
-    // 检查OpenLayers是否加载成功
-    function checkOpenLayersLoaded() {
-      if (typeof ol === 'undefined') {
-        console.error('OpenLayers加载失败，尝试使用本地资源...');
-        // 这里可以添加本地资源加载逻辑
-        alert('地图资源加载失败，请检查网络连接或联系管理员。');
-        return false;
-      }
-      return true;
-    }
-    
-    // 页面加载完成后检查资源
-    window.addEventListener('load', function() {
-      if (!checkOpenLayersLoaded()) {
-        // 如果OpenLayers加载失败，显示错误信息
-        const loadingOverlay = document.getElementById('loading-overlay');
-        if (loadingOverlay) {
-          loadingOverlay.innerHTML = '<div style="text-align: center; padding: 20px; color: red;">地图资源加载失败，请刷新页面或检查网络连接。</div>';
-        }
-      }
-    });
+    (function () {
+      'use strict';
+      document.querySelectorAll('.dropdown-toggle').forEach(function (t) {
+        t.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          var menu = t.nextElementSibling;
+          if (!menu) return;
+          var wasOpen = menu.classList.contains('active');
+          document.querySelectorAll('.dropdown-menu.active').forEach(function (m) { m.classList.remove('active'); });
+          if (!wasOpen) menu.classList.add('active');
+        });
+      });
+      document.addEventListener('click', function () {
+        document.querySelectorAll('.dropdown-menu.active').forEach(function (m) { m.classList.remove('active'); });
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape') return;
+        document.querySelectorAll('.dropdown-menu.active').forEach(function (m) { m.classList.remove('active'); });
+      });
+      // 当前页就是后台，隐藏「系统管理」相关的旧高亮入口
+      var page = window.location.pathname.split('/').pop();
+      document.querySelectorAll('.dropdown-menu .dropdown-item').forEach(function (item) {
+        var href = item.getAttribute('href') || '';
+        if (href.indexOf('?') !== -1) return;
+        if (href.split('/').pop() === page) item.classList.add('active');
+      });
+    })();
   </script>
-  
-  <script src="js/lib/echarts.min.js"></script>
+
   <script src="js/ui-components.js"></script>
-  <script src="js/main.js?v=20261127gdp"></script>
-  <script src="js/admin.js?v=20261128b"></script>
-  <script src="js/user-menu.js?v=20261128f"></script>
-  <script src="js/command-palette.js?v=20261128nokbd"></script>
+  <script src="js/lib/echarts.min.js"></script>
+  <script src="js/admin.js?v=20261128n"></script>
+  <script src="js/command-palette.js?v=20261127basins"></script>
+  <script src="js/user-menu.js?v=20261128i"></script>
 </body>
 </html>

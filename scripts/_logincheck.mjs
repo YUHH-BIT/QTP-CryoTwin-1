@@ -182,21 +182,66 @@ try {
   }
   console.log('管理面板打开耗时(ms):', openMs === null ? '超时未打开' : openMs);
 
-  let badgeText = '';
-  for (let i = 0; i < 60; i++) {
-    badgeText = await evaluate(`(() => { const b = document.getElementById('admin-current-user');
-      return b ? b.textContent : ''; })()`).catch(() => '');
-    if (badgeText) break;
-    await sleep(300);
+  // 头部栏已删，改为等内容区渲染出真实内容（默认落地「系统状态」是卡片+图表，其它分类是表格）
+  const tReady = Date.now();
+  const tableReady = await waitFor('#admin-content .admin-stats, #admin-content table');
+  console.log('内容区就绪:', tableReady, `(${Date.now() - tReady}ms)`);
+  for (let i = 0; i < 40; i++) {
+    const v = await evaluate(`(() => { const e = document.getElementById('stat-data-total'); return e ? e.textContent : null; })()`);
+    if (v && v.indexOf('统计中') < 0) { console.log('数据目录总量回填:', v); break; }
+    await sleep(500);
   }
-  console.log('面板标题栏用户徽标:', JSON.stringify(badgeText));
+  console.log('后台布局:', JSON.stringify(await evaluate(`
+    (() => {
+      const b = el => { const r = el.getBoundingClientRect();
+        return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) }; };
+      const stage = document.querySelector('.admin-stage');
+      const ov = document.getElementById('admin-overlay');
+      const pan = document.querySelector('.admin-panel');
+      return { vh: innerHeight, stage: b(stage), overlay: b(ov), panel: b(pan),
+        panelH: getComputedStyle(pan).height, ovH: getComputedStyle(ov).height };
+    })()
+  `)));
   console.log('me 状态:', await evaluate(`fetch('/api/auth/me').then(r => r.status).catch(e => 'ERR')`));
   await sleep(1500);
   await shot('03_admin_after_login.png', 900);
+  await shotRegion('03b_admin_nav_zoom.png', 10, 50, 300, 420, 2);
+  await shotRegion('03c_admin_stats_zoom.png', 140, 50, 1400, 200, 1.2);
 
-  /* ---------- 4. 首页顶栏（管理员身份区 = 直达入口） ---------- */
+  /* ---------- 3b. 内容区加载动效（系统同款双圈转轮） ---------- */
+  // 手动把内容区切成加载态，捕捉画面（真实切换时它只闪现几百 ms）
+  await evaluate(`(() => {
+    document.getElementById('admin-content').innerHTML =
+      '<div class="admin-loading"><div class="loading-content">' +
+      '<div class="loading-spinner"></div>' +
+      '<p class="loading-text">系统正在加载中，请稍候...</p>' +
+      '</div></div>';
+    return true;
+  })()`);
+  await sleep(400);
+  console.log('加载动效:', JSON.stringify(await evaluate(`
+    (() => { const s = document.querySelector('.admin-loading .loading-spinner');
+      const t = document.querySelector('.admin-loading .loading-text');
+      if (!s || !t) return null;
+      const cs = getComputedStyle(s), ct = getComputedStyle(t);
+      return { spinner: cs.width, spinAnim: cs.animationName, text: t.textContent,
+               textAnim: ct.animationName, color: ct.color }; })()
+  `)));
+  await shot('13_admin_loading.png', 900);
+
+  /* ---------- 3c. 真实切换分类 → 系统日志页（ECharts 深色适配） ---------- */
+  // 点下去的瞬间应出现加载态 DOM，随后被内容替换
+  await evaluate(`document.querySelector('.admin-nav-item[data-cat="log"]').click(); true`);
+  console.log('切换瞬间加载态出现:', await evaluate(`!!document.querySelector('.admin-loading')`));
+  await waitFor('#chart-trend');
+  await sleep(1500);
+  console.log('日志页图表 canvas:', await evaluate(`document.querySelectorAll('#admin-content canvas').length`));
+  console.log('加载完成后加载态已移除:', await evaluate(`!document.querySelector('.admin-loading')`));
+  await shot('12_admin_log_dark.png', 900);
+
+  /* ---------- 4. 首页顶栏（管理员身份区 = 头像菜单） ---------- */
   await goto(`${BASE}/index.html`);
-  console.log('身份区出现:', await waitFor('#tu-enter'));
+  console.log('身份区出现:', await waitFor('#tu-toggle'));
   await evaluate(`(()=>{const o=document.getElementById('loading-overlay');if(o)o.classList.remove('active');return true})()`);
   await sleep(500);
 
@@ -206,18 +251,18 @@ try {
         return { x: Math.round(b.x), w: Math.round(b.width), right: Math.round(b.right) }; };
       const nav = document.querySelector('.nav-links');
       const right = document.querySelector('.topbar-right');
-      const enter = document.getElementById('tu-enter');
+      const toggle = document.getElementById('tu-toggle');
+      const menuLink = document.querySelector('#tu-menu a');
       const nb = nav.getBoundingClientRect(), rb = right.getBoundingClientRect();
       return {
         vw: innerWidth,
         navItems: [...document.querySelectorAll('.nav-links > a, .nav-links > .dropdown-container > .dropdown-toggle')].map(e => e.textContent.trim()),
         navCenter: Math.round(nb.left + nb.width / 2), vwCenter: Math.round(innerWidth / 2),
-        right: box(right), userEntry: box(enter),
+        right: box(right), userEntry: box(toggle),
         searchBtn: box(document.getElementById('search-btn')),
         searchInput: box(document.getElementById('place-search')),
-        entryHref: enter ? enter.getAttribute('href') : null,
-        entryText: enter ? enter.textContent.trim() : null,
-        hasMenu: !!document.getElementById('tu-menu'),
+        menuItems: [...document.querySelectorAll('#tu-menu a, #tu-menu button')].map(e => e.textContent.trim()),
+        menuHref: menuLink ? menuLink.getAttribute('href') : null,
         overlap: rb.left < nb.right,
         overflowX: document.documentElement.scrollWidth > innerWidth
       };
@@ -227,20 +272,39 @@ try {
   await shot('04_topbar_admin.png', 300);
   await shotRegion('04b_topbar_right_zoom.png', 1240, 0, 340, 62, 2);
 
-  /* ---------- 5. 点身份区 → 进管理页 ---------- */
-  await evaluate(`document.getElementById('tu-enter').click(); true`);
+  /* ---------- 5. 头像菜单 → 进入系统管理 ---------- */
+  await evaluate(`document.getElementById('tu-toggle').click(); true`);
+  await sleep(400);
+  await shot('04c_user_menu.png', 360);
+  await evaluate(`document.querySelector('#tu-menu a').click(); true`);
   const entered = await waitPath('admin.html');
-  console.log('点身份区落点:', entered || '（未跳转）');
+  console.log('菜单进入系统管理落点:', entered || '（未跳转）');
 
-  /* ---------- 6. 退出登录 → 未登录态 ---------- */
-  // 等面板头部绑定完成（徽标有内容），否则点击会落在未绑定监听器的按钮上
-  for (let i = 0; i < 60; i++) {
-    const t = await evaluate(`(() => { const b = document.getElementById('admin-current-user');
-      return b ? b.textContent : ''; })()`).catch(() => '');
-    if (t) break;
-    await sleep(300);
-  }
-  await evaluate(`document.getElementById('admin-logout-btn').click(); true`);
+  /* ---------- 5b. 后台页窄屏自查（1280×720） ---------- */
+  await sleep(1200);
+  await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
+  await sleep(900);
+  console.log('后台窄屏 1280×720:', JSON.stringify(await evaluate(`
+    (() => {
+      const r = el => el.getBoundingClientRect();
+      const pan = r(document.querySelector('.admin-panel'));
+      const cont = r(document.getElementById('admin-content'));
+      const table = document.getElementById('admin-content').querySelector('table');
+      return { panelH: Math.round(pan.height), contentH: Math.round(cont.height),
+        tableOverflow: table ? table.scrollWidth > cont.width : null,
+        pageOverflowX: document.documentElement.scrollWidth > innerWidth };
+    })()
+  `)));
+  await shot('07_admin_1280.png', 720);
+  await send('Emulation.clearDeviceMetricsOverride');
+  await sleep(600);
+
+  /* ---------- 6. 头像菜单 → 退出登录 ---------- */
+  // 身份区要等 /api/auth/me 回来才渲染，先等头像按钮出现
+  console.log('后台页身份区出现:', await waitFor('#tu-toggle'));
+  await evaluate(`document.getElementById('tu-toggle').click(); true`);
+  await sleep(400);
+  await evaluate(`document.getElementById('tu-logout').click(); true`);
   const backToLogin = await waitPath('login.html');
   console.log('退出后路径:', backToLogin || '（未跳登录页）');
 

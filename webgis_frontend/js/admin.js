@@ -71,7 +71,8 @@
   }
 
   const AdminPanel = {
-    currentCat: 'user',
+    // 默认落地页 = 系统状态（概览优先，2026-11-28 用户定序）
+    currentCat: 'status',
 
     async init() {
       // 登录校验
@@ -91,9 +92,9 @@
         badge.textContent = roleLabel ? (me.user + ' · ' + roleLabel) : (me.display_name || me.user);
       }
       this.bindHeader();
-      // 打开面板：URL 指定分类则打开该分类，否则默认用户管理
+      // 打开面板：URL 指定分类则打开该分类，否则落在系统状态（概览）
       const cat = new URLSearchParams(window.location.search).get('cat');
-      this.openCategory(cat || 'user');
+      this.openCategory(cat || 'status');
       // 供 main.js 下拉菜单调用
       window.applyNavCategory = (c) => this.openCategory(c);
     },
@@ -115,14 +116,22 @@
     },
 
     async openCategory(cat) {
-      const valid = ['user', 'role', 'permission', 'log', 'data', 'agent', 'setting', 'status'];
-      if (valid.indexOf(cat) < 0) cat = 'user';
+      const valid = ['status', 'data', 'user', 'role', 'log', 'kb', 'setting'];
+      if (valid.indexOf(cat) < 0) cat = 'status';
       this.currentCat = cat;
       overlayEl().style.display = 'flex';
       document.querySelectorAll('.admin-nav-item').forEach(n => {
         n.classList.toggle('active', n.getAttribute('data-cat') === cat);
       });
-      setContent('<div class="admin-empty">加载中…</div>');
+      // 与系统其他页同款加载动效：双层转轮 + 呼吸文字（样式在 admin.html 的 .admin-loading）
+      setContent(
+        '<div class="admin-loading">' +
+          '<div class="loading-content">' +
+            '<div class="loading-spinner"></div>' +
+            '<p class="loading-text">系统正在加载中，请稍候...</p>' +
+          '</div>' +
+        '</div>'
+      );
       try {
         await this['render' + cat.charAt(0).toUpperCase() + cat.slice(1)]();
       } catch (e) {
@@ -169,7 +178,7 @@
       const totalPages = data.total_pages || 1;
       const html =
         '<div class="admin-toolbar">' +
-          '<h3>用户管理</h3>' +
+          '<span class="admin-toolbar-gap"></span>' +
           '<input class="admin-search" id="user-search" placeholder="搜索用户名/显示名（回车查询）" value="' + esc(keyword) + '" />' +
           '<button class="admin-btn" data-action="add-user">＋ 新增用户</button>' +
           '<details class="admin-batch"><summary class="admin-btn admin-btn-sm admin-btn-ghost">批量操作 ▾</summary>' +
@@ -310,8 +319,9 @@
 
     // ---------------- 角色管理 ----------------
     async renderRole() {
-      const rRes = await api('/api/admin/roles');
+      const [rRes, pRes] = await Promise.all([api('/api/admin/roles'), api('/api/admin/permissions')]);
       const roles = rRes.data || [];
+      const perms = pRes.data || [];
       const rows = roles.map(r =>
         '<tr>' +
         '<td>' + r.id + '</td>' +
@@ -325,15 +335,25 @@
           '<button class="admin-btn admin-btn-sm admin-btn-danger" data-action="del-role" data-id="' + r.id + '">删除</button>' +
         '</td></tr>'
       ).join('');
+      const permRows = perms.map(p =>
+        '<tr><td>' + p.id + '</td><td>' + esc(p.name) + '</td><td><code>' + esc(p.code) + '</code></td><td>' + esc(p.description || '') + '</td></tr>'
+      ).join('');
       const html =
         '<div class="admin-toolbar">' +
-          '<h3>角色管理</h3>' +
+          '<span class="admin-toolbar-gap"></span>' +
           '<button class="admin-btn" data-action="add-role">＋ 新增角色</button>' +
         '</div>' +
         '<table class="admin-table">' +
           '<thead><tr><th>ID</th><th>名称</th><th>编码</th><th>描述</th><th>用户数</th><th>权限数</th><th>操作</th></tr></thead>' +
           '<tbody>' + (rows || '<tr><td colspan="7" class="admin-empty">暂无角色</td></tr>') + '</tbody>' +
-        '</table>';
+        '</table>' +
+        '<details class="admin-role-perm" style="margin-top:18px;">' +
+          '<summary class="admin-role-perm-head"><span>权限点清单 <span class="admin-badge-code">共 ' + perms.length + ' 项</span></span></summary>' +
+          '<table class="admin-table">' +
+            '<thead><tr><th>ID</th><th>模块</th><th>权限编码</th><th>说明</th></tr></thead>' +
+            '<tbody>' + (permRows || '<tr><td colspan="4" class="admin-empty">暂无权限</td></tr>') + '</tbody>' +
+          '</table>' +
+        '</details>';
       setContent(html);
     },
 
@@ -395,36 +415,6 @@
       });
     },
 
-    // ---------------- 权限管理 ----------------
-    async renderPermission() {
-      const [pRes, rRes] = await Promise.all([api('/api/admin/permissions'), api('/api/admin/roles')]);
-      const perms = pRes.data || [];
-      const roles = rRes.data || [];
-      const rows = perms.map(p =>
-        '<tr><td>' + p.id + '</td><td>' + esc(p.name) + '</td><td><code>' + esc(p.code) + '</code></td><td>' + esc(p.description || '') + '</td></tr>'
-      ).join('');
-      const roleBlocks = roles.map(r => {
-        const owned = r.permissions || [];
-        const boxes = perms.map(p =>
-          '<label><input type="checkbox" class="perm-cb" value="' + esc(p.code) + '"' + (owned.indexOf(p.code) >= 0 ? ' checked' : '') + ' /> ' + esc(p.description || p.code) + '</label>'
-        ).join('');
-        return '<details class="admin-role-perm" data-role-id="' + r.id + '">' +
-          '<summary class="admin-role-perm-head"><span>' + esc(r.name) +
-            '<span class="admin-badge-code">' + esc(r.code) + ' · ' + owned.length + '</span></span></summary>' +
-          '<div class="admin-perm-grid">' + boxes + '</div>' +
-          '<div class="admin-role-perm-foot"><button class="admin-btn admin-btn-sm" data-action="save-role-perms" data-id="' + r.id + '">保存</button></div>' +
-          '</details>';
-      }).join('');
-      const html =
-        '<div class="admin-toolbar"><h3>权限管理</h3></div>' +
-        '<div class="admin-role-perm-list">' + (roleBlocks || '<div class="admin-empty">暂无角色</div>') + '</div>' +
-        '<table class="admin-table">' +
-          '<thead><tr><th>ID</th><th>模块</th><th>权限编码</th><th>说明</th></tr></thead>' +
-          '<tbody>' + (rows || '<tr><td colspan="4" class="admin-empty">暂无权限</td></tr>') + '</tbody>' +
-        '</table>';
-      setContent(html);
-    },
-
     // ---------------- 系统日志 ----------------
     async renderLog() {
       const limit = this._logLimit || 100;
@@ -446,7 +436,7 @@
       ).join('');
       const html =
         '<div class="admin-toolbar">' +
-          '<h3>系统日志</h3>' +
+          '<span class="admin-toolbar-gap"></span>' +
           '<input class="admin-search" id="log-user" placeholder="用户" value="' + esc(f.user || '') + '" style="width:110px;" />' +
           '<input class="admin-search" id="log-action" placeholder="动作" value="' + esc(f.action || '') + '" style="width:110px;" />' +
           '<input class="admin-search" id="log-keyword" placeholder="关键词" value="' + esc(f.keyword || '') + '" style="width:130px;" />' +
@@ -517,6 +507,14 @@
       const actionEl = document.getElementById('chart-action');
       const userEl = document.getElementById('chart-user');
       if (!trendEl || !actionEl || !userEl) return;
+      // 后台内容区为深色主题：ECharts 默认深色文字在深底上看不清，统一注入浅色配置
+      const DARK = {
+        textStyle: { color: '#a9bad2' },
+        tooltip: { backgroundColor: '#16233a', borderColor: '#3b82f6', textStyle: { color: '#e8f1ff' } },
+        axisLine: { lineStyle: { color: '#3a4a66' } },
+        axisLabel: { color: '#8fa3bd' },
+        splitLine: { lineStyle: { color: '#243450' } }
+      };
       const trend = echarts.init(trendEl);
       const action = echarts.init(actionEl);
       const user = echarts.init(userEl);
@@ -525,96 +523,219 @@
       trend.setOption({
         tooltip: { trigger: 'axis' },
         grid: { left: 40, right: 20, top: 30, bottom: 30 },
-        xAxis: { type: 'category', data: daily.map(d => d.date), axisLabel: { fontSize: 11 } },
-        yAxis: { type: 'value', minInterval: 1 },
+        textStyle: DARK.textStyle, tooltip: DARK.tooltip,
+        xAxis: { type: 'category', data: daily.map(d => d.date), axisLabel: { fontSize: 11, color: DARK.axisLabel.color }, axisLine: DARK.axisLine },
+        yAxis: { type: 'value', minInterval: 1, axisLabel: DARK.axisLabel, axisLine: DARK.axisLine, splitLine: DARK.splitLine },
         series: [{ name: '操作次数', type: 'line', smooth: true, data: daily.map(d => d.count), areaStyle: { opacity: 0.15 }, itemStyle: { color: '#3b82f6' } }]
       });
       const acts = stats.by_action || [];
       action.setOption({
         tooltip: { trigger: 'item' },
-        legend: { bottom: 0, type: 'scroll' },
+        textStyle: DARK.textStyle, tooltip: DARK.tooltip,
+        legend: { bottom: 0, type: 'scroll', textStyle: { color: '#a9bad2' } },
         series: [{ name: '操作类型', type: 'pie', radius: ['38%', '62%'], data: acts.map(a => ({ name: a.action, value: a.count })), label: { fontSize: 11 } }]
       });
       const users = stats.by_user || [];
       user.setOption({
         tooltip: { trigger: 'axis' },
         grid: { left: 70, right: 20, top: 20, bottom: 30 },
-        xAxis: { type: 'value', minInterval: 1 },
-        yAxis: { type: 'category', data: users.map(u => u.username).reverse(), axisLabel: { fontSize: 11 } },
+        textStyle: DARK.textStyle, tooltip: DARK.tooltip,
+        xAxis: { type: 'value', minInterval: 1, axisLabel: DARK.axisLabel, axisLine: DARK.axisLine, splitLine: DARK.splitLine },
+        yAxis: { type: 'category', data: users.map(u => u.username).reverse(), axisLabel: { fontSize: 11, color: DARK.axisLabel.color }, axisLine: DARK.axisLine },
         series: [{ name: '操作次数', type: 'bar', data: users.map(u => u.count).reverse(), itemStyle: { color: '#34d399' } }]
       });
     },
 
-    // ---------------- 系统设置 ----------------
-    async renderSetting() {
-      const meRes = await api('/api/auth/me');
-      const me = meRes;
-      const roleCode = me.role_code || '';
-      const roleName = roleCode === 'admin' ? '系统管理员' : (roleCode === 'operator' ? '运维人员' : (roleCode === 'viewer' ? '访客' : roleCode));
-      const html =
-        '<div class="admin-toolbar"><h3>系统设置</h3></div>' +
-        '<div class="admin-stats" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));margin-bottom:18px;">' +
-          '<div class="admin-stat"><div class="v">' + esc(me.user || '') + '</div><div class="k">当前登录账号</div></div>' +
-          '<div class="admin-stat"><div class="v">' + esc(me.display_name || '—') + '</div><div class="k">显示名称</div></div>' +
-          '<div class="admin-stat"><div class="v">' + esc(roleName) + '</div><div class="k">所属角色</div></div>' +
-        '</div>' +
-        '<div class="admin-form-row"><label>修改当前账号密码</label></div>' +
-        '<div class="admin-form-row"><label>原密码</label><input id="s-old" type="password" /></div>' +
-        '<div class="admin-form-row"><label>新密码（至少6位）</label><input id="s-new" type="password" /></div>' +
-        '<div class="admin-form-row"><label>确认新密码</label><input id="s-confirm" type="password" /></div>' +
-        '<button class="admin-btn" id="s-save">保存修改</button>';
-      setContent(html);
-      const btn = document.getElementById('s-save');
-      if (btn) btn.addEventListener('click', async () => {
-        const p1 = document.getElementById('s-new').value;
-        const p2 = document.getElementById('s-confirm').value;
-        if (p1 !== p2) { toast('两次输入的新密码不一致', 'error'); return; }
-        try {
-          await api('/api/admin/change-password', {
-            method: 'POST',
-            body: JSON.stringify({
-              old_password: document.getElementById('s-old').value,
-              new_password: p1
-            })
-          });
-          toast('密码已修改，请重新登录', 'success');
-          setTimeout(() => { window.location.href = 'login.html'; }, 1200);
-        } catch (err) { toast(err.message, 'error'); }
-      });
-
-    },
-
-    // ---------------- 大模型设置 ----------------
-    async renderAgent() {
+    // ---------------- 知识库管理（冰冻圈灾害大模型 RAG） ----------------
+    async renderKb() {
       let roleCode = '';
       try {
         const meRes = await api('/api/auth/me');
         roleCode = (meRes && meRes.role_code) || '';
       } catch (e) { /* ignore */ }
       const canEdit = roleCode !== 'viewer';
+
+      let d = {};
+      try {
+        const res = await api('/api/admin/kb-status');
+        d = (res && res.data) || {};
+      } catch (e) {
+        toast('知识库状态读取失败：' + (e && e.message ? e.message : '接口不可用'), 'error');
+      }
+
+      const counts = d.counts || {};
+      const sources = d.sources || [];
+      const LABELS = [
+        ['kb_disaster_cases', '灾害事件案例'],
+        ['kb_stations', '气象站点'],
+        ['kb_counties', '县域社会经济'],
+        ['kb_infra', '基础设施'],
+        ['kb_geo_overview', '冰冻圈地理概览'],
+        ['kb_era5_stats', 'ERA5 气象索引'],
+        ['kb_methods', '风险评估方法学']
+      ];
+      const statCards = LABELS.map(function (p) {
+        return '<div class="admin-stat"><div class="v">' +
+          (counts[p[0]] != null ? counts[p[0]] : '—') + '</div><div class="k">' + p[1] + '</div></div>';
+      }).join('');
+      const rows = sources.map(function (s) {
+        return '<tr>' +
+          '<td>' + esc(s.name) + '</td>' +
+          '<td>' + esc(s.description) + '</td>' +
+          '<td>' + (s.size_bytes ? fmtSize(s.size_bytes) : '—') + '</td>' +
+          '<td>' + esc(s.updated_at || '—') + '</td>' +
+          '<td>' + (s.exists ? '<span class="badge badge-ok">就绪</span>' : '<span class="badge badge-off">缺失</span>') + '</td>' +
+        '</tr>';
+      }).join('');
+
       const html =
-        '<div class="admin-toolbar"><h3>大模型设置</h3></div>' +
-        '<textarea id="agent-prompt" rows="16" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #cdd8e6;border-radius:8px;font-family:inherit;font-size:13px;line-height:1.6;background:#fff;color:#243b53;"' + (canEdit ? '' : ' readonly') + '></textarea>' +
-        '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;">' +
-          (canEdit
-            ? '<button class="admin-btn" id="agent-save">保存</button>' +
-              '<button class="admin-btn admin-btn-cancel" id="agent-reset">恢复默认</button>'
-            : '') +
-        '</div>';
+        '<div class="setting-intro">' +
+          '<div class="setting-intro-icon"><i class="fa fa-book"></i></div>' +
+          '<div class="setting-intro-text">' +
+            '<div class="setting-intro-title">冰冻圈灾害大模型知识库</div>' +
+            '<div class="setting-intro-desc">从项目真实数据构建，大模型回答时检索并标注来源。原始图层或统计表更新后，需要手动重建才会生效。</div>' +
+          '</div>' +
+        '</div>' +
+        (d.built
+          ? '<div class="admin-stat-section">' +
+              '<div class="admin-stat-section-title">入库内容</div>' +
+              '<div class="admin-stats">' + statCards + '</div>' +
+            '</div>' +
+            '<div class="admin-stat-section">' +
+              '<div class="admin-toolbar">' +
+                '<div class="admin-stat-section-title" style="margin:0;">数据源 · ' + sources.length + ' 项</div>' +
+                '<span class="admin-toolbar-gap"></span>' +
+                (canEdit ? '<button class="admin-btn" id="kb-rebuild"><i class="fa fa-refresh"></i> 重建知识库</button>' : '<span class="setting-prompt-hint">当前角色只读</span>') +
+              '</div>' +
+              '<table class="admin-table">' +
+                '<thead><tr><th>数据源</th><th>说明</th><th>大小</th><th>构建时间</th><th>状态</th></tr></thead>' +
+                '<tbody>' + (rows || '<tr><td colspan="5" class="admin-empty">暂无数据源</td></tr>') + '</tbody>' +
+              '</table>' +
+              '<div class="setting-footnote">重建会重新读取项目目录中的 GeoJSON / CSV / SQLite 索引，使知识库与数据现状一致；过程中请勿关闭页面。</div>' +
+            '</div>'
+          : '<div class="admin-empty">知识库尚未构建。</div>' +
+            (canEdit ? '<div style="text-align:center;"><button class="admin-btn" id="kb-rebuild">重建知识库</button></div>' : ''));
       setContent(html);
 
+      const btn = document.getElementById('kb-rebuild');
+      if (btn) btn.addEventListener('click', async () => {
+        let ok = false;
+        if (window.UI && window.UI.confirm) {
+          ok = await UI.confirm({ title: '重建知识库', message: '将从项目真实数据重建全部知识库表，过程中请勿关闭页面。确定继续吗？', danger: true });
+        } else {
+          ok = window.confirm('确定重建知识库吗？');
+        }
+        if (!ok) return;
+        btn.disabled = true;
+        const old = btn.innerHTML;
+        btn.textContent = '重建中…';
+        try {
+          await api('/api/admin/kb-rebuild', { method: 'POST' });
+          toast('知识库已重建', 'success');
+          this.openCategory('kb');
+        } catch (err) {
+          toast(err.message, 'error');
+          btn.disabled = false;
+          btn.innerHTML = old;
+        }
+      });
+    },
+
+    // ---------------- 设置（冰冻圈灾害大模型） ----------------
+    // 账号信息与修改密码已并入右上角头像菜单；此页只保留大模型配置。
+    async renderSetting() {
+      let roleCode = '';
       try {
-        const cfg = await api('/api/admin/agent-config');
-        const d = cfg.data || {};
-        const ta = document.getElementById('agent-prompt');
-        if (ta) ta.value = d.system_prompt || '';
+        const meRes = await api('/api/auth/me');
+        roleCode = (meRes && meRes.role_code) || '';
+      } catch (e) { /* ignore */ }
+      const canEdit = roleCode !== 'viewer';
+
+      let cfg = {};
+      try {
+        const res = await api('/api/admin/agent-config');
+        cfg = (res && res.data) || {};
       } catch (e) {
         toast('大模型配置读取失败：' + (e && e.message ? e.message : '接口不可用'), 'error');
       }
 
+      const model = cfg.model || '—';
+      const hasApiStatus = Object.prototype.hasOwnProperty.call(cfg, 'api_configured');
+      const apiReady = !!cfg.api_configured;
+      const hasAmapStatus = Object.prototype.hasOwnProperty.call(cfg, 'amap_configured');
+      const amapReady = !!cfg.amap_configured;
+      const isDefault = cfg.is_default !== false;
+      const prompt = cfg.system_prompt || '';
+      const updatedAt = cfg.updated_at || '—';
+
+      const html =
+        '<div class="setting-intro">' +
+          '<div class="setting-intro-icon"><i class="fa fa-comments"></i></div>' +
+          '<div class="setting-intro-text">' +
+            '<div class="setting-intro-title">冰冻圈灾害大模型</div>' +
+            '<div class="setting-intro-desc">用于灾害机理解读、风险分级说明与应急对策问答。下方提示词定义它的角色与输出边界，保存后对新会话立即生效。</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="admin-stat-section">' +
+          '<div class="admin-stat-section-title">运行状态</div>' +
+          '<div class="admin-stats">' +
+            '<div class="admin-stat"><div class="v" style="font-size:15px;">' + esc(model) + '</div><div class="k">底层模型</div></div>' +
+            '<div class="admin-stat"><div class="v">' + (!hasApiStatus ? '<span class="badge badge-gray">未知</span>' : (apiReady ? '<span class="badge badge-ok">已配置</span>' : '<span class="badge badge-off">未配置</span>')) + '</div><div class="k">DeepSeek 接口密钥</div></div>' +
+            '<div class="admin-stat"><div class="v">' + (!hasAmapStatus ? '<span class="badge badge-gray">未知</span>' : (amapReady ? '<span class="badge badge-ok">已配置</span>' : '<span class="badge badge-off">未配置</span>')) + '</div><div class="k">高德地图 Key</div></div>' +
+            '<div class="admin-stat"><div class="v" id="setting-prompt-source">' + (isDefault ? '内置默认' : '自定义') + '</div><div class="k">提示词来源</div></div>' +
+            '<div class="admin-stat"><div class="v" id="setting-updated-at">' + esc(updatedAt) + '</div><div class="k">最近修改</div></div>' +
+          '</div>' +
+          (hasApiStatus && !apiReady
+            ? '<div class="setting-warning"><i class="fa fa-exclamation-triangle"></i> 后端尚未配置 DeepSeek API 密钥，模型对话暂不可用；提示词仍可编辑。</div>'
+            : '') +
+          (hasAmapStatus && !amapReady
+            ? '<div class="setting-warning"><i class="fa fa-exclamation-triangle"></i> 后端尚未配置高德地图 Key，在线影像底图可能无法加载。</div>'
+            : '') +
+        '</div>' +
+        '<div class="admin-stat-section">' +
+          '<div class="admin-stat-section-title">系统提示词</div>' +
+          '<div class="setting-prompt-wrap">' +
+            '<div class="admin-form-row">' +
+              '<label>角色设定与输出边界 <span class="setting-prompt-meta" id="setting-prompt-count">' + prompt.length + ' 字</span></label>' +
+              '<textarea id="agent-prompt" class="setting-prompt" rows="16"' + (canEdit ? '' : ' readonly') + '>' + esc(prompt) + '</textarea>' +
+            '</div>' +
+            (canEdit
+              ? '<div class="setting-prompt-actions">' +
+                  '<button class="admin-btn" id="agent-save">保存</button>' +
+                  '<button class="admin-btn admin-btn-cancel" id="agent-reset">恢复默认</button>' +
+                  '<span class="setting-prompt-hint">修改后对所有用户的新会话生效</span>' +
+                '</div>'
+              : '<div class="setting-prompt-actions"><span class="setting-prompt-hint">当前角色只读，无法修改配置</span></div>') +
+          '</div>' +
+          '<div class="setting-footnote">提示词只定义模型角色与回答边界，不提供实时数据；模型输出不能替代防洪决策。</div>' +
+        '</div>' +
+        '<div class="admin-stat-section">' +
+          '<div class="admin-stat-section-title">配置备份</div>' +
+          '<div class="setting-prompt-wrap">' +
+            '<div class="setting-intro-desc">备份文件包含用户、角色、权限、操作日志与大模型提示词（约 64 KB），不含 data/ 下的大体积数据。恢复前会自动把当前配置留一份 .bak。</div>' +
+            '<div class="setting-prompt-actions">' +
+              (canEdit
+                ? '<a class="admin-btn" style="text-decoration:none;display:inline-block;" href="/api/admin/config-backup" download><i class="fa fa-download"></i> 下载备份</a>'
+                : '<span class="setting-prompt-hint">当前角色只读</span>') +
+            '</div>' +
+            (canEdit
+              ? '<div class="admin-form-row" style="margin-top:16px;"><label>从备份恢复</label>' +
+                  '<input type="file" id="config-restore-file" accept=".db" style="padding:6px;" /></div>' +
+                '<div class="setting-prompt-actions">' +
+                  '<button class="admin-btn admin-btn-danger" id="config-restore-btn">恢复配置</button>' +
+                  '<span class="setting-prompt-hint">恢复后需要重新登录</span>' +
+                '</div>'
+              : '') +
+          '</div>' +
+        '</div>';
+      setContent(html);
+
+      const ta = document.getElementById('agent-prompt');
+      const counter = document.getElementById('setting-prompt-count');
+      if (ta && counter) ta.addEventListener('input', function () { counter.textContent = ta.value.length + ' 字'; });
+
       const saveBtn = document.getElementById('agent-save');
       if (saveBtn) saveBtn.addEventListener('click', async () => {
-        const ta = document.getElementById('agent-prompt');
         const val = (ta ? ta.value : '').trim();
         if (!val) { toast('系统提示词不能为空', 'error'); return; }
         saveBtn.disabled = true;
@@ -623,6 +744,10 @@
         try {
           await api('/api/admin/agent-config', { method: 'PUT', body: JSON.stringify({ system_prompt: val }) });
           toast('已保存，立即生效', 'success');
+          const src = document.getElementById('setting-prompt-source');
+          if (src) src.textContent = '自定义';
+          const at = document.getElementById('setting-updated-at');
+          if (at) at.textContent = new Date().toLocaleString('zh-CN', { hour12: false }).replace(/\//g, '-');
         } catch (err) { toast(err.message, 'error'); }
         finally {
           saveBtn.disabled = false;
@@ -638,8 +763,38 @@
         try {
           await api('/api/admin/agent-config', { method: 'DELETE' });
           toast('已恢复默认', 'success');
-          this.openCategory('agent');
+          this.openCategory('setting');
         } catch (err) { toast(err.message, 'error'); }
+      });
+
+      const restoreBtn = document.getElementById('config-restore-btn');
+      if (restoreBtn) restoreBtn.addEventListener('click', async () => {
+        const input = document.getElementById('config-restore-file');
+        const file = input && input.files && input.files[0];
+        if (!file) { toast('请先选择备份文件', 'error'); return; }
+        let ok = false;
+        if (window.UI && window.UI.confirm) {
+          ok = await UI.confirm({ title: '恢复配置', message: '将用上传的备份覆盖当前配置（当前配置会自动留一份 .bak）。确定继续吗？', danger: true });
+        } else {
+          ok = window.confirm('确定恢复配置吗？');
+        }
+        if (!ok) return;
+        const fd = new FormData();
+        fd.append('file', file);
+        restoreBtn.disabled = true;
+        const old = restoreBtn.textContent;
+        restoreBtn.textContent = '恢复中…';
+        try {
+          const resp = await fetch('/api/admin/config-restore', { method: 'POST', body: fd });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error((data && data.message) || '恢复失败');
+          toast('配置已恢复，即将跳转登录页', 'success');
+          setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+        } catch (err) {
+          toast(err.message, 'error');
+          restoreBtn.disabled = false;
+          restoreBtn.textContent = old;
+        }
       });
     },
 
@@ -652,26 +807,21 @@
     },
 
     async renderStatus() {
-      const [stRes, sysRes, treeRes] = await Promise.all([
+      // 数据相关指标已收归「数据管理」页；这里只呈现系统运行指标，
+      // 不再触发 /api/admin/data-tree 的几十 GB 递归统计。
+      const [stRes, sysRes] = await Promise.all([
         api('/api/admin/stats'),
-        api('/api/system/status'),
-        api('/api/admin/data-tree')
+        api('/api/system/status')
       ]);
       const s = stRes.data || {};
       const sys = sysRes || {};
-      const roots = (treeRes.data && treeRes.data.roots) || [];
-      let dataFiles = 0, dataBytes = 0;
-      roots.forEach(function (r) {
-        (r.children || []).forEach(function (c) {
-          dataFiles += (c.file_count || 0);
-          dataBytes += (c.size_bytes || 0);
-        });
-      });
-      const ok = '<span style="color:#1e7e34;font-weight:600;">正常</span>';
-      const bad = '<span style="color:#dc4c4c;font-weight:600;">异常</span>';
+      const ok = '<span style="color:#4ade80;font-weight:600;">正常</span>';
+      const bad = '<span style="color:#f87171;font-weight:600;">异常</span>';
       const html =
-        '<div class="admin-toolbar"><h3>系统状态</h3>' +
-          '<button class="admin-btn admin-btn-sm" id="status-refresh">刷新</button>' +
+        '<div class="admin-toolbar">' +
+          '<span class="setting-prompt-hint">进程内缓存用于加速统计与模型加载；数据更新后可手动清除。</span>' +
+          '<span class="admin-toolbar-gap"></span>' +
+          '<button class="admin-btn admin-btn-sm admin-btn-ghost" id="status-clear-cache"><i class="fa fa-refresh"></i> 清除缓存</button>' +
         '</div>' +
         this.statSection('运行概况', [
           { v: esc(sys.system || '—'), k: '系统名称' },
@@ -693,13 +843,6 @@
           { v: esc(sys.platform || '—'), k: '操作系统' },
           { v: sys.debug ? '调试模式' : '生产模式', k: '运行模式' }
         ]) +
-        this.statSection('数据资产', [
-          { v: (sys.model_count || 0), k: '模型文件 (.tif)' },
-          { v: (sys.threshold_count || 0), k: '阈值文件 (.tif)' },
-          { v: (sys.runoff_files || 0), k: '径流输出文件' },
-          { v: (sys.flood_inundation_files || 0), k: '淹没输出文件' },
-          { v: fmtSize(dataBytes) + ' · ' + dataFiles + ' 个', k: '数据目录总量' }
-        ]) +
         this.statSection('服务健康', [
           { v: sys.db_exists ? ok : bad,  k: '数据库' },
           { v: s.logs_today != null ? s.logs_today : '—', k: '今日日志' },
@@ -707,8 +850,19 @@
           { v: fmtSize((sys.storage_usage_mb || 0) * 1024 * 1024), k: '后端程序目录占用' }
         ]);
       setContent(html);
-      const refresh = document.getElementById('status-refresh');
-      if (refresh) refresh.addEventListener('click', function () { AdminPanel.openCategory('status'); });
+
+      const clearBtn = document.getElementById('status-clear-cache');
+      if (clearBtn) clearBtn.addEventListener('click', async () => {
+        clearBtn.disabled = true;
+        const old = clearBtn.innerHTML;
+        clearBtn.textContent = '清除中…';
+        try {
+          const res = await api('/api/admin/cache-clear', { method: 'POST' });
+          const list = ((res && res.data && res.data.cleared) || []).join('、');
+          toast('已清除：' + list, 'success');
+        } catch (err) { toast(err.message, 'error'); }
+        finally { clearBtn.disabled = false; clearBtn.innerHTML = old; }
+      });
     },
 
     // ---------------- 数据管理（真实 data/ 目录浏览器） ----------------
@@ -717,36 +871,53 @@
       const path = this._dataPath || '';
 
       if (!path) {
-        // 顶层：展示真实目录树（data/ 与 uploads）
+        // 第一屏：数据资产中心。按业务语义分组，量级按项目目录核对，
+        // 不递归统计（GLDAS 5 万文件 + ERA5 67GB 会让首屏卡十几秒）。
         let data;
-        try { data = await api('/api/admin/data-tree'); } catch (e) { data = { data: { roots: [] } }; }
-        const roots = (data.data && data.data.roots) || [];
-        let cards = '';
-        roots.forEach(function (r) {
-          const kids = r.children || [];
-          if (kids.length) {
-            kids.forEach(function (c) {
-              cards += '<div class="data-folder-card" data-path="' + esc(c.path) + '">' +
-                '<div class="data-folder-icon"><i class="fa fa-folder"></i></div>' +
-                '<div class="data-folder-name">' + esc(c.name) + '</div>' +
-                '<div class="data-folder-meta">' + (c.file_count || 0) + ' 个文件 · ' + esc(c.size_text || '—') + '</div>' +
-                '</div>';
-            });
-          }
-          else {
-            cards += '<div class="data-folder-card" data-path="' + esc(r.path) + '">' +
-              '<div class="data-folder-icon"><i class="fa fa-folder"></i></div>' +
-              '<div class="data-folder-name">' + esc(r.name) + '</div>' +
-              '<div class="data-folder-meta">点击查看</div></div>';
-          }
+        try { data = await api('/api/admin/data-assets'); } catch (e) { data = { data: { groups: [] } }; }
+        const groups = (data.data && data.data.groups) || [];
+        const total = (data.data && data.data.total) || 0;
+        const present = (data.data && data.data.present) || 0;
+
+        let groupsHTML = '';
+        groups.forEach(function (g) {
+          const cards = (g.items || []).map(function (it) {
+            const missing = !it.exists;
+            return '<div class="asset-card tone-' + esc(it.tone || 'blue') + (missing ? ' is-missing' : '') + '"' +
+              ' data-path="' + esc(it.path) + '"' + (missing ? ' title="目录不存在"' : '') + '>' +
+              '<div class="asset-card-top">' +
+                '<span class="asset-icon"><i class="fa ' + esc(it.icon || 'fa-folder') + '"></i></span>' +
+                '<span class="asset-name">' + esc(it.name) + '</span>' +
+                (missing ? '<span class="asset-status">缺失</span>' : '') +
+              '</div>' +
+              '<div class="asset-scale">' + esc(it.scale || '') + '</div>' +
+              '<div class="asset-usage">' + esc(it.usage || '') + '</div>' +
+              '<div class="asset-enter">查看文件 <i class="fa fa-angle-right"></i></div>' +
+            '</div>';
+          }).join('');
+          groupsHTML +=
+            '<section class="asset-group">' +
+              '<div class="asset-group-head">' +
+                '<div class="asset-group-title"><i class="fa ' + esc(g.icon || 'fa-folder') + '"></i> ' + esc(g.name) + '</div>' +
+                '<div class="asset-group-desc">' + esc(g.desc || '') + '</div>' +
+              '</div>' +
+              '<div class="asset-grid">' + cards + '</div>' +
+            '</section>';
         });
+
         const html =
-          '<div class="admin-toolbar"><h3>数据管理</h3></div>' +
-          '<div class="data-folder-grid">' + (cards || '<div class="admin-empty">暂无数据目录</div>') + '</div>';
+          '<div class="asset-overview">' +
+            '<div class="asset-overview-num">' + present + ' <span>/ ' + total + '</span></div>' +
+            '<div class="asset-overview-label">数据资产已就绪</div>' +
+            '<div class="asset-overview-note">按业务语义分组 · 规模按项目目录核对，点开卡片查看实际文件</div>' +
+          '</div>' +
+          (groupsHTML || '<div class="admin-empty">未能加载数据资产目录</div>');
         setContent(html);
-        document.querySelectorAll('#admin-content .data-folder-card').forEach(function (card) {
+
+        document.querySelectorAll('#admin-content .asset-card:not(.is-missing)').forEach(function (card) {
           card.addEventListener('click', function () {
             self._dataPath = card.getAttribute('data-path');
+            self._dataLabel = card.querySelector('.asset-name').textContent;
             self._dataPage = 1;
             self.openCategory('data');
           });
@@ -761,17 +932,21 @@
       const files = info.files || [];
       const rows = files.map(function (f) {
         return '<tr>' +
-          '<td>' + (f.is_dir ? '<i class="fa fa-folder" style="color:#eab308;"></i> ' : '') + esc(f.name) + '</td>' +
+          '<td>' + (f.is_dir
+            ? '<a class="data-dir-link" data-subdir="' + esc(f.name) + '"><i class="fa fa-folder" style="color:#fbbf24;"></i> ' + esc(f.name) + '</a>'
+            : esc(f.name)) + '</td>' +
           '<td>' + esc(f.size_text || '') + '</td>' +
           '<td>' + esc(f.mtime) + '</td>' +
-          '<td>' + (f.is_dir ? '<span style="color:#8a99a8;">—</span>' : '<button class="admin-btn admin-btn-sm admin-btn-danger" data-action="del-data" data-file="' + esc(f.name) + '">删除</button>') + '</td>' +
+          '<td>' + (f.is_dir ? '<span style="color:#7d90ac;">—</span>' : '<button class="admin-btn admin-btn-sm admin-btn-danger" data-action="del-data" data-file="' + esc(f.name) + '">删除</button>') + '</td>' +
         '</tr>';
       }).join('');
       const totalPages = info.total_pages || 1;
       const html =
-        '<div class="admin-toolbar"><h3>数据管理</h3>' +
-          '<button class="admin-btn admin-btn-sm admin-btn-ghost" id="data-back">&laquo; 返回目录</button>' +
-          '<span class="admin-path">路径：' + esc(info.directory || '') + '</span>' +
+        '<div class="admin-toolbar">' +
+          '<button class="admin-btn admin-btn-sm admin-btn-ghost" id="data-back"><i class="fa fa-angle-left"></i> 数据资产</button>' +
+          '<span class="data-crumb">' + esc(this._dataLabel || path) + '</span>' +
+          '<span class="admin-toolbar-gap"></span>' +
+          '<span class="admin-path">' + esc(info.directory || '') + '</span>' +
         '</div>' +
         '<div class="admin-form-row" style="max-width:760px;">' +
           '<label>上传文件到当前目录：</label>' +
@@ -790,7 +965,18 @@
       setContent(html);
 
       const back = document.getElementById('data-back');
-      if (back) back.addEventListener('click', function () { self._dataPath = ''; self._dataPage = 1; self.openCategory('data'); });
+      if (back) back.addEventListener('click', function () { self._dataPath = ''; self._dataLabel = ''; self._dataPage = 1; self.openCategory('data'); });
+
+      // 子目录可继续下钻（如 raw/TibetanPlateau 下按气象变量分目录）
+      document.querySelectorAll('#admin-content [data-subdir]').forEach(function (link) {
+        link.addEventListener('click', function () {
+          const sub = link.getAttribute('data-subdir');
+          self._dataPath = (path.replace(/\/$/, '') + '/' + sub).replace(/^\//, '');
+          self._dataLabel = sub;
+          self._dataPage = 1;
+          self.openCategory('data');
+        });
+      });
 
       const upBtn = document.getElementById('data-upload-btn');
       if (upBtn) {
@@ -882,14 +1068,6 @@
         const role = (rRes.data || []).find(r => String(r.id) === String(id));
         if (role) AdminPanel.openRoleForm(role); else toast('角色不存在', 'error');
       })().catch(e => toast(e.message, 'error'));
-    } else if (action === 'save-role-perms') {
-      const box = btn.closest('.admin-role-perm');
-      const codes = Array.prototype.map.call(box.querySelectorAll('.perm-cb:checked'), c => c.value);
-      api('/api/admin/roles/' + id + '/permissions', {
-        method: 'PUT',
-        body: JSON.stringify({ permissions: codes })
-      }).then(function () { toast('已保存', 'success'); })
-        .catch(function (err) { toast(err.message, 'error'); });
     } else if (action === 'del-role') {
       if (window.UI && window.UI.confirm) {
         window.UI.confirm({ title: '确认删除', message: '确定要删除该角色吗？' }).then(ok => {

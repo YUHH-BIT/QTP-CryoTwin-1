@@ -167,8 +167,9 @@
         })
         .then(function (r) {
           if (r.ok && r.data && r.data.success) {
-            // 管理员登录后直接进系统管理；其他角色回到来源页（无后台可进）
-            var target = (r.data.role_code === 'admin') ? 'admin.html?cat=user' : returnUrl;
+            // 管理员登录后直接进系统管理（不带 cat，落在默认的「系统状态」概览页）；
+            // 其他角色回来源页（无后台可进）
+            var target = (r.data.role_code === 'admin') ? 'admin.html' : returnUrl;
             window.location.href = target;
             return;
           }

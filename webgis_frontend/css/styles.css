@@ -57,18 +57,23 @@ body {
   overflow: hidden;
 }
 
-/* 顶部导航栏样式（单行：系统名 | 模块按钮 | 搜索框） */
-/* 顶部导航栏样式（三段式栅格：品牌靠左 / 模块条全宽居中 / 搜索框靠右）
-   中间列 auto、左右两列都是 1fr，宽度相等 → 模块条精确压在整条导航栏的中线上 */
+/* 顶部导航栏样式（单行：系统名 | 模块按钮 | 搜索框）
+   2026-11-28：由「三段式栅格」改为「弹性两端 + 中间自动留白」。
+   栅格版把模块条压在视口几何中线上，但品牌区比右侧搜索区宽，
+   模块条左右两侧的可视留白一小一大（实测 1920 宽下左 276 / 右 363），
+   看上去就是「偏左」。改成 flex 后由 nav-links 的 auto margin 平分
+   品牌区与右侧区之间的空档，左右留白始终相等，观感才是居中的。 */
 .topbar {
   height: var(--nav-height);
   background: var(--grad-topbar);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
   column-gap: 12px;
   padding: 0 20px;
+  /* 品牌区与模块条、模块条与右侧区的最小呼吸间距。
+     两侧同源，模块条的 auto margin 才能把左右可视留白补成相等。 */
+  --brand-gap: 24px;
   position: relative;
   /* 导航栏须高于左侧图层管理面板(z:25)、右侧侧边栏(z:30)及其遮罩(z:29)，
      否则其下拉菜单会被这些面板盖住；低于全屏遮罩(z:1000+)与弹窗(z:2000+) */
@@ -185,6 +190,10 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   flex: 0 1 auto; /* 按内容自适应，不再平分整行；右侧留白给搜索栏 */
   min-width: 0;
+  /* 左右 auto margin 平分「品牌区右侧 → 搜索区左侧」的空档，
+     保证模块条两侧的可视留白相等（不再是视口几何居中） */
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .topbar .nav-links a:not(.dropdown-item) {
@@ -414,6 +423,13 @@ body {
   border-radius: 8px;
   transition: all 0.2s;
   cursor: pointer;
+}
+
+/* 2026-11-28：品牌区里的 .user 是身份区搬到右上角之前留下的空壳
+   （7 个页面里都只有一个空 <i>），却靠 padding 占掉 48px 不可见宽度，
+   让模块条左侧的视觉留白比右侧多出一截。直接隐藏，HTML 不用改。 */
+.topbar-row1 .user {
+  display: none;
 }
 
 /* 隐藏天气信息组件 */
@@ -730,7 +746,7 @@ body {
   font-weight: 700;
   letter-spacing: 0.6px;
   color: #eef4fc;
-  margin-right: 24px;
+  margin-right: var(--brand-gap, 24px);
   /* 不要给 .logo 加 text-shadow：渐变字的填充是透明的，阴影会浮在字形外圈变成脏影 */
   filter: none;
   position: relative;
@@ -6279,7 +6295,7 @@ body.rhs-v2 input[type="range"]:focus { outline: none; }
    系统名 + 模块按钮 + 搜索框挤在同一行，按 1560 / 1360 / 1300 / 1180 / 1100 / 900 逐级压缩，
    保证模块条居中时不顶到品牌区、搜索框不被压到无法输入。 */
 @media (max-width: 1560px) {
-  .topbar .logo { margin-right: 14px; }
+  .topbar { --brand-gap: 14px; }
   .topbar .logo-name { font-size: 15.5px; }
   .topbar .logo-code { font-size: 10px; }
   .topbar .logo-img { width: 28px; height: 28px; }
@@ -6287,8 +6303,7 @@ body.rhs-v2 input[type="range"]:focus { outline: none; }
 }
 
 @media (max-width: 1400px) {
-  .topbar { padding: 0 14px; }
-  .topbar .logo { margin-right: 10px; }
+  .topbar { padding: 0 14px; --brand-gap: 10px; }
   .topbar .logo-name { font-size: 14px; letter-spacing: 0.3px; }
   .topbar .logo-code { font-size: 9px; padding-left: 8px; margin-left: 8px; }
   .topbar .logo-img { width: 26px; height: 26px; margin-right: 8px; }
@@ -6395,7 +6410,10 @@ body.rhs-v2 input[type="range"]:focus { outline: none; }
   display: flex;
   align-items: center;
   gap: 10px;
-  justify-self: end;
+  justify-self: end; /* 旧栅格布局残留，flex 下自动忽略 */
+  /* 与品牌区 .logo 的 margin-right 同值：两侧各让出 --brand-gap，
+     模块条的左右可视留白才真正相等 */
+  margin-left: var(--brand-gap, 24px);
   min-width: 0;
 }
 

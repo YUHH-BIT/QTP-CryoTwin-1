@@ -6,7 +6,8 @@
  * 现撤销该导航项，改由右上角（搜索框右侧）的身份区承载：
  *
  *   未登录 → 「登录」按钮，跳 login.html 并带回跳地址
- *   已登录 → 头像 + 显示名称，下拉为「系统管理（仅 admin）/ 退出登录」
+ *   已登录 → 头像，下拉为「进入系统管理（仅 admin）/ 账号设置 / 退出登录」
+ *            「账号设置」承载当前账号信息与修改密码，后台侧栏不再单列「系统设置」
  *
  * 用法：页面顶栏放 <div class="topbar-user" id="topbar-user"></div> 并引入本脚本。
  * 数据来自 /api/auth/me（401 视为未登录，不报错、不打扰业务页）。
@@ -52,9 +53,77 @@
     });
   }
 
+  /* ---------------- 账号设置弹窗 ----------------
+     原「系统设置」页只有当前账号信息和改密码，已收进头像菜单。 */
+  function openAccountModal(me, roleText) {
+    if (!window.UI || !UI.modal) {
+      window.alert('账号设置组件未加载');
+      return;
+    }
+    var card = function (label, value) {
+      return '<div style="background:#16233a;border:1px solid #2a3b55;border-radius:8px;padding:9px 10px;">' +
+        '<div style="font-size:11px;color:#8fa3bd;">' + label + '</div>' +
+        '<div style="font-size:14px;color:#e8f1ff;font-weight:600;margin-top:3px;overflow-wrap:anywhere;">' + esc(value) + '</div>' +
+      '</div>';
+    };
+    var inputStyle = 'width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #334563;border-radius:8px;' +
+      'background:#101c2f;color:#dbe7f6;font-family:inherit;font-size:13px;';
+    var labelStyle = 'display:block;font-size:12px;color:#a9bad2;margin:10px 0 4px;';
+    var bodyHTML =
+      '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;">' +
+        card('当前登录账号', me.user || '') +
+        card('显示名称', me.display_name || '—') +
+        card('所属角色', roleText || '—') +
+      '</div>' +
+      '<label style="' + labelStyle + '">原密码</label>' +
+      '<input id="tu-old" type="password" style="' + inputStyle + '" autocomplete="current-password" />' +
+      '<label style="' + labelStyle + '">新密码（至少 6 位）</label>' +
+      '<input id="tu-new" type="password" style="' + inputStyle + '" autocomplete="new-password" />' +
+      '<label style="' + labelStyle + '">确认新密码</label>' +
+      '<input id="tu-confirm" type="password" style="' + inputStyle + '" autocomplete="new-password" />';
+
+    var overlay = UI.modal({
+      title: '账号设置',
+      icon: 'fa-user-circle',
+      message: '',
+      actions: [
+        { text: '取消', type: 'ui-btn-ghost' },
+        { text: '保存修改', type: 'ui-btn-primary', onClick: save }
+      ]
+    });
+    var body = overlay.querySelector('.ui-modal-body');
+    if (body) body.innerHTML = bodyHTML;
+
+    function save() {
+      var oldPwd = (document.getElementById('tu-old') || {}).value || '';
+      var newPwd = (document.getElementById('tu-new') || {}).value || '';
+      var confirmPwd = (document.getElementById('tu-confirm') || {}).value || '';
+      if (newPwd !== confirmPwd) {
+        UI.toast('两次输入的新密码不一致', 'warning');
+        return;
+      }
+      if (newPwd.length < 6) {
+        UI.toast('新密码至少需要 6 位', 'warning');
+        return;
+      }
+      fetch('/api/admin/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ old_password: oldPwd, new_password: newPwd })
+      })
+        .then(function (resp) { return resp.json().catch(function () { return {}; }).then(function (d) { return { ok: resp.ok, data: d }; }); })
+        .then(function (r) {
+          if (!r.ok) throw new Error((r.data && r.data.message) || '修改失败');
+          UI.toast('密码已修改，请重新登录', 'success');
+          setTimeout(function () { window.location.href = 'login.html'; }, 1200);
+        })
+        .catch(function (err) { UI.toast(err.message || '修改失败', 'error'); });
+    }
+  }
+
   /* ---------------- 已登录 ----------------
-     管理员：不再展开下拉，点身份区直接进系统管理（退出登录在管理面板右上角）；
-     非管理员：无后台可进，保留一个只含「退出登录」的小菜单。 */
+     管理员下拉：进入系统管理 / 账号设置 / 退出登录；
+     非管理员下拉：账号设置 / 退出登录。 */
   function renderUser(me) {
     var name = me.display_name || me.user || '用户';
     var roleCode = me.role_code || '';
@@ -68,17 +137,9 @@
       ? (me.user || '')
       : (roleText + ' · ' + (me.user || ''));
 
-    // 身份区只留圆形头像（姓名进 title 提示），给顶栏省出横向空间
+    // 身份区只留圆形头像（姓名进 title 提示），给顶栏省出横向空间；
+    // 后台入口与退出登录都收在这一个菜单里（后台页的头部栏已删，不再放操作按钮）
     var titleText = name + '（' + (me.user || '') + (roleText ? ' · ' + roleText : '') + '）';
-
-    if (isAdmin) {
-      mount.innerHTML =
-        '<a class="tu-btn tu-btn-avatar" id="tu-enter" href="admin.html?cat=user" ' +
-          'title="' + esc(titleText) + ' · 进入系统管理" aria-label="进入系统管理">' +
-          avatarHTML +
-        '</a>';
-      return;
-    }
 
     mount.innerHTML =
       '<button type="button" class="tu-btn tu-btn-avatar" id="tu-toggle" ' +
@@ -90,10 +151,16 @@
           '<span class="n">' + esc(name) + '</span>' +
           '<span class="r">' + esc(metaText) + '</span>' +
         '</div>' +
+        (isAdmin
+          ? '<a href="admin.html" role="menuitem"><i class="fa fa-cogs"></i>进入系统管理</a>'
+          : '') +
+        '<button type="button" id="tu-account" role="menuitem"><i class="fa fa-user-circle"></i>账号设置</button>' +
+        '<div class="tu-menu-sep"></div>' +
         '<button type="button" id="tu-logout" class="tu-danger" role="menuitem"><i class="fa fa-sign-out"></i>退出登录</button>' +
       '</div>';
 
     var toggle = document.getElementById('tu-toggle');
+    var account = document.getElementById('tu-account');
     var logout = document.getElementById('tu-logout');
 
     function close() {
@@ -105,6 +172,11 @@
       e.stopPropagation();
       var open = mount.classList.toggle('open');
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+
+    account.addEventListener('click', function () {
+      close();
+      openAccountModal(me, roleText);
     });
 
     document.addEventListener('click', function (e) {

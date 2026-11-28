@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import os
 import logging
+import threading
 from flask import (Flask, render_template, send_from_directory,
                    request, jsonify, redirect, session, url_for)
 from flask_cors import CORS
@@ -316,6 +317,33 @@ def create_app(config_name=None):
 
 
 app = create_app()
+
+
+def _warm_admin_dir_stats(application):
+    """启动后异步预热「数据目录统计」。
+
+    data/ 有几十 GB、两万多文件，冷缓存下 os.walk 一次要 30 秒量级，而
+    「系统状态」页要显示数据目录总量。若把这活儿留给首个 /api/admin/data-tree
+    请求，页面会卡到 30s 以上。这里在进程启动时先算一遍写进 admin 模块的缓存，
+    正常使用就不会再撞冷启动；统计失败也不影响任何功能。
+    """
+    def run():
+        try:
+            from modules import admin as admin_module
+            targets = [
+                os.path.join(application.config['BASE_DIR'], 'data'),
+                application.config.get('UPLOADS_DIR'),
+            ]
+            for p in targets:
+                if p and os.path.isdir(p):
+                    admin_module._dir_stats(p)
+        except Exception:  # 预热带任何异常都不应影响服务
+            logging.getLogger(__name__).warning('数据目录统计预热失败', exc_info=True)
+
+    threading.Thread(target=run, name='warm-dir-stats', daemon=True).start()
+
+
+_warm_admin_dir_stats(app)
 
 if __name__ == '__main__':
     host = os.environ.get('HOST', '127.0.0.1')
