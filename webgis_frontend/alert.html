@@ -8,7 +8,7 @@
   <!-- 使用多个CDN源确保OpenLayers加载成功 -->
   <link rel="stylesheet" href="css/lib/ol.css" />
   <!-- 移除高德地图API引用 -->
-  <link rel="stylesheet" href="css/styles.css?v=20261128disc" />
+  <link rel="stylesheet" href="css/styles.css?v=20261128disc3" />
   <!-- UI 组件库（statCard/badge/ring/btn/toast，统一评估模块视觉风格） -->
   <link rel="stylesheet" href="css/components.css" />
   <link rel="stylesheet" href="css/lib/air-datepicker.css?v=2" />
@@ -371,7 +371,7 @@
           <button type="button" class="tab-btn" data-factor="flood_vulnerability">脆弱性</button>
         </div>
 
-        <label for="flood-risk-basin">选择流域</label>
+        <label for="flood-risk-basin">研究流域</label>
         <select id="flood-risk-basin" data-tomselect="1">
           <option value="all">青藏高原全域</option>
         </select>
@@ -381,10 +381,10 @@
           <option value="weighted">H-E-V 风险评估模型</option>
         </select>
 
-        <label for="flood-risk-start-date">开始日期：</label>
+        <label for="flood-risk-start-date">评估起始日期：</label>
         <input type="date" id="flood-risk-start-date" value="2024-07-01" min="2024-01-01" max="2024-12-30">
 
-        <label for="flood-risk-end-date">结束日期：</label>
+        <label for="flood-risk-end-date">评估结束日期：</label>
         <input type="date" id="flood-risk-end-date" value="2024-08-31" min="2024-01-01" max="2024-12-30">
 
         <!-- 权重方法（二选一：熵权·先验混合默认 / 自定义） -->
@@ -466,7 +466,7 @@
         </div>
 
         <button id="flood-analyze-btn" class="btn btn-primary">
-          <i class="fa fa-play mr-2"></i>开始分析
+          <i class="fa fa-play mr-2"></i>执行风险评估
         </button>
       </div>
     </div>
@@ -522,7 +522,7 @@
             </select>
           </div>
           <div class="alert-analysis-item">
-            <button class="btn-small" id="snow-analyze-btn">开始分析</button>
+            <button class="btn-small" id="snow-analyze-btn">执行评估</button>
           </div>
         </div>
       </div>
@@ -579,7 +579,7 @@
             </select>
           </div>
           <div class="alert-analysis-item">
-            <button class="btn-small" id="ice-analyze-btn">开始分析</button>
+            <button class="btn-small" id="ice-analyze-btn">执行评估</button>
           </div>
         </div>
       </div>
@@ -636,7 +636,7 @@
             </select>
           </div>
           <div class="alert-analysis-item">
-            <button class="btn-small" id="permafrost-analyze-btn">开始分析</button>
+            <button class="btn-small" id="permafrost-analyze-btn">执行评估</button>
           </div>
         </div>
       </div>
@@ -949,7 +949,7 @@
   <!-- 截图库：将 DOM 节点导出为 PNG（SVG foreignObject 方案，原生保留 conic-gradient/box-shadow 等现代 CSS） -->
   <script src="js/lib/dom-to-image-more.min.js"></script>
   <!-- 引入风险评估JS -->
-  <script src="js/alert.js?v=20261127nomin"></script>
+  <script src="js/alert.js?v=20261128wording"></script>
   <script src="js/geotiff-render.js"></script>
   <script src="js/meteo-query.js"></script>
   <script src="js/lib/air-datepicker.js?v=2"></script>

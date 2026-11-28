@@ -12,7 +12,7 @@
   <script src="js/lib/echarts.min.js"></script>
 
   <!-- 平台样式 -->
-  <link rel="stylesheet" href="css/styles.css?v=20261128disc" />
+  <link rel="stylesheet" href="css/styles.css?v=20261128disc3" />
   <link rel="stylesheet" href="css/lib/air-datepicker.css?v=2" />
   <link rel="stylesheet" href="css/lib/air-datepicker-dark.css?v=2" />
   <link rel="stylesheet" href="css/lib/tom-select.min.css?v=2" />
@@ -161,21 +161,21 @@
     <div class="simulate-category-sidebar" id="runoff-category-sidebar" style="display: none;">
       <div class="simulate-category-sidebar-content">
         <!-- 模拟条件区域 -->
-        <label for="model-select">径流模型</label>
+        <label for="model-select">径流模拟模型</label>
         <select id="model-select" data-tomselect="1">
-          <option value="">-- 请选择径流模型 --</option>
+          <option value="">-- 请选择径流模拟模型 --</option>
         </select>
 
-        <label for="start-date">开始日期：</label>
+        <label for="start-date">模拟起始日期：</label>
         <input type="date" id="start-date" value="2024-01-01" />
 
-        <label for="end-date">结束日期：</label>
+        <label for="end-date">模拟结束日期：</label>
         <input type="date" id="end-date" value="2024-12-31" />
 
         <!-- 流域选择 -->
-        <label for="runoff-basin-select">选择流域</label>
+        <label for="runoff-basin-select">研究流域</label>
         <select id="runoff-basin-select" data-tomselect="1">
-          <option value="">-- 请选择流域 --</option>
+          <option value="">-- 请选择研究流域 --</option>
         </select>
 
         <button id="start-simulate" class="btn btn-primary">
@@ -208,10 +208,10 @@
           <option value="">-- 请选择洪水阈值 --</option>
         </select>
 
-        <label for="flood-start-date">开始日期：</label>
+        <label for="flood-start-date">模拟起始日期：</label>
         <input type="date" id="flood-start-date" value="2024-01-01" />
 
-        <label for="flood-end-date">结束日期：</label>
+        <label for="flood-end-date">模拟结束日期：</label>
         <input type="date" id="flood-end-date" value="2024-12-31" />
 
         <div style="margin-top: 15px;">
@@ -250,25 +250,25 @@
         <!-- 洪水径流模拟子模块 -->
         <div id="runoff-tab" class="flood-submodule-content active">
       <!-- 流域选择 -->
-      <label for="basin-select">选择流域</label>
+      <label for="basin-select">研究流域</label>
       <select id="basin-select" data-tomselect="1">
         <option value="all">青藏高原全域</option>
       </select>
 
       <!-- 洪水径流模拟条件区域 -->
-      <label for="flood-runoff-model-select">径流模型</label>
+      <label for="flood-runoff-model-select">径流模拟模型</label>
       <select id="flood-runoff-model-select" data-tomselect="1">
-        <option value="">-- 请选择径流模型 --</option>
+        <option value="">-- 请选择径流模拟模型 --</option>
       </select>
 
-      <label for="flood-runoff-start-date">开始日期：</label>
+      <label for="flood-runoff-start-date">模拟起始日期：</label>
       <input type="date" id="flood-runoff-start-date" value="2024-06-01" />
 
-      <label for="flood-runoff-end-date">结束日期：</label>
+      <label for="flood-runoff-end-date">模拟结束日期：</label>
       <input type="date" id="flood-runoff-end-date" value="2024-07-01" />
 
       <button id="start-flood-runoff-simulate" class="btn btn-primary">
-        <i class="fa fa-play mr-2"></i>开始径流模拟
+        <i class="fa fa-play mr-2"></i>执行径流模拟
       </button>
 
           <!-- 洪水径流模拟结果区域 -->
@@ -291,7 +291,7 @@
         <!-- 融雪洪水识别子模块 -->
         <div id="snowmelt-flood-tab" class="flood-submodule-content">
           <!-- 流域选择 -->
-          <label for="flood-snowmelt-basin-select">选择流域</label>
+          <label for="flood-snowmelt-basin-select">研究流域</label>
           <select id="flood-snowmelt-basin-select" data-tomselect="1">
             <option value="all">青藏高原全域</option>
           </select>
@@ -303,15 +303,15 @@
           </select>
 
           <!-- 日期范围选择 -->
-          <label for="flood-snowmelt-start-date">开始日期：</label>
+          <label for="flood-snowmelt-start-date">模拟起始日期：</label>
           <input type="date" id="flood-snowmelt-start-date" value="2024-06-01" />
 
-          <label for="flood-snowmelt-end-date">结束日期：</label>
+          <label for="flood-snowmelt-end-date">模拟结束日期：</label>
           <input type="date" id="flood-snowmelt-end-date" value="2024-07-01" />
 
           <!-- 开始识别按钮 -->
           <button id="start-flood-snowmelt-identify" class="btn btn-primary">
-            <i class="fa fa-play mr-2"></i>开始洪水识别
+            <i class="fa fa-play mr-2"></i>执行洪水识别
           </button>
 
           <!-- 融雪洪水识别结果区域 -->
@@ -339,7 +339,7 @@
         <!-- 洪水淹没模拟子模块 -->
         <div id="inundation-tab" class="flood-submodule-content">
           <!-- 流域选择 -->
-          <label for="flood-inundation-basin-select">选择流域</label>
+          <label for="flood-inundation-basin-select">研究流域</label>
           <select id="flood-inundation-basin-select" data-tomselect="1">
             <option value="all">青藏高原全域</option>
           </select>
@@ -350,14 +350,14 @@
             <option value="">-- 请选择洪水阈值 --</option>
           </select>
 
-          <label for="flood-inundation-start-date">开始日期：</label>
+          <label for="flood-inundation-start-date">模拟起始日期：</label>
           <input type="date" id="flood-inundation-start-date" value="2024-06-01" />
 
-          <label for="flood-inundation-end-date">结束日期：</label>
+          <label for="flood-inundation-end-date">模拟结束日期：</label>
           <input type="date" id="flood-inundation-end-date" value="2024-07-01" />
 
           <button id="start-flood-inundation-analysis" class="btn btn-primary">
-            <i class="fa fa-play mr-2"></i>开始淹没模拟
+            <i class="fa fa-play mr-2"></i>执行淹没模拟
           </button>
 
           <!-- 洪水淹没模拟结果区域 -->
@@ -388,10 +388,10 @@
           <option value="">-- 请选择积雪模型 --</option>
         </select>
 
-        <label for="snow-simulate-start-date">开始日期：</label>
+        <label for="snow-simulate-start-date">模拟起始日期：</label>
         <input type="date" id="snow-simulate-start-date" value="2024-01-01" />
 
-        <label for="snow-simulate-end-date">结束日期：</label>
+        <label for="snow-simulate-end-date">模拟结束日期：</label>
         <input type="date" id="snow-simulate-end-date" value="2024-12-31" />
 
         <button id="start-snow-simulate" class="btn btn-primary">
@@ -424,10 +424,10 @@
           <option value="">-- 请选择冰川模型 --</option>
         </select>
 
-        <label for="ice-simulate-start-date">开始日期：</label>
+        <label for="ice-simulate-start-date">模拟起始日期：</label>
         <input type="date" id="ice-simulate-start-date" value="2024-01-01" />
 
-        <label for="ice-simulate-end-date">结束日期：</label>
+        <label for="ice-simulate-end-date">模拟结束日期：</label>
         <input type="date" id="ice-simulate-end-date" value="2024-12-31" />
 
         <button id="start-ice-simulate" class="btn btn-primary">
@@ -460,10 +460,10 @@
           <option value="">-- 请选择冻土模型 --</option>
         </select>
 
-        <label for="permafrost-simulate-start-date">开始日期：</label>
+        <label for="permafrost-simulate-start-date">模拟起始日期：</label>
         <input type="date" id="permafrost-simulate-start-date" value="2024-01-01" />
 
-        <label for="permafrost-simulate-end-date">结束日期：</label>
+        <label for="permafrost-simulate-end-date">模拟结束日期：</label>
         <input type="date" id="permafrost-simulate-end-date" value="2024-12-31" />
 
         <button id="start-permafrost-simulate" class="btn btn-primary">
@@ -730,10 +730,10 @@
         <option value="">-- 请选择洪水阈值 --</option>
       </select>
 
-      <label for="flood-start-date-main">开始日期：</label>
+      <label for="flood-start-date-main">模拟起始日期：</label>
       <input type="date" id="flood-start-date-main" value="2024-01-01" />
 
-      <label for="flood-end-date-main">结束日期：</label>
+      <label for="flood-end-date-main">模拟结束日期：</label>
       <input type="date" id="flood-end-date-main" value="2024-12-31" />
 
       <div style="margin-top: 15px;">
@@ -818,7 +818,7 @@
   <script src="js/ui-components.js"></script>
   <script src="js/geotiff.js"></script>
   <script src="js/main.js?v=20261127gdp"></script>
-  <script src="js/simulate.js?v=20261127nomin"></script>
+  <script src="js/simulate.js?v=20261128wording"></script>
   <script src="js/geotiff-render.js"></script>
   <script src="js/meteo-query.js"></script>
   

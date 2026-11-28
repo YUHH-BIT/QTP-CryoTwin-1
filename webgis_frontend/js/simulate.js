@@ -269,10 +269,10 @@ document.addEventListener('DOMContentLoaded', () => {
             'mean_value': '值',
             'tif_file': '操作',
             'load_to_map': '加载',
-            'select_model': '请选择径流模型',
-            'select_start_date': '请选择开始日期',
-            'select_end_date': '请选择结束日期',
-            'start_date_later': '开始日期不能晚于结束日期',
+            'select_model': '请选择径流模拟模型',
+            'select_start_date': '请选择模拟起始日期',
+            'select_end_date': '请选择模拟结束日期',
+            'start_date_later': '模拟起始日期不能晚于模拟结束日期',
             'no_data': '未查询到模拟结果',
             'loading': '模拟中...',
             'loading_layer': '正在加载模拟数据图层...',
@@ -1557,7 +1557,7 @@ window.loadGeoTiffLayer = async function(filePath, variable, date) {
             modelSelect.innerHTML = '';
             const defaultOption = document.createElement('option');
             defaultOption.value = '';
-            defaultOption.textContent = `-- 请选择径流模型 --`;
+            defaultOption.textContent = `-- 请选择径流模拟模型 --`;
             modelSelect.appendChild(defaultOption);
 
             models.forEach(name => {
@@ -1832,7 +1832,7 @@ function startSnowmeltFloodIdentify() {
     
     // 参数校验（"全部流域" all 为合法值）
     if (!basinId) {
-        uiMsg('请选择流域');
+        uiMsg('请选择研究流域');
         return;
     }
     
@@ -1848,7 +1848,7 @@ function startSnowmeltFloodIdentify() {
     
     // 检查日期顺序
     if (new Date(startDate) > new Date(endDate)) {
-        uiMsg('开始日期不能晚于结束日期');
+        uiMsg('模拟起始日期不能晚于模拟结束日期');
         return;
     }
     
@@ -1916,7 +1916,7 @@ function startSnowmeltFloodIdentify() {
         // 恢复按钮状态
         if (startButton) {
             startButton.disabled = false;
-            startButton.innerHTML = '<i class="fa fa-play mr-2"></i>开始洪水识别';
+            startButton.innerHTML = '<i class="fa fa-play mr-2"></i>执行洪水识别';
         }
         
         // 隐藏加载遮罩
@@ -1930,7 +1930,7 @@ function startSnowmeltFloodIdentify() {
         // 恢复按钮状态
         if (startButton) {
             startButton.disabled = false;
-            startButton.innerHTML = '<i class="fa fa-play mr-2"></i>开始洪水识别';
+            startButton.innerHTML = '<i class="fa fa-play mr-2"></i>执行洪水识别';
         }
         
         // 隐藏加载遮罩
@@ -2399,7 +2399,7 @@ function initializeFloodSimulationModule() {
             floodRunoffModelSelect.innerHTML = '';
             const defaultOption = document.createElement('option');
             defaultOption.value = '';
-            defaultOption.textContent = '-- 请选择径流模型 --';
+            defaultOption.textContent = '-- 请选择径流模拟模型 --';
             floodRunoffModelSelect.appendChild(defaultOption);
 
             models.forEach(name => {
@@ -2458,7 +2458,7 @@ function initializeFloodSimulationModule() {
         const basinParam = (selectedBasin && selectedBasin !== 'all') ? selectedBasin : null; // 全部流域→null
         
         if (!model || !startDate || !endDate) {
-            uiMsg('请选择径流模型和日期范围');
+            uiMsg('请选择径流模拟模型和日期范围');
             return;
         }
         
@@ -2466,7 +2466,7 @@ function initializeFloodSimulationModule() {
         const end = new Date(endDate);
         
         if (start > end) {
-            uiMsg('开始日期不能晚于结束日期');
+            uiMsg('模拟起始日期不能晚于模拟结束日期');
             return;
         }
 
@@ -2564,7 +2564,7 @@ function initializeFloodSimulationModule() {
             uiMsg(`径流模拟失败: ${error.message}`, 'error');
         } finally {
             // 恢复按钮状态
-            startFloodRunoffSimulateBtn.innerHTML = '<i class="fa fa-play mr-2"></i>开始径流模拟';
+            startFloodRunoffSimulateBtn.innerHTML = '<i class="fa fa-play mr-2"></i>执行径流模拟';
             startFloodRunoffSimulateBtn.disabled = false;
             window.runoffApiBusy = false;
         }
@@ -2587,7 +2587,7 @@ function initializeFloodSimulationModule() {
         const end = new Date(endDate);
         
         if (start > end) {
-            uiMsg('开始日期不能晚于结束日期');
+            uiMsg('模拟起始日期不能晚于模拟结束日期');
             return;
         }
         
@@ -2643,7 +2643,7 @@ function initializeFloodSimulationModule() {
             uiMsg(`淹没模拟失败: ${error.message}`, 'error');
         } finally {
             // 恢复按钮状态
-            startFloodInundationAnalysisBtn.innerHTML = '<i class="fa fa-play mr-2"></i>开始淹没模拟';
+            startFloodInundationAnalysisBtn.innerHTML = '<i class="fa fa-play mr-2"></i>执行淹没模拟';
             startFloodInundationAnalysisBtn.disabled = false;
         }
     });
@@ -3085,7 +3085,7 @@ function initializeFloodSimulation() {
         if (start > end) {
             _floodBtns.forEach(b => { b.disabled = false; });
             floodInundationRunning = false;
-            uiMsg('开始日期不能晚于结束日期');
+            uiMsg('模拟起始日期不能晚于模拟结束日期');
             return;
         }
         
@@ -3376,7 +3376,7 @@ function initializeSnowSimulationModule() {
         }
         
         if (startDate > endDate) {
-            uiMsg('开始日期不能晚于结束日期');
+            uiMsg('模拟起始日期不能晚于模拟结束日期');
             return;
         }
         
@@ -3412,7 +3412,7 @@ function initializeIceSimulationModule() {
         }
         
         if (startDate > endDate) {
-            uiMsg('开始日期不能晚于结束日期');
+            uiMsg('模拟起始日期不能晚于模拟结束日期');
             return;
         }
         
@@ -3448,7 +3448,7 @@ function initializePermafrostSimulationModule() {
         }
         
         if (startDate > endDate) {
-            uiMsg('开始日期不能晚于结束日期');
+            uiMsg('模拟起始日期不能晚于模拟结束日期');
             return;
         }
         

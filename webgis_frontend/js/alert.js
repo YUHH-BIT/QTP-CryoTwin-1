@@ -187,11 +187,11 @@ class AlertSidebarManager {
         const basinText = document.getElementById('flood-risk-basin').selectedOptions[0].text;
 
         if (!startDate || !endDate) {
-            showToast('请选择开始日期和结束日期');
+            showToast('请选择评估起始日期和评估结束日期');
             return;
         }
         if (new Date(startDate) > new Date(endDate)) {
-            showToast('开始日期不能晚于结束日期');
+            showToast('评估起始日期不能晚于评估结束日期');
             return;
         }
 

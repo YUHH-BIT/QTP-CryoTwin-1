@@ -6007,8 +6007,9 @@ body.rhs-v2 .expert-disclaimer {
   background: var(--mod-soft);
   border-color: var(--mod-line);
 }
-body.rhs-v2 .expert-disclaimer i { color: var(--mod-ink); }
-body.rhs-v2 .expert-disclaimer strong { color: var(--mod-ink); }
+body.rhs-v2 .expert-disclaimer i { color: #d8b4fe; }
+/* 强调字用明显的亮紫（#f5f3ff 太接近白，看不出紫色） */
+body.rhs-v2 .expert-disclaimer strong { color: #d8b4fe; }
 
 /* ---------- 决策页说明条 / 列表滚动条：模块紫（2026-11-28 14:57）---------- */
 body.rhs-v2 .decision-content-note {
