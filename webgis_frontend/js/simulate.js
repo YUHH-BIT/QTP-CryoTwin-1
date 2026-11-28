@@ -2804,7 +2804,7 @@ function initializeFloodSimulationModule() {
                 { label: '有效天数', value: (result.valid_days || 0).toLocaleString(), unit: '天', icon: 'fa-check-circle', accent: 'success' },
                 { label: '洪水累加天数', value: (result.flood_days || 0).toLocaleString(), unit: '天', icon: 'fa-exclamation-triangle', accent: 'danger' },
                 { label: '平均洪水比例', value: ((result.avg_flood_ratio || 0) * 100).toFixed(2), unit: '%', icon: 'fa-percent', accent: 'warning' },
-                { label: '平均径流量', value: result.avg_mean_value !== null && result.avg_mean_value !== undefined ? result.avg_mean_value.toFixed(2) : 'N/A', unit: result.avg_mean_value !== null && result.avg_mean_value !== undefined ? 'mm' : '', icon: 'fa-tint', accent: 'ice' }
+                { label: '平均洪水径流', value: result.avg_mean_value !== null && result.avg_mean_value !== undefined ? result.avg_mean_value.toFixed(2) : 'N/A', unit: result.avg_mean_value !== null && result.avg_mean_value !== undefined ? 'mm' : '', icon: 'fa-tint', accent: 'ice' }
             ]);
             const gridHolder = document.createElement('div');
             gridHolder.innerHTML = gridHtml;
