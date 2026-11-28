@@ -7,72 +7,319 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20261111b" />
   <link rel="stylesheet" href="css/styles.css" />
   <style>
+    /* ============ 登录页（Google 账号选择器样式，两步流程） ============
+       第一步：选账号；第二步：输密码。视觉参照 Google 账号选择器，
+       背后仍走 /api/auth/login（账号密码），不是 OAuth。 */
     * { box-sizing: border-box; }
+    html { background: #0a1424; }
     body {
       margin: 0;
       min-height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      background: linear-gradient(135deg, #0b3d6b 0%, #1b5e9e 55%, #2c7bb6 100%);
-      font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+      gap: 18px;
+      padding: 32px 16px;
+      background: linear-gradient(135deg, #0a1424 0%, #12294a 55%, #1b4b7d 100%);
+      font-family: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif;
     }
+
     .login-card {
-      width: 380px;
-      max-width: 92vw;
+      width: 400px;
+      max-width: 100%;
       background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-      padding: 36px 32px 24px;
+      border-radius: 16px;
+      padding: 40px 40px 28px;
+      box-shadow: 0 24px 64px rgba(2, 10, 24, 0.55);
+    }
+
+    .login-logo {
+      display: block;
+      width: 44px;
+      height: 44px;
+      margin: 0 auto 20px;
+    }
+
+    .login-title {
+      margin: 0 0 8px;
+      font-size: 21px;
+      font-weight: 500;
+      color: #16243a;
+      text-align: center;
+      letter-spacing: 0.2px;
+    }
+
+    .login-sub {
+      margin: 0 0 22px;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #5f6b7a;
       text-align: center;
     }
-    .login-title { margin: 0 0 26px; font-size: 20px; color: #0b3d6b; }
-    .login-field { margin-bottom: 16px; text-align: left; }
-    .login-field label { display: block; margin-bottom: 6px; font-size: 13px; color: #555; }
+
+    .login-sub strong { font-weight: 500; color: #16243a; }
+
+    /* ---------- 账号列表 ---------- */
+    .acct-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 10px 12px;
+      margin-bottom: 2px;
+      border: none;
+      border-radius: 10px;
+      background: none;
+      font-family: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+
+    .acct-row:hover { background: #f3f7fc; }
+    .acct-row:focus-visible { outline: 2px solid #2c7bb6; outline-offset: -2px; }
+
+    .acct-avatar {
+      width: 36px;
+      height: 36px;
+      flex: 0 0 auto;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .acct-avatar.ghost {
+      background: #eef2f7;
+      color: #5f6b7a;
+      border: 1px dashed #c6d2e0;
+    }
+
+    .acct-text { min-width: 0; flex: 1; }
+
+    .acct-name {
+      display: block;
+      font-size: 14px;
+      color: #1f2a37;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .acct-meta {
+      display: block;
+      margin-top: 2px;
+      font-size: 12px;
+      color: #7b8794;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .acct-arrow {
+      flex: 0 0 auto;
+      color: #b3bfcc;
+      display: flex;
+      align-items: center;
+    }
+
+    .acct-sep {
+      height: 1px;
+      margin: 10px 0;
+      background: #eceff3;
+    }
+
+    /* ---------- 第二步：密码 ---------- */
+    .acct-current {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 4px 0 16px;
+      margin-bottom: 4px;
+      border-bottom: 1px solid #eceff3;
+      min-width: 0;
+    }
+
+    .acct-current .acct-text { min-width: 0; }
+
+    .login-field { margin-bottom: 14px; }
+
     .login-field input {
       width: 100%;
-      height: 38px;
-      padding: 0 10px;
-      border: 1px solid #d0d7de;
-      border-radius: 6px;
+      height: 44px;
+      padding: 0 14px;
+      border: 1px solid #d6dde6;
+      border-radius: 8px;
+      font-family: inherit;
       font-size: 14px;
+      color: #1f2a37;
       outline: none;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
     }
-    .login-field input:focus { border-color: #2c7bb6; box-shadow: 0 0 0 2px rgba(44,123,182,.15); }
-    .login-error { color: #d7191c; font-size: 13px; margin-bottom: 12px; }
-    .login-btn {
-      width: 100%;
-      height: 40px;
+
+    .login-field input:focus {
+      border-color: #2c7bb6;
+      box-shadow: 0 0 0 3px rgba(44, 123, 182, 0.14);
+    }
+
+    .login-show {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 14px;
+      font-size: 12.5px;
+      color: #5f6b7a;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .login-show input { accent-color: #2c7bb6; }
+
+    .login-error {
+      margin-bottom: 12px;
+      padding: 9px 12px;
+      border-radius: 8px;
+      background: #fdeaea;
+      color: #b42318;
+      font-size: 12.5px;
+      line-height: 1.5;
+    }
+
+    .login-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 4px;
+    }
+
+    .login-link {
       border: none;
-      border-radius: 6px;
-      background: #2c7bb6;
-      color: #fff;
-      font-size: 15px;
+      background: none;
+      padding: 8px 2px;
+      font-family: inherit;
+      font-size: 12.5px;
+      color: #2c7bb6;
       cursor: pointer;
     }
+
+    .login-link:hover { text-decoration: underline; }
+
+    .login-btn {
+      height: 40px;
+      padding: 0 22px;
+      border: none;
+      border-radius: 8px;
+      background: #2c7bb6;
+      color: #fff;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+
     .login-btn:hover { background: #1b5e9e; }
-    .login-btn:disabled { opacity: .6; cursor: not-allowed; }
-    .login-back { margin-top: 16px; font-size: 13px; }
-    .login-back a { color: #2c7bb6; text-decoration: none; }
+    .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    /* 演示密码提示：默认隐藏，URL 加 ?hint=1 才显示（上线前可整段删除） */
+    .login-hint {
+      margin-top: 16px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: #fff7e6;
+      border: 1px solid #f5dfae;
+      color: #8a6420;
+      font-size: 12px;
+      line-height: 1.8;
+      word-break: break-all;
+    }
+
+    .login-hint code {
+      font-family: Consolas, Menlo, monospace;
+      background: rgba(0, 0, 0, 0.05);
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    .login-copyright {
+      margin: 0;
+      font-size: 12px;
+      color: rgba(198, 216, 236, 0.6);
+      text-align: center;
+    }
+
+    .login-copyright a { color: rgba(198, 216, 236, 0.85); text-decoration: none; }
+    .login-copyright a:hover { text-decoration: underline; }
+
+    [hidden] { display: none !important; }
+
+    @media (max-width: 440px) {
+      .login-card { padding: 32px 22px 22px; }
+    }
   </style>
 </head>
 <body>
   <div class="login-card">
-    <h2 class="login-title">青藏高原冰冻圈灾害数字孪生系统</h2>
-    <form id="login-form" autocomplete="off">
-      <div class="login-field">
-        <label for="username">用户名</label>
-        <input type="text" id="username" name="username" required autofocus />
-      </div>
-      <div class="login-field">
-        <label for="password">密码</label>
-        <input type="password" id="password" name="password" required />
-      </div>
-      <div class="login-error" id="login-error" style="display:none;"></div>
-      <button type="submit" id="login-btn" class="login-btn">登 录</button>
-    </form>
-    <p class="login-back"><a href="index.html">&larr; 返回首页</a></p>
+    <!-- 第一步：选择账号 -->
+    <div id="step-accounts">
+      <img class="login-logo" src="img/logo-icon.png" alt="" />
+      <h1 class="login-title">选择一个账号</h1>
+      <p class="login-sub">登录后进入<strong>系统管理</strong></p>
+
+      <div id="acct-list"></div>
+
+      <div class="acct-sep"></div>
+
+      <button class="acct-row" id="acct-other" type="button">
+        <span class="acct-avatar ghost">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path fill="currentColor" d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span class="acct-text"><span class="acct-name">使用其他账号</span></span>
+      </button>
+    </div>
+
+    <!-- 第二步：输入密码 -->
+    <div id="step-login" hidden>
+      <img class="login-logo" src="img/logo-icon.png" alt="" />
+      <h1 class="login-title">欢迎回来</h1>
+      <p class="login-sub">请输入密码以继续</p>
+
+      <form id="login-form" autocomplete="off" novalidate>
+        <div class="acct-current" id="acct-current"></div>
+
+        <div class="login-field" id="field-username" hidden>
+          <input type="text" id="username" placeholder="用户名" autocomplete="username" />
+        </div>
+
+        <div class="login-field">
+          <input type="password" id="password" placeholder="输入密码" autocomplete="current-password" />
+        </div>
+
+        <label class="login-show"><input type="checkbox" id="show-pw" /> 显示密码</label>
+
+        <div class="login-error" id="login-error" hidden></div>
+
+        <div class="login-actions">
+          <button type="button" class="login-link" id="back-link">返回账号列表</button>
+          <button type="submit" id="login-btn" class="login-btn">下一步</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="login-hint" id="login-hint" hidden></div>
   </div>
-  <script src="js/login.js"></script>
+
+  <p class="login-copyright">
+    <a href="index.html" id="page-back">&larr; 返回上一页</a> · 青藏高原冰冻圈灾害数字孪生系统
+  </p>
+
+  <script src="js/login.js?v=20261128google7"></script>
 </body>
 </html>

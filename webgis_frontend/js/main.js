@@ -3615,7 +3615,7 @@ function initNavHighlightByPage() {
     'simulate.html': '.dropdown-toggle[data-page="simulate"]',
     'alert.html': '.dropdown-toggle[data-page="alert"]',
     'decision.html': '.dropdown-toggle[data-page="decision"]',
-    'admin.html': '.dropdown-toggle[data-page="admin"]',
+    // 系统管理已从顶栏撤销（2026-11-28），改由右上角身份区进入，无导航项可点亮
     // 三维示范区是决策支持下拉里的一个普通入口（独立页面），
     // 停留时把「决策支持」这个导航项点亮
     'terrain3d.html': '.dropdown-toggle[data-page="decision"]'

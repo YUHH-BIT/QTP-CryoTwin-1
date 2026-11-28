@@ -24,11 +24,7 @@
   var icon = document.createElement('span');
   icon.className = 'cmd-icon';
   icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>';
-  var kbd = document.createElement('kbd');
-  kbd.className = 'cmd-kbd';
-  kbd.textContent = 'Ctrl K';
   bar.insertBefore(icon, input);
-  input.parentNode.insertBefore(kbd, input.nextSibling);
 
   /* ---------- 面板 DOM ---------- */
   var overlay = document.createElement('div');

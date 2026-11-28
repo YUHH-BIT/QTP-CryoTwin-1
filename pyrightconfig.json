@@ -1,0 +1,25 @@
+{
+  "include": [
+    "conftest.py",
+    "webgis_backend",
+    "scripts",
+    "tests",
+    "Training",
+    "validation",
+    "standalone_runoff"
+  ],
+  "exclude": [
+    "data",
+    ".runtime",
+    ".workbuddy",
+    ".idea",
+    "webgis_frontend",
+    "output",
+    "assets",
+    "docs",
+    "**/node_modules",
+    "**/__pycache__"
+  ],
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic"
+}

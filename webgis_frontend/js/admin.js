@@ -84,7 +84,11 @@
       }
       const badge = document.getElementById('admin-current-user');
       if (badge) {
-        badge.textContent = (me.display_name || me.user) + (me.role_code ? ' · ' + (me.role_code === 'admin' ? '系统管理员' : me.role_code) : '');
+        // 统一显示「账号 · 角色」：display_name 常常就等于角色名（admin 的显示名就是
+        // 「系统管理员」），直接拼会出现「系统管理员 · 系统管理员」。
+        const ROLE_LABEL = { admin: '系统管理员', operator: '运维人员', viewer: '访客' };
+        const roleLabel = ROLE_LABEL[me.role_code] || me.role_code || '';
+        badge.textContent = roleLabel ? (me.user + ' · ' + roleLabel) : (me.display_name || me.user);
       }
       this.bindHeader();
       // 打开面板：URL 指定分类则打开该分类，否则默认用户管理

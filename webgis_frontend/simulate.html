@@ -12,7 +12,7 @@
   <script src="js/lib/echarts.min.js"></script>
 
   <!-- 平台样式 -->
-  <link rel="stylesheet" href="css/styles.css?v=20261128disc3" />
+  <link rel="stylesheet" href="css/styles.css?v=20261128c" />
   <link rel="stylesheet" href="css/lib/air-datepicker.css?v=2" />
   <link rel="stylesheet" href="css/lib/air-datepicker-dark.css?v=2" />
   <link rel="stylesheet" href="css/lib/tom-select.min.css?v=2" />
@@ -68,7 +68,7 @@
       box-shadow: 0 6px 20px var(--mod-line, rgba(74, 222, 128, .45));
     }
   </style>
-  <link rel="stylesheet" href="css/command-palette.css?v=20261127size" />
+  <link rel="stylesheet" href="css/command-palette.css?v=20261128nokbd" />
 </head>
 <body class="rhs-v2" data-module="simulate">
   <!-- 加载遮罩层 -->
@@ -126,23 +126,14 @@
             <a href="decision.html?cat=engineering" class="dropdown-item" data-category="engineering">工程措施</a>
           </div>
         </div>
-        <div class="dropdown-container">
-          <a href="#" class="dropdown-toggle" data-page="admin">系统管理</a>
-          <div class="dropdown-menu" id="admin-dropdown">
-            <a href="admin.html?cat=user" class="dropdown-item" data-category="user">用户管理</a>
-            <a href="admin.html?cat=role" class="dropdown-item" data-category="role">角色管理</a>
-            <a href="admin.html?cat=permission" class="dropdown-item" data-category="permission">权限管理</a>
-            <a href="admin.html?cat=log" class="dropdown-item" data-category="log">系统日志</a>
-            <a href="admin.html?cat=data" class="dropdown-item" data-category="data">数据管理</a>
-            <a href="admin.html?cat=agent" class="dropdown-item" data-category="agent">大模型设置</a>
-            <a href="admin.html?cat=setting" class="dropdown-item" data-category="setting">系统设置</a>
-            <a href="admin.html?cat=status" class="dropdown-item" data-category="status">系统状态</a>
-          </div>
-        </div>
       </div>
-      <div class="searchbar">
-        <input type="search" id="place-search" placeholder="搜索地点或流域…" />
-        <button id="search-btn" title="搜索">🔍</button>
+      <div class="topbar-right">
+        <div class="searchbar">
+          <input type="search" id="place-search" placeholder="搜索地点或流域…" />
+          <button id="search-btn" title="搜索">🔍</button>
+        </div>
+        <!-- 身份区：未登录为「登录」，登录后为头像下拉（js/user-menu.js 渲染） -->
+        <div class="topbar-user" id="topbar-user"></div>
       </div>
     </div>
   </div>
@@ -856,6 +847,7 @@
   <script src="js/lib/tom-select.complete.min.js?v=2"></script>
   <script src="js/tomselect-init.js?v=2"></script>
   <script src="js/rhs-tabs.js?v=20261127center"></script>
-  <script src="js/command-palette.js?v=20261127basins"></script>
+  <script src="js/user-menu.js?v=20261128f"></script>
+  <script src="js/command-palette.js?v=20261128nokbd"></script>
 </body>
 </html>

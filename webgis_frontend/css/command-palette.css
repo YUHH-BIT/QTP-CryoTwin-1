@@ -8,7 +8,7 @@
   min-width: 0;
   margin-left: auto;
   height: 38px;
-  padding: 0 10px 0 14px;
+  padding: 0 14px;
   align-items: center;
   background: #1e293b;
   border: 1px solid #3a4a66;
@@ -54,15 +54,6 @@
   width: 16px;
   height: 16px;
   display: block;
-}
-.topbar .searchbar.cmd-mode .cmd-kbd {
-  font-size: 11px;
-  color: #cbd5e1;
-  border: 1px solid #3a4a66;
-  border-radius: 4px;
-  padding: 1px 5px;
-  white-space: nowrap;
-  line-height: 1.3;
 }
 
 /* ---------- 命令面板 ---------- */
