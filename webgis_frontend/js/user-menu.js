@@ -5,7 +5,7 @@
  * 四个业务模块并列，层级不对等，且 8 个子项的下拉是顶栏唯一会溢出滚动的菜单。
  * 现撤销该导航项，改由右上角（搜索框右侧）的身份区承载：
  *
- *   未登录 → 「登录」按钮，跳 login.html 并带回跳地址
+ *   未登录 → 「登录」按钮，点开系统内登录弹窗（js/auth-modal.js），不跳页
  *   已登录 → 头像，下拉为「进入系统管理（仅 admin）/ 账号设置 / 退出登录」
  *            「账号设置」承载当前账号信息与修改密码，后台侧栏不再单列「系统设置」
  *
@@ -49,6 +49,11 @@
         '<i class="fa fa-user"></i><span>登录</span>' +
       '</button>';
     document.getElementById('tu-login').addEventListener('click', function () {
+      // 登录做成系统内弹窗（与「账号设置」同一形态），不跳页；组件缺失时退回独立登录页
+      if (window.AuthModal && window.AuthModal.open) {
+        window.AuthModal.open({ returnUrl: currentPage() });
+        return;
+      }
       window.location.href = 'login.html?return_url=' + encodeURIComponent(currentPage());
     });
   }
@@ -69,11 +74,16 @@
     var inputStyle = 'width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #334563;border-radius:8px;' +
       'background:#101c2f;color:#dbe7f6;font-family:inherit;font-size:13px;';
     var labelStyle = 'display:block;font-size:12px;color:#a9bad2;margin:10px 0 4px;';
+    // admin 的 display_name 本身就是「系统管理员」，与所属角色同名，
+    // 三张卡并排会把同一句话写两遍；同名时省掉「显示名称」，按实际张数分配列宽
+    var nameText = String(me.display_name || '').trim();
+    var roleLabel = String(roleText || '').trim();
+    var cards = [card('当前登录账号', me.user || '—')];
+    if (nameText && nameText !== roleLabel) cards.push(card('显示名称', nameText));
+    cards.push(card('所属角色', roleLabel || '—'));
     var bodyHTML =
-      '<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;">' +
-        card('当前登录账号', me.user || '') +
-        card('显示名称', me.display_name || '—') +
-        card('所属角色', roleText || '—') +
+      '<div style="display:grid;grid-template-columns:repeat(' + cards.length + ',minmax(0,1fr));gap:8px;">' +
+        cards.join('') +
       '</div>' +
       '<label style="' + labelStyle + '">原密码</label>' +
       '<input id="tu-old" type="password" style="' + inputStyle + '" autocomplete="current-password" />' +
@@ -198,7 +208,10 @@
       function go() {
         if (done) return;
         done = true;
-        window.location.href = 'login.html';
+        // 退出后就地刷新回「未登录」形态（业务页显示登录按钮、后台页弹登录框），
+        // 不再跳到独立登录页；只有在没有登录弹窗组件时才回退跳页
+        if (window.AuthModal) window.location.reload();
+        else window.location.href = 'login.html';
       }
       setTimeout(go, 3000);
       fetch('/api/auth/logout', { method: 'POST' })
@@ -207,18 +220,25 @@
     });
   }
 
-  /* ---------------- 初始化 ---------------- */
-  fetch('/api/auth/me', { headers: { 'Accept': 'application/json' } })
-    .then(function (resp) {
-      if (!resp.ok) return null;          // 401 → 未登录
-      return resp.json().catch(function () { return null; });
-    })
-    .then(function (me) {
-      if (me && me.success) renderUser(me);
-      else renderGuest();
-    })
-    .catch(function () {
-      // 后端不可达时不阻断页面，退化为「登录」按钮
-      renderGuest();
-    });
+  /* ---------------- 初始化 ----------------
+     暴露 UserMenu.refresh()：登录弹窗登录成功后只重渲染身份区，
+     不整页刷新（避免地图、图层、播放状态被打断）。 */
+  function init() {
+    fetch('/api/auth/me', { headers: { 'Accept': 'application/json' } })
+      .then(function (resp) {
+        if (!resp.ok) return null;          // 401 → 未登录
+        return resp.json().catch(function () { return null; });
+      })
+      .then(function (me) {
+        if (me && me.success) renderUser(me);
+        else renderGuest();
+      })
+      .catch(function () {
+        // 后端不可达时不阻断页面，退化为「登录」按钮
+        renderGuest();
+      });
+  }
+
+  window.UserMenu = { refresh: init };
+  init();
 })();

@@ -8,7 +8,7 @@
   <!-- 使用多个CDN源确保OpenLayers加载成功 -->
   <link rel="stylesheet" href="css/lib/ol.css" />
   <!-- 移除高德地图API引用 -->
-  <link rel="stylesheet" href="css/styles.css?v=20261128f" />
+  <link rel="stylesheet" href="css/styles.css?v=20261128g" />
   <!-- UI.confirm / UI.modal / UI.toast 的样式在 components.css，缺了会变成裸 DOM 堆在页面底部 -->
   <link rel="stylesheet" href="css/components.css?v=20261128a" />
   <style>
@@ -280,7 +280,10 @@
         </div>
       </div>
       <div class="topbar-right">
-        <div class="searchbar">
+        <!-- cmd-mode + 静态图标直接写在 HTML：首帧就是新版胶囊外观，不再等底部的 command-palette.js
+             加类（否则每次刷新会先闪一下 styles.css 里的老版搜索框） -->
+        <div class="searchbar cmd-mode">
+          <span class="cmd-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></span>
           <input type="search" id="place-search" placeholder="搜索地点或流域…" />
           <button id="search-btn" title="搜索">🔍</button>
         </div>
@@ -346,7 +349,8 @@
   <script src="js/ui-components.js"></script>
   <script src="js/lib/echarts.min.js"></script>
   <script src="js/admin.js?v=20261128n"></script>
-  <script src="js/command-palette.js?v=20261127basins"></script>
-  <script src="js/user-menu.js?v=20261128i"></script>
+  <script src="js/command-palette.js?v=20261128static"></script>
+  <script src="js/auth-modal.js?v=20261128c"></script>
+  <script src="js/user-menu.js?v=20261128p"></script>
 </body>
 </html>

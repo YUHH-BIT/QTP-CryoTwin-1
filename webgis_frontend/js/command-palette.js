@@ -15,16 +15,20 @@
   if (!input || !bar) return;
 
   /* ---------- 顶栏触发器 ---------- */
+  /* cmd-mode 与放大镜图标已静态写在 HTML 里（首帧即新版外观，避免刷新闪旧样式），
+     这里只做兜底：老页面若还是裸 .searchbar，再补上类和图标；已有则不重复插入。 */
   bar.classList.add('cmd-mode');
   input.setAttribute('readonly', 'readonly');
   input.setAttribute('aria-haspopup', 'dialog');
   input.setAttribute('aria-expanded', 'false');
   if (btn) btn.setAttribute('tabindex', '-1');
 
-  var icon = document.createElement('span');
-  icon.className = 'cmd-icon';
-  icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>';
-  bar.insertBefore(icon, input);
+  if (!bar.querySelector('.cmd-icon')) {
+    var icon = document.createElement('span');
+    icon.className = 'cmd-icon';
+    icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>';
+    bar.insertBefore(icon, input);
+  }
 
   /* ---------- 面板 DOM ---------- */
   var overlay = document.createElement('div');

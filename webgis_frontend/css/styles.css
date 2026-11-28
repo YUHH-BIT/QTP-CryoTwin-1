@@ -204,6 +204,11 @@ body {
   letter-spacing: 0.2px;
   padding: 0 18px; /* 2026-11-28：12px→18px，导航条更舒展 */
   border: 1px solid transparent; /* 占位，active 加描边时不产生尺寸抖动 */
+  /* 同心圆角：外层玻璃条 11px − padding 4px = 7px。
+     之前这里漏了圆角，只有窄屏媒体查询里补过 6px，
+     导致桌面宽度下 active 的蓝色渐变底、冰蓝描边、投影全是直角，与整条胶囊语言冲突。
+     ::before 用 border-radius: inherit，改这一处即可连渐变底一起圆掉。 */
+  border-radius: 7px;
   box-sizing: border-box;
   /* 统一缓动曲线：ease-out-quad 质感，切换不突兀 */
   transition:

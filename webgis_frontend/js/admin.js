@@ -37,7 +37,13 @@
       headers: { 'Content-Type': 'application/json' }
     }, options || {}));
     if (resp.status === 401) {
-      window.location.href = 'login.html?return_url=admin.html';
+      // 后台页同样走系统内登录弹窗，不跳页；组件缺失时回退独立登录页
+      if (window.AuthModal && window.AuthModal.open) {
+        // 后台页要重新拉全部数据，登录成功后整页重载
+        window.AuthModal.open({ returnUrl: 'admin.html', onSuccess: () => window.location.reload() });
+      } else {
+        window.location.href = 'login.html?return_url=admin.html';
+      }
       throw new Error('未登录');
     }
     let data = null;
@@ -788,8 +794,8 @@
           const resp = await fetch('/api/admin/config-restore', { method: 'POST', body: fd });
           const data = await resp.json();
           if (!resp.ok) throw new Error((data && data.message) || '恢复失败');
-          toast('配置已恢复，即将跳转登录页', 'success');
-          setTimeout(() => { window.location.href = 'login.html'; }, 1200);
+          toast('配置已恢复，请重新登录', 'success');
+          setTimeout(() => { window.location.reload(); }, 1200);
         } catch (err) {
           toast(err.message, 'error');
           restoreBtn.disabled = false;

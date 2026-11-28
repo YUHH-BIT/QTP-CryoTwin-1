@@ -1,9 +1,9 @@
 /**
- * 登录页脚本（2026-11-28 改版：Google 账号选择器样式，两步流程）
+ * 登录页脚本（2026-11-28 两步流程；21:20 视觉改为深蓝夜空口径）
  *
  * 第一步 选账号 → 第二步 输密码。选中的账号只是「预填用户名」，
  * 密码必须手输，最终仍提交到 POST /api/auth/login（用户名 + 密码）。
- * 视觉参照 Google，但不是 OAuth —— 本地演示环境跑不起来真实 OAuth 回调。
+ * 视觉与「账号设置」弹窗同源（#16233a 卡 / #2a3b55 描边 / #101c2f 输入底），不是 OAuth。
  *
  * return 参数仅允许白名单页面，避免开放重定向。
  */
@@ -19,9 +19,9 @@
      （admin / operator / viewer），仅用于渲染账号选择器。
      密码不写在前端，避免随仓库泄露；演示密码见项目根目录 .env。 */
   var ACCOUNTS = [
-    { username: 'admin',    name: '系统管理员', role: '系统管理员', color: '#2c7bb6' },
-    { username: 'operator', name: '运维人员',   role: '运维人员',   color: '#0f9488' },
-    { username: 'viewer',   name: '访客',       role: '访客',       color: '#8b98a8' }
+    { username: 'admin',    name: '系统管理员', role: '系统管理员', color: '#3b82f6' },
+    { username: 'operator', name: '运维人员',   role: '运维人员',   color: '#14b8a6' },
+    { username: 'viewer',   name: '访客',       role: '访客',       color: '#64748b' }
   ];
 
   var params = new URLSearchParams(window.location.search);

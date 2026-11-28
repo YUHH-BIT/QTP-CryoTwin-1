@@ -7,8 +7,9 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico?v=20261111b" />
   <link rel="stylesheet" href="css/styles.css" />
   <style>
-    /* ============ 登录页（Google 账号选择器样式，两步流程） ============
-       第一步：选账号；第二步：输密码。视觉参照 Google 账号选择器，
+    /* ============ 登录页（深蓝夜空口径，与系统浮层/弹窗同源） ============
+       两步流程不变：第一步选账号，第二步输密码；视觉对齐「账号设置」弹窗
+       ——#16233a 卡片 / #2a3b55 描边 / #8fa3bd 标签 / #e8f1ff 正文 / #101c2f 输入底。
        背后仍走 /api/auth/login（账号密码），不是 OAuth。 */
     * { box-sizing: border-box; }
     html { background: #0a1424; }
@@ -21,64 +22,86 @@
       justify-content: center;
       gap: 18px;
       padding: 32px 16px;
-      background: linear-gradient(135deg, #0a1424 0%, #12294a 55%, #1b4b7d 100%);
+      background:
+        radial-gradient(1100px 620px at 16% -12%, rgba(59, 130, 246, 0.20), transparent 62%),
+        radial-gradient(900px 520px at 90% 110%, rgba(125, 211, 252, 0.13), transparent 64%),
+        linear-gradient(165deg, #08111f 0%, #0d1b30 48%, #0a1424 100%);
+      background-attachment: fixed;
       font-family: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif;
+      -webkit-font-smoothing: antialiased;
     }
 
     .login-card {
-      width: 400px;
+      width: 404px;
       max-width: 100%;
-      background: #fff;
+      padding: 34px 34px 26px;
+      border: 1px solid #2e425f;
       border-radius: 16px;
-      padding: 40px 40px 28px;
-      box-shadow: 0 24px 64px rgba(2, 10, 24, 0.55);
+      background: linear-gradient(180deg, rgba(22, 35, 58, 0.97) 0%, rgba(15, 24, 40, 0.98) 100%);
+      box-shadow:
+        0 28px 76px rgba(2, 8, 20, 0.62),
+        0 0 0 1px rgba(125, 211, 252, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
     }
 
     .login-logo {
       display: block;
-      width: 44px;
-      height: 44px;
-      margin: 0 auto 20px;
+      width: 46px;
+      height: 46px;
+      margin: 0 auto 18px;
+      border-radius: 12px;
+      box-shadow:
+        0 8px 22px rgba(0, 0, 0, 0.45),
+        0 0 0 1px rgba(125, 211, 252, 0.22),
+        0 0 16px rgba(59, 130, 246, 0.14);
     }
 
     .login-title {
-      margin: 0 0 8px;
-      font-size: 21px;
-      font-weight: 500;
-      color: #16243a;
+      margin: 0 0 7px;
+      font-size: 20px;
+      font-weight: 600;
+      color: #e8f1ff;
       text-align: center;
       letter-spacing: 0.2px;
     }
 
     .login-sub {
-      margin: 0 0 22px;
+      margin: 0 0 20px;
       font-size: 13px;
       line-height: 1.6;
-      color: #5f6b7a;
+      color: #8fa3bd;
       text-align: center;
     }
 
-    .login-sub strong { font-weight: 500; color: #16243a; }
+    .login-sub strong { font-weight: 500; color: #7dd3fc; }
 
-    /* ---------- 账号列表 ---------- */
+    /* ---------- 账号列表（每行一张深色小卡） ---------- */
     .acct-row {
       display: flex;
       align-items: center;
       gap: 12px;
       width: 100%;
       padding: 10px 12px;
-      margin-bottom: 2px;
-      border: none;
+      margin-bottom: 8px;
+      border: 1px solid #2a3b55;
       border-radius: 10px;
-      background: none;
+      background: rgba(255, 255, 255, 0.035);
       font-family: inherit;
       text-align: left;
       cursor: pointer;
-      transition: background-color 0.15s ease;
+      transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
     }
 
-    .acct-row:hover { background: #f3f7fc; }
-    .acct-row:focus-visible { outline: 2px solid #2c7bb6; outline-offset: -2px; }
+    .acct-row:hover {
+      background: rgba(255, 255, 255, 0.075);
+      border-color: #3a4a66;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.28);
+    }
+
+    .acct-row:focus-visible {
+      outline: 2px solid rgba(59, 130, 246, 0.8);
+      outline-offset: 1px;
+    }
 
     .acct-avatar {
       width: 36px;
@@ -91,12 +114,14 @@
       color: #fff;
       font-size: 14px;
       font-weight: 500;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
     }
 
     .acct-avatar.ghost {
-      background: #eef2f7;
-      color: #5f6b7a;
-      border: 1px dashed #c6d2e0;
+      background: #101c2f;
+      color: #7dd3fc;
+      border: 1px dashed #3a4a66;
+      box-shadow: none;
     }
 
     .acct-text { min-width: 0; flex: 1; }
@@ -104,7 +129,8 @@
     .acct-name {
       display: block;
       font-size: 14px;
-      color: #1f2a37;
+      font-weight: 500;
+      color: #e8f1ff;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -114,7 +140,7 @@
       display: block;
       margin-top: 2px;
       font-size: 12px;
-      color: #7b8794;
+      color: #7f92ad;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -122,48 +148,61 @@
 
     .acct-arrow {
       flex: 0 0 auto;
-      color: #b3bfcc;
+      color: #5b6f8e;
       display: flex;
       align-items: center;
+      transition: color 0.15s ease, transform 0.15s ease;
     }
+
+    .acct-row:hover .acct-arrow { color: #7dd3fc; transform: translateX(2px); }
 
     .acct-sep {
       height: 1px;
-      margin: 10px 0;
-      background: #eceff3;
+      margin: 12px 0;
+      background: #22314a;
     }
 
     /* ---------- 第二步：密码 ---------- */
+    /* 确认账号行：与第一步的账号行同一张卡的样式，避免切步时视觉语言突变 */
     .acct-current {
       display: flex;
       align-items: center;
       gap: 12px;
-      padding: 4px 0 16px;
-      margin-bottom: 4px;
-      border-bottom: 1px solid #eceff3;
+      padding: 9px 12px;
+      margin-bottom: 14px;
+      border: 1px solid #2a3b55;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.035);
       min-width: 0;
     }
 
     .acct-current .acct-text { min-width: 0; }
 
-    .login-field { margin-bottom: 14px; }
+    .login-field { margin-bottom: 12px; }
 
     .login-field input {
       width: 100%;
       height: 44px;
       padding: 0 14px;
-      border: 1px solid #d6dde6;
+      border: 1px solid #334563;
       border-radius: 8px;
+      background: #101c2f;
       font-family: inherit;
       font-size: 14px;
-      color: #1f2a37;
+      color: #dbe7f6;
       outline: none;
-      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
     }
 
+    .login-field input::placeholder { color: #7d90aa; }
+
+    /* 输错后 login.js 会 select() 选中密码，默认浅色选区在深色框上很刺眼 */
+    .login-field input::selection { background: rgba(59, 130, 246, 0.38); color: #eef5ff; }
+
     .login-field input:focus {
-      border-color: #2c7bb6;
-      box-shadow: 0 0 0 3px rgba(44, 123, 182, 0.14);
+      border-color: #3b82f6;
+      background: #0e1929;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
     }
 
     .login-show {
@@ -172,19 +211,49 @@
       gap: 7px;
       margin-bottom: 14px;
       font-size: 12.5px;
-      color: #5f6b7a;
+      color: #8fa3bd;
       cursor: pointer;
       user-select: none;
     }
 
-    .login-show input { accent-color: #2c7bb6; }
+    .login-show input {
+      appearance: none;
+      -webkit-appearance: none;
+      position: relative;
+      width: 15px;
+      height: 15px;
+      margin: 0;
+      border: 1px solid #3a4a66;
+      border-radius: 4px;
+      background: #101c2f;
+      cursor: pointer;
+      transition: background-color 0.15s ease, border-color 0.15s ease;
+    }
+
+    .login-show input:checked {
+      border-color: #3b82f6;
+      background: #3b82f6;
+    }
+
+    .login-show input:checked::after {
+      content: "";
+      position: absolute;
+      left: 4px;
+      top: 1px;
+      width: 4px;
+      height: 8px;
+      border: solid #fff;
+      border-width: 0 2px 2px 0;
+      transform: rotate(45deg);
+    }
 
     .login-error {
       margin-bottom: 12px;
       padding: 9px 12px;
+      border: 1px solid rgba(239, 68, 68, 0.35);
       border-radius: 8px;
-      background: #fdeaea;
-      color: #b42318;
+      background: rgba(239, 68, 68, 0.12);
+      color: #fca5a5;
       font-size: 12.5px;
       line-height: 1.5;
     }
@@ -203,7 +272,7 @@
       padding: 8px 2px;
       font-family: inherit;
       font-size: 12.5px;
-      color: #2c7bb6;
+      color: #7dd3fc;
       cursor: pointer;
     }
 
@@ -211,29 +280,30 @@
 
     .login-btn {
       height: 40px;
-      padding: 0 22px;
+      padding: 0 24px;
       border: none;
       border-radius: 8px;
-      background: #2c7bb6;
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
       color: #fff;
       font-family: inherit;
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
-      transition: background-color 0.15s ease;
+      box-shadow: 0 6px 18px rgba(59, 130, 246, 0.30);
+      transition: filter 0.15s ease, box-shadow 0.15s ease;
     }
 
-    .login-btn:hover { background: #1b5e9e; }
-    .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .login-btn:hover { filter: brightness(1.08); box-shadow: 0 8px 22px rgba(59, 130, 246, 0.40); }
+    .login-btn:disabled { opacity: 0.6; cursor: not-allowed; box-shadow: none; }
 
     /* 演示密码提示：默认隐藏，URL 加 ?hint=1 才显示（上线前可整段删除） */
     .login-hint {
       margin-top: 16px;
       padding: 10px 12px;
+      border: 1px solid rgba(250, 204, 21, 0.26);
       border-radius: 8px;
-      background: #fff7e6;
-      border: 1px solid #f5dfae;
-      color: #8a6420;
+      background: rgba(250, 204, 21, 0.08);
+      color: #e9c98c;
       font-size: 12px;
       line-height: 1.8;
       word-break: break-all;
@@ -241,7 +311,8 @@
 
     .login-hint code {
       font-family: Consolas, Menlo, monospace;
-      background: rgba(0, 0, 0, 0.05);
+      background: rgba(255, 255, 255, 0.07);
+      color: #f7e2b6;
       padding: 1px 5px;
       border-radius: 4px;
     }
@@ -249,17 +320,17 @@
     .login-copyright {
       margin: 0;
       font-size: 12px;
-      color: rgba(198, 216, 236, 0.6);
+      color: rgba(198, 216, 236, 0.5);
       text-align: center;
     }
 
-    .login-copyright a { color: rgba(198, 216, 236, 0.85); text-decoration: none; }
-    .login-copyright a:hover { text-decoration: underline; }
+    .login-copyright a { color: rgba(198, 216, 236, 0.8); text-decoration: none; }
+    .login-copyright a:hover { color: #7dd3fc; }
 
     [hidden] { display: none !important; }
 
     @media (max-width: 440px) {
-      .login-card { padding: 32px 22px 22px; }
+      .login-card { padding: 28px 20px 22px; }
     }
   </style>
 </head>
@@ -320,6 +391,6 @@
     <a href="index.html" id="page-back">&larr; 返回上一页</a> · 青藏高原冰冻圈灾害数字孪生系统
   </p>
 
-  <script src="js/login.js?v=20261128google8"></script>
+  <script src="js/login.js?v=20261128dark"></script>
 </body>
 </html>
