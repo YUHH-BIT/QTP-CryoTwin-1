@@ -142,13 +142,16 @@ await send('Network.enable');
 await send('Network.setCacheDisabled', { cacheDisabled: true });
 
 try {
-  /* ---------- 0. 从首页进登录 → 「返回上一页」应回首页 ---------- */
+  /* ---------- 0. 从首页点「登录」→ 系统内弹窗（2026-11-28 21:45 起不跳页） ---------- */
   await goto(`${BASE}/index.html`);
   await waitFor('#tu-login');
   await evaluate(`document.getElementById('tu-login').click(); true`);
-  await waitPath('login.html');
-  await evaluate(`document.getElementById('page-back').click(); true`);
-  console.log('返回上一页落点:', (await waitPath('index.html')) || '（未回退）');
+  await sleep(700);
+  const modalOpen = await evaluate(`!!document.querySelector('.ui-modal-overlay.am-open')`);
+  const urlAfterClick = await evaluate(`location.pathname`);
+  console.log('点「登录」→ 弹窗:', modalOpen, '| URL 未跳转:', urlAfterClick);
+  await evaluate(`document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'})); true`);
+  await sleep(400);
 
   /* ---------- 1. 登录页第一步 ---------- */
   await goto(`${BASE}/login.html`);

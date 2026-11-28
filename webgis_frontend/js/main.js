@@ -272,12 +272,17 @@ const pageLoadState = {
   }
 };
 
-// 页面加载完成后执行系统级初始化（所有页面通用：打开即显示加载动效，要素加载完才移除）
+// 系统加载动效在脚本执行的第一时间就接管（全页面通用）
+// 2026-11-28：首页此前会看到「两套」加载动效——loadBasinData() 在本文件顶层就执行，
+// 它自带的「正在加载流域边界数据…」遮罩先亮一次，数据回来后自己又关掉，
+// 随后 DOMContentLoaded 再把系统遮罩亮一次；两次遮罩/两句话叠在一起。
+// 现在：脚本一执行就点亮系统遮罩并锁定，各要素加载函数里的 showLoading(...) 全被守卫忽略，
+// 只由 pageLoadState.finish() 在全部要素加载完成后移除遮罩。
+showLoading(true, '系统正在加载，请稍候...');
+pageLoadState.init = true;
+
+// 页面加载完成后只做日志标记（遮罩与文案已由上面的系统加载接管）
 document.addEventListener('DOMContentLoaded', function () {
-  // 所有页面打开时立即显示系统加载动效，文案固定为"系统正在加载"
-  showLoading(true, '系统正在加载，请稍候...');
-  // 立即锁定：在全部要素加载完成前，忽略单个要素的加载提示/提前隐藏（见 showLoading 守卫）
-  pageLoadState.init = true;
   console.log('🌐 开始系统级加载流程...');
 });
 
@@ -1281,7 +1286,8 @@ function loadBasinData() {
   // 幂等守卫：已加载过则不再重复请求
   if (basinLayer) return;
   pageLoadState.register('basin');
-  showLoading(true, '正在加载流域边界数据...');
+  // 不再单独弹「正在加载流域边界数据…」遮罩：加载动效统一由系统遮罩负责
+  // （该函数在本文件顶层执行，早于 DOMContentLoaded，自己开关遮罩会与系统遮罩叠加）
   fetch('/api/basin/data')
     .then(res => {
       if (!res.ok) throw new Error('接口流域数据加载失败');
@@ -1333,7 +1339,6 @@ function loadBasinData() {
       // 添加流域数据加载完成提示
       console.log('流域边界数据加载完成！');
       pageLoadState.complete('basin');
-      showLoading(false);
     })
     .catch(error => {
       console.error('流域边界接口加载失败:', error);

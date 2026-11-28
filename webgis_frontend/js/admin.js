@@ -825,7 +825,6 @@
       const bad = '<span style="color:#f87171;font-weight:600;">异常</span>';
       const html =
         '<div class="admin-toolbar">' +
-          '<span class="setting-prompt-hint">进程内缓存用于加速统计与模型加载；数据更新后可手动清除。</span>' +
           '<span class="admin-toolbar-gap"></span>' +
           '<button class="admin-btn admin-btn-sm admin-btn-ghost" id="status-clear-cache"><i class="fa fa-refresh"></i> 清除缓存</button>' +
         '</div>' +
@@ -853,7 +852,7 @@
           { v: sys.db_exists ? ok : bad,  k: '数据库' },
           { v: s.logs_today != null ? s.logs_today : '—', k: '今日日志' },
           { v: sys.online_users != null ? sys.online_users : '—', k: '近24h活跃用户' },
-          { v: fmtSize((sys.storage_usage_mb || 0) * 1024 * 1024), k: '后端程序目录占用' }
+          { v: sys.storage_usage_mb == null ? '<span style="color:#8496b0;">统计中…</span>' : fmtSize(sys.storage_usage_mb * 1024 * 1024), k: '后端程序目录占用' }
         ]);
       setContent(html);
 

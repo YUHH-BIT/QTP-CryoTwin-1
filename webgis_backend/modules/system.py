@@ -5,6 +5,7 @@
 import os
 import time
 import platform
+import threading
 from flask import Blueprint, jsonify, current_app
 
 # 版本信息（真实环境探测，异常时为空字符串）
@@ -24,8 +25,12 @@ system_bp = Blueprint('system', __name__, url_prefix='/api/system')
 # 进程启动时间（用于计算运行时长）
 _START_TIME = time.time()
 
-# 存储使用量缓存（避免每次请求都遍历 12GB 静态目录）
-_STORAGE_CACHE = {'ts': 0, 'mb': 0}
+# 存储使用量缓存（避免每次请求都遍历静态输出目录）
+# 2026-11-28：outputs 实测约 115 GB / 24 万文件，os.walk 冷跑约 8 秒，
+# 原先 60 秒过期的同步扫描会让「系统管理 → 系统状态」首屏卡 8 秒。
+# 现改为：命中缓存直接返回，未命中返回 None 并在后台线程刷新（前端显示「统计中…」）。
+_STORAGE_CACHE = {'ts': 0, 'mb': None, 'busy': False}
+_STORAGE_TTL = 1800  # 30 分钟
 
 
 def _dir_size_mb(path):
@@ -60,15 +65,25 @@ def _recent_active_users():
         return 0
 
 
-def _storage_usage_mb():
+def _storage_usage_mb(path):
+    """返回静态输出目录占用（MB）。有缓存立即返回，否则 None + 后台线程刷新。"""
     now = time.time()
-    if now - _STORAGE_CACHE['ts'] < 60:
+    if _STORAGE_CACHE['mb'] is not None and now - _STORAGE_CACHE['ts'] < _STORAGE_TTL:
         return _STORAGE_CACHE['mb']
-    outputs_dir = current_app.config.get('OUTPUTS_DIR', '')
-    mb = _dir_size_mb(outputs_dir) if outputs_dir and os.path.isdir(outputs_dir) else 0
-    _STORAGE_CACHE['ts'] = now
-    _STORAGE_CACHE['mb'] = mb
-    return mb
+    if not _STORAGE_CACHE['busy'] and path and os.path.isdir(path):
+        _STORAGE_CACHE['busy'] = True
+
+        def _work():
+            try:
+                _STORAGE_CACHE['mb'] = _dir_size_mb(path)
+                _STORAGE_CACHE['ts'] = time.time()
+            except Exception:
+                pass
+            finally:
+                _STORAGE_CACHE['busy'] = False
+
+        threading.Thread(target=_work, name='storage-usage', daemon=True).start()
+    return _STORAGE_CACHE['mb']
 
 
 @system_bp.route('/status', methods=['GET'])
@@ -87,6 +102,7 @@ def status():
             return 0
 
     uptime_sec = int(time.time() - _START_TIME)
+    storage_mb = _storage_usage_mb(current_app.config.get('OUTPUTS_DIR', ''))
     days, rem = divmod(uptime_sec, 86400)
     hours, rem = divmod(rem, 3600)
     minutes = rem // 60
@@ -108,6 +124,6 @@ def status():
         'runoff_files': _count_tif(current_app.config.get('RUNOFF_OUTPUT_DIR', '')),
         'flood_inundation_files': _count_tif(current_app.config.get('FLOOD_INUNDATION_DIR', '')),
         'online_users': _recent_active_users(),   # 最近24小时活跃用户数（来自日志）
-        'storage_usage_mb': round(_storage_usage_mb(), 1),
+        'storage_usage_mb': round(storage_mb, 1) if storage_mb is not None else None,
         'server_time': time.strftime('%Y-%m-%d %H:%M:%S'),
     })
