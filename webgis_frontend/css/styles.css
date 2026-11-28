@@ -6469,6 +6469,13 @@ body.rhs-v2 input[type="range"]:focus { outline: none; }
   flex: 0 0 auto;
 }
 
+/* 首帧占位：user-menu.js 拉到 /api/auth/me 之前这个容器是空的，不给宽度会让
+   搜索框先贴右、拿到身份后再左移（2026-11-28 实测 73px，肉眼可见）。
+   34px = 已登录头像的宽度，所以已登录用户刷新时完全不跳；
+   未登录访客从 34px 撑到 73px 的「登录」按钮，只剩 39px 余量。
+   不用固定宽度：那样已登录时头像左侧会永久多出 39px 留白。 */
+.topbar-user:empty { width: 34px; }
+
 /* 未登录 / 已登录共用胶囊：材质与 nav-links 玻璃条、搜索框同源 */
 .topbar-user .tu-btn {
   display: inline-flex;

@@ -69,7 +69,7 @@ function _hideSimResultModal() {
 // 导出：洪水淹没逐日统计 CSV
 function exportFloodCsv(result) {
     if (!result || !result.flood_results) { uiMsg('暂无淹没结果可导出', 'warning'); return; }
-    const lines = ['日期,有无洪水,淹没面积(km²),淹没比例(%),平均径流,最大径流'];
+    const lines = ['日期,有无洪水,淹没面积(km²),淹没比例(%),平均洪水径流,最大洪水径流'];
     (result.flood_results || []).forEach(f => {
         lines.push([
             f.date || '',
@@ -246,8 +246,12 @@ document.addEventListener('DOMContentLoaded', () => {
         variables: {
             'runoff': '径流',
             'inundation': '淹没水深',
-            'flood': '洪水',
-            'snowmelt': '融雪径流',
+            // 2026-11-28 用户定稿：洪水识别 / 淹没模拟 两个功能的图例统一叫「洪水径流/mm」。
+            // 依据：两张结果图渲染的都是径流原始值（mm），区别只在保留哪些像元——
+            // 洪水识别是 daily >= 年最大值，淹没模拟是超阈值，其余置 0 后透明不画。
+            // 所以叫「洪水」不准确（不是淹没水深），叫「融雪径流」又丢了"只剩洪水像元"这层语义。
+            'flood': '洪水径流',
+            'snowmelt': '洪水径流',
             'temperature_2m': '日均温',
             'temperature_2m_max': '日最高温',
             'total_precipitation_sum': '日总降水',
@@ -561,8 +565,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const varKey = (variable || '').toLowerCase();
         varName = i18n.variables[varKey]
             || (varKey.includes('inundation') ? '淹没水深'
-                : varKey.includes('flood') ? '洪水'
-                : varKey.includes('snowmelt') ? '融雪径流'
+                : varKey.includes('flood') ? '洪水径流'
+                : varKey.includes('snowmelt') ? '洪水径流'
                 : varKey.includes('runoff') ? '径流'
                 : '径流');
         unit = i18n.units[varKey] || (isRunoff ? 'mm' : '');
@@ -1983,13 +1987,13 @@ function showSnowmeltFloodResult(response, sub) {
         topRow.appendChild(ringWrap);
         panel.appendChild(topRow);
 
-        // 统计卡片网格（覆盖全部统计项：总天数/有效天数/洪水天数/平均洪水比例/平均融雪径流）
+        // 统计卡片网格（覆盖全部统计项：总天数/有效天数/洪水天数/平均洪水比例/平均洪水径流）
         const gridHtml = UI.statGrid([
             { label: '总天数', value: (response.total_days || 0).toLocaleString(), unit: '天', icon: 'fa-calendar-check-o', accent: 'ice' },
             { label: '有效天数', value: (response.valid_days || 0).toLocaleString(), unit: '天', icon: 'fa-check-circle', accent: 'success' },
             { label: '洪水累加天数', value: (response.flood_days || 0).toLocaleString(), unit: '天', icon: 'fa-exclamation-triangle', accent: 'danger' },
             { label: '平均洪水比例', value: ((response.avg_flood_ratio || 0) * 100).toFixed(2), unit: '%', icon: 'fa-percent', accent: 'warning' },
-            { label: '平均融雪径流', value: response.avg_mean_value !== null && response.avg_mean_value !== undefined ? response.avg_mean_value.toFixed(2) : 'N/A', unit: response.avg_mean_value !== null && response.avg_mean_value !== undefined ? 'mm' : '', icon: 'fa-tint', accent: 'ice' }
+            { label: '平均洪水径流', value: response.avg_mean_value !== null && response.avg_mean_value !== undefined ? response.avg_mean_value.toFixed(2) : 'N/A', unit: response.avg_mean_value !== null && response.avg_mean_value !== undefined ? 'mm' : '', icon: 'fa-tint', accent: 'ice' }
         ]);
         const gridHolder = document.createElement('div');
         gridHolder.innerHTML = gridHtml;
@@ -2029,7 +2033,7 @@ function showSnowmeltFloodResult(response, sub) {
             
             const option = {
                 title: {
-                    text: '融雪径流（mm）',
+                    text: '洪水径流（mm）',
                     left: 'center',
                     textStyle: {
                         color: '#93c5fd',
@@ -2085,13 +2089,13 @@ function showSnowmeltFloodResult(response, sub) {
                             type: 'dashed'
                         }
                     },
-                    name: '融雪径流量 (mm)',
+                    name: '洪水径流量 (mm)',
                     nameTextStyle: {
                         color: '#94a3b8'
                     }
                 },
                 series: [{
-                    name: '融雪径流',
+                    name: '洪水径流',
                     type: 'line',
                     smooth: true,
                     data: chartData.map(item => item.value),
@@ -2256,7 +2260,7 @@ function displaySnowmeltFloodResults(response) {
     thead.innerHTML = `
         <tr>
             <th>日期</th>
-            <th>均值(mm)</th>
+            <th>洪水径流(mm)</th>
             <th>操作</th>
         </tr>
     `;
