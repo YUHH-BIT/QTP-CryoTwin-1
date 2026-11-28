@@ -115,30 +115,74 @@ const map = window.map = new ol.Map({
     baseLayers['normal']
   ],
   view: new ol.View({
-    // 子页面（非首页）默认聚焦位置（用户设定：东经94.1691度，北纬32.8524度，缩放5.5）
+    // 子页面（非首页）默认聚焦位置：中心不动（东经94.1691度，北纬32.8524度），
+    // 缩放 5.5 → 5.2（2026-11-28 20:47 用户指定，只改缩放）
     center: ol.proj.fromLonLat([94.1691, 32.8524]),
-    zoom: 5.5
+    zoom: 5.2
   }),
   controls: []
 });
 
-// 初始设置：只显示普通地图
-baseLayers['normal'].setVisible(true);
-baseLayers['hybrid'].forEach(layer => layer.setVisible(false));
+// 初始设置：默认显示卫星影像（2026-11-28 用户要求所有界面默认卫星地图）
+baseLayers['normal'].setVisible(false);
+baseLayers['hybrid'].forEach(layer => layer.setVisible(true));
 
 // 当前是否首页：首页加载完整的流域要素；其他页面只加载默认青藏高原边界以提升性能
 const isHomePage = window.location.pathname.endsWith('index.html') ||
                    window.location.pathname.endsWith('/') ||
                    window.location.pathname === '';
 
+// ---------- 首页开场运镜：中国全境 → 青藏高原（2026-11-28）----------
+// 进入首页先给一个大范围（中国全境 + 周边一圈），等要素加载完成、加载遮罩移除后，
+// 平滑推进到青藏高原（西藏 + 青海）。用户一拖动 / 滚轮，OL 会自行打断动画。
+const HOME_INTRO = {
+  // 起始视野（用户 2026-11-28 20:09 指定）：中国全境 + 少量周边
+  startExtent: [62, 3.5, 141, 50],
+  // 左侧 200px 留给图层面板，其余对称
+  startPadding: [48, 48, 48, 200],
+  // 终点视野：西藏 + 青海 + 川西/南疆边缘，在 [76,26,102,42] 基础上再放大一档
+  targetExtent: [77.5, 27, 100.5, 41],
+  holdMs: 800,                            // 起始视野停留时长（1200→800）
+  flyMs: 2200,                            // 推进时长（3400→2200）
+  played: false
+};
+
+// 首页初始视角：大范围起始视野（左侧面板是浮层，padding 留到面板右缘，免得压住西藏）
+function setHomeStartView() {
+  const view = map.getView();
+  const size = map.getSize();
+  if (size && size[0] > 0 && size[1] > 0) {
+    view.fit(ol.proj.transformExtent(HOME_INTRO.startExtent, 'EPSG:4326', 'EPSG:3857'), {
+      size: size,
+      padding: HOME_INTRO.startPadding
+    });
+  } else {
+    view.setCenter(ol.proj.fromLonLat([90, 24]));
+    view.setZoom(3.2);
+  }
+}
+
+// 开场推进：由 pageLoadState.finish() 在加载遮罩移除后调用
+function startHomeIntro() {
+  if (!isHomePage || HOME_INTRO.played) return;
+  HOME_INTRO.played = true;
+  const view = map.getView();
+  window.setTimeout(function () {
+    view.fit(ol.proj.transformExtent(HOME_INTRO.targetExtent, 'EPSG:4326', 'EPSG:3857'), {
+      padding: [60, 60, 60, 300],   // 左侧留出图层面板宽度，免得青藏高原被压住
+      duration: HOME_INTRO.flyMs,
+      easing: function (t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    });
+  }, HOME_INTRO.holdMs);
+}
+
 // 首页与子页面使用不同的默认聚焦位置（用户分别设定）
 if (isHomePage) {
-  // 首页：聚焦青藏高原西部（东经84.7950度，北纬32.9394度，缩放5.5）
-  map.getView().setCenter(ol.proj.fromLonLat([84.7950, 32.9394]));
-  map.getView().setZoom(5.5);
+  // 首页：开场先给大范围视野，随后由 startHomeIntro() 推进到青藏高原
+  setHomeStartView();
 }
 // 非首页（query/simulate/alert/decision 等）保持上面 View 定义的东部默认聚焦
-// （东经94.1691度，北纬32.8524度，缩放5.5）
+// （东经94.1691度，北纬32.8524度，缩放5.2）
 
 // 底图切换函数
 function switchBasemap(type) {
@@ -220,7 +264,11 @@ const pageLoadState = {
     this.finished = true;
     console.log(`[系统加载] 页面要素加载完成（${Object.keys(this.completed).length}/${Object.keys(this.tasks).length}），移除加载动画`);
     // 延迟一小段，等待页面渲染稳定后再隐藏遮罩
-    setTimeout(() => showLoading(false), 200);
+    setTimeout(() => {
+      showLoading(false);
+      // 首页：遮罩移除后再播「中国全境 → 青藏高原」开场运镜，否则动画会被遮罩挡住
+      startHomeIntro();
+    }, 200);
   }
 };
 
@@ -1279,9 +1327,9 @@ function loadBasinData() {
       // 按面板勾选状态同步可见性（面板勾选状态为唯一事实来源）
       const basinCheckbox = document.getElementById('layer-basin');
       basinLayer.setVisible(!!(basinCheckbox && basinCheckbox.checked));
-      // 移除自动调整到整个数据范围的代码，保持地图在青藏高原的正确位置
-      // 如果需要，可以设置一个适合青藏高原显示的缩放级别
-      map.getView().setZoom(5.5);
+      // 视图交给开场运镜 / 用户操作，数据加载不再改视图。
+      // （2026-11-28 删掉这里的 setZoom(5.5)：它会在开场推进途中把镜头直接拽到 5.5，
+      //   而 5.5 在窄窗口下只能看到喜马拉雅南坡，表现就是"地图突然怼近"）
       // 添加流域数据加载完成提示
       console.log('流域边界数据加载完成！');
       pageLoadState.complete('basin');
@@ -1389,9 +1437,9 @@ function loadTPChinaData() {
       zIndex: 55
       });
       map.addLayer(tpChinaLayer);
-      // 移除自动调整到整个数据范围的代码，保持地图在青藏高原的正确位置
-      // 如果需要，可以设置一个适合青藏高原显示的缩放级别
-      map.getView().setZoom(5.5);
+      // 视图交给开场运镜 / 用户操作，数据加载不再改视图。
+      // （2026-11-28 删掉这里的 setZoom(5.5)：全页面都会走到这里，它会把开场动画
+      //   打断并强行拉到 5.5，窄窗口下看起来就是"直接怼到喜马拉雅"）
       // 添加TP_China数据加载完成提示
       console.log('TP_China边界数据加载完成！');
       console.log('加载的要素数量:', vectorSource.getFeatures().length);
@@ -2992,7 +3040,13 @@ map.on('load', function() {
 });
 
 // 地图缩放事件更新高程图例
+// 200ms 节流（2026-11-28）：createElevationLegend 会重建整块图例 DOM，
+// 开场运镜期间 resolution 每帧都在变，不节流会每帧重建、明显拖慢动画。
+let _legendThrottleTs = 0;
 map.getView().on('change:resolution', function() {
+  const now = Date.now();
+  if (now - _legendThrottleTs < 200) return;
+  _legendThrottleTs = now;
   if (elevationLegendControl && elevationLegendControl.element && 
       elevationLegendControl.element.style.display !== 'none') {
     createElevationLegend(); // 重新创建图例
@@ -3021,7 +3075,7 @@ document.getElementById('place-search').addEventListener('keydown', (e) => {
 
 // 页面初始化
 document.addEventListener('DOMContentLoaded', function() {
-  switchBasemap("normal"); // 初始化底图
+  switchBasemap("hybrid"); // 初始化底图：默认卫星影像（同时点亮「卫星地图」按钮）
   // 分类折叠展开功能（所有页面通用，仅 UI 交互）
   initCategoryFold();
   // 左侧图层面板：悬浮岛式（标题栏 + 收起/展开按钮）

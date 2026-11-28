@@ -9,7 +9,7 @@
   <!-- 使用多个CDN源确保OpenLayers加载成功 -->
   <link rel="stylesheet" href="css/lib/ol.css" />
   <!-- 移除高德地图API引用 -->
-  <link rel="stylesheet" href="css/styles.css?v=20261128d" />
+  <link rel="stylesheet" href="css/styles.css?v=20261128f" />
   <!-- UI 组件库样式 -->
   <link rel="stylesheet" href="css/components.css" />
   <!-- 使用多个CDN源确保Font Awesome加载成功 -->
@@ -92,8 +92,8 @@
   <div class="sidepanel">
     <h3>查看选项</h3>
     <div class="mode-switch">
-      <button class="active" id="btn-map">普通地图</button>
-      <button id="btn-mix">卫星地图</button>
+      <button id="btn-map">普通地图</button>
+      <button class="active" id="btn-mix">卫星地图</button>
     </div>
     
     <!-- 图层控制分类 -->
@@ -121,7 +121,7 @@
             <label for="layer-river">河网水系</label>
           </div>
           <div class="layer-item">
-            <input type="checkbox" id="layer-lake" class="layer-checkbox" checked>
+            <input type="checkbox" id="layer-lake" class="layer-checkbox">
             <label for="layer-lake">湖泊分布</label>
           </div>
         </div>
@@ -259,7 +259,7 @@
           <!-- 冻土分布 -->
           <div class="category-item" data-type="permafrost">
             <div class="layer-item">
-              <input type="checkbox" id="layer-cryo-permafrost" class="layer-checkbox" checked>
+              <input type="checkbox" id="layer-cryo-permafrost" class="layer-checkbox">
               <label for="layer-cryo-permafrost">冻土分布</label>
             </div>
           </div>
@@ -267,7 +267,7 @@
           <!-- 冰川分布 -->
           <div class="category-item" data-type="glacier">
             <div class="layer-item">
-              <input type="checkbox" id="layer-cryo-glacier" class="layer-checkbox" checked>
+              <input type="checkbox" id="layer-cryo-glacier" class="layer-checkbox">
               <label for="layer-cryo-glacier">冰川分布</label>
             </div>
           </div>
@@ -344,7 +344,7 @@
   </script>
 
   <script src="js/ui-components.js"></script>
-  <script src="js/main.js?v=20261127gdp"></script>
+  <script src="js/main.js?v=20261128zoom12"></script>
   <!-- 气象水文栅格查询：geotiff 解码 + 自包含渲染 + 查询交互（顺序依赖） -->
   <script src="js/geotiff.js"></script>
   <script src="js/geotiff-render.js"></script>

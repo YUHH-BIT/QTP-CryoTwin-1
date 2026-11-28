@@ -182,7 +182,7 @@ body {
    材质与右侧 cmd 搜索框同源（深色填充 + 1px 描边 + 内高光），整条顶栏语言统一。 */
 .topbar .nav-links {
   display: flex;
-  gap: 2px;
+  gap: 6px; /* 2026-11-28：2px 太挤，拉开让菜单项有呼吸感 */
   background: rgba(30, 41, 59, 0.55);
   border: 1px solid rgba(148, 163, 184, 0.14);
   border-radius: 11px;
@@ -202,8 +202,7 @@ body {
   font-size: 14px;
   font-weight: 500;
   letter-spacing: 0.2px;
-  padding: 0 12px;
-  border-radius: 7px;
+  padding: 0 18px; /* 2026-11-28：12px→18px，导航条更舒展 */
   border: 1px solid transparent; /* 占位，active 加描边时不产生尺寸抖动 */
   box-sizing: border-box;
   /* 统一缓动曲线：ease-out-quad 质感，切换不突兀 */
@@ -5675,6 +5674,47 @@ body.rhs-v2 .decision-sidebar.active ~ .rhs-tab {
   opacity: 0;
   transform: translate(100%, -50%);
   pointer-events: none;
+}
+
+/* ---------- 首页图层面板尺寸对齐（2026-11-28）----------
+   四个业务页走 body.rhs-v2 的紧凑口径（268px 宽 / 10px 内边距 / 12~13px 字），
+   首页 index.html 不加载 rhs-v2，仍用上方基础样式（320px / 16px 内边距 / 15px 字），
+   实际观感比业务页「大一圈」。这里只对齐尺寸、间距与字号，颜色继续用系统主色；
+   移动端（<=700px）仍按原媒体查询铺满宽度，容器尺寸包进 min-width 里避免被覆盖。 */
+@media (min-width: 701px) {
+  body:not(.rhs-v2) .sidepanel {
+    top: calc(var(--nav-height) + 12px);
+    left: 12px;
+    width: 268px;
+    max-height: calc(100vh - var(--nav-height) - 24px);
+    padding: 10px;
+    border-radius: 10px;
+  }
+  body:not(.rhs-v2) .sidepanel.collapsed { left: -288px; }
+}
+body:not(.rhs-v2) .sidepanel-head { margin-bottom: 10px; padding-bottom: 8px; }
+body:not(.rhs-v2) .sidepanel-head-title { font-size: 13px; font-weight: 500; gap: 6px; }
+body:not(.rhs-v2) .sidepanel-head-title i { font-size: 12px; }
+body:not(.rhs-v2) .sidepanel-collapse-btn {
+  width: 24px; height: 24px; border-radius: 6px;
+  border: 1px solid transparent; font-size: 18px;
+}
+body:not(.rhs-v2) .sidepanel .category { border-radius: 10px; margin-bottom: 8px; }
+body:not(.rhs-v2) .sidepanel .category-header { padding: 7px 9px; }
+body:not(.rhs-v2) .sidepanel .category-header span { font-size: 12px; font-weight: 500; }
+body:not(.rhs-v2) .sidepanel .category-header span i { font-size: 12px; margin-right: 6px; }
+body:not(.rhs-v2) .sidepanel .category-header .toggle-icon { font-size: 12px; }
+body:not(.rhs-v2) .sidepanel .layer-item { padding: 4px 9px; }
+body:not(.rhs-v2) .sidepanel .layer-item:hover { transform: none; }
+body:not(.rhs-v2) .sidepanel .layer-item input[type="checkbox"] {
+  width: 14px; height: 14px; margin-right: 8px;
+}
+body:not(.rhs-v2) .sidepanel .layer-item label {
+  font-size: 12px; font-weight: 400; line-height: 1.4;
+}
+body:not(.rhs-v2) .sidepanel .mode-switch { gap: 8px; margin-bottom: 10px; }
+body:not(.rhs-v2) .sidepanel .mode-switch button {
+  padding: 5px 8px; font-size: 11px; border-radius: 6px;
 }
 
 /* ---------- 图层管理浮层（main.js 的 .sidepanel / .sidepanel-toggle） ---------- */

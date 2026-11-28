@@ -355,7 +355,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     zIndex: 40
                 });
                 map.addLayer(basinLayer);
-                map.getView().setZoom(5.5);
+                // 与全站默认缩放保持一致（5.2，2026-11-28 20:47）
+                map.getView().setZoom(5.2);
                 console.log('流域边界数据加载完成！');
             })
             .catch(error => {
