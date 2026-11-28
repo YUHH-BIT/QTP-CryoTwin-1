@@ -122,7 +122,11 @@
     },
 
     async openCategory(cat) {
-      const valid = ['status', 'data', 'user', 'role', 'log', 'kb', 'setting'];
+      // 2026-11-28 调整：原「知识库管理」与「设置」合并为「大模型管理」。
+      // 旧链接 ?cat=kb / ?cat=setting 仍可用，统一映射到 llm。
+      const ALIAS = { kb: 'llm', setting: 'llm' };
+      if (ALIAS[cat]) cat = ALIAS[cat];
+      const valid = ['status', 'data', 'user', 'role', 'log', 'llm'];
       if (valid.indexOf(cat) < 0) cat = 'status';
       this.currentCat = cat;
       overlayEl().style.display = 'flex';
@@ -552,8 +556,15 @@
       });
     },
 
-    // ---------------- 知识库管理（冰冻圈灾害大模型 RAG） ----------------
+    // 2026-11-28：知识库已并入「大模型管理」（renderLlm），此处不再单独成页。
     async renderKb() {
+      return this.renderLlm();
+    },
+
+    // ---------------- 大模型管理（模型配置 + 系统提示词 + RAG 知识库） ----------------
+    // 2026-11-28 合并：原独立的「知识库管理」「设置」两页并到这里。
+    // 账号信息与修改密码在右上角头像菜单；高德 Key 与配置备份移到「系统状态」。
+    async renderLlm() {
       let roleCode = '';
       try {
         const meRes = await api('/api/auth/me');
@@ -561,17 +572,32 @@
       } catch (e) { /* ignore */ }
       const canEdit = roleCode !== 'viewer';
 
-      let d = {};
-      try {
-        const res = await api('/api/admin/kb-status');
-        d = (res && res.data) || {};
-      } catch (e) {
-        toast('知识库状态读取失败：' + (e && e.message ? e.message : '接口不可用'), 'error');
-      }
+      let cfg = {};
+      let kb = {};
+      const [cfgRes, kbRes] = await Promise.all([
+        api('/api/admin/agent-config').catch(function (e) {
+          toast('大模型配置读取失败：' + (e && e.message ? e.message : '接口不可用'), 'error');
+          return {};
+        }),
+        api('/api/admin/kb-status').catch(function (e) {
+          toast('知识库状态读取失败：' + (e && e.message ? e.message : '接口不可用'), 'error');
+          return {};
+        })
+      ]);
+      cfg = (cfgRes && cfgRes.data) || {};
+      kb = (kbRes && kbRes.data) || {};
 
-      const counts = d.counts || {};
-      const sources = d.sources || [];
-      const LABELS = [
+      const model = cfg.model || '—';
+      const hasApiStatus = Object.prototype.hasOwnProperty.call(cfg, 'api_configured');
+      const apiReady = !!cfg.api_configured;
+      const isDefault = cfg.is_default !== false;
+      const prompt = cfg.system_prompt || '';
+      const updatedAt = cfg.updated_at || '—';
+
+      // 知识库（RAG 检索源，原「知识库管理」页）
+      const kbCounts = kb.counts || {};
+      const kbSources = kb.sources || [];
+      const KB_LABELS = [
         ['kb_disaster_cases', '灾害事件案例'],
         ['kb_stations', '气象站点'],
         ['kb_counties', '县域社会经济'],
@@ -580,11 +606,11 @@
         ['kb_era5_stats', 'ERA5 气象索引'],
         ['kb_methods', '风险评估方法学']
       ];
-      const statCards = LABELS.map(function (p) {
+      const kbStatCards = KB_LABELS.map(function (p) {
         return '<div class="admin-stat"><div class="v">' +
-          (counts[p[0]] != null ? counts[p[0]] : '—') + '</div><div class="k">' + p[1] + '</div></div>';
+          (kbCounts[p[0]] != null ? kbCounts[p[0]] : '—') + '</div><div class="k">' + p[1] + '</div></div>';
       }).join('');
-      const rows = sources.map(function (s) {
+      const kbRows = kbSources.map(function (s) {
         return '<tr>' +
           '<td>' + esc(s.name) + '</td>' +
           '<td>' + esc(s.description) + '</td>' +
@@ -596,90 +622,10 @@
 
       const html =
         '<div class="setting-intro">' +
-          '<div class="setting-intro-icon"><i class="fa fa-book"></i></div>' +
-          '<div class="setting-intro-text">' +
-            '<div class="setting-intro-title">冰冻圈灾害大模型知识库</div>' +
-            '<div class="setting-intro-desc">从项目真实数据构建，大模型回答时检索并标注来源。原始图层或统计表更新后，需要手动重建才会生效。</div>' +
-          '</div>' +
-        '</div>' +
-        (d.built
-          ? '<div class="admin-stat-section">' +
-              '<div class="admin-stat-section-title">入库内容</div>' +
-              '<div class="admin-stats">' + statCards + '</div>' +
-            '</div>' +
-            '<div class="admin-stat-section">' +
-              '<div class="admin-toolbar">' +
-                '<div class="admin-stat-section-title" style="margin:0;">数据源 · ' + sources.length + ' 项</div>' +
-                '<span class="admin-toolbar-gap"></span>' +
-                (canEdit ? '<button class="admin-btn" id="kb-rebuild"><i class="fa fa-refresh"></i> 重建知识库</button>' : '<span class="setting-prompt-hint">当前角色只读</span>') +
-              '</div>' +
-              '<table class="admin-table">' +
-                '<thead><tr><th>数据源</th><th>说明</th><th>大小</th><th>构建时间</th><th>状态</th></tr></thead>' +
-                '<tbody>' + (rows || '<tr><td colspan="5" class="admin-empty">暂无数据源</td></tr>') + '</tbody>' +
-              '</table>' +
-              '<div class="setting-footnote">重建会重新读取项目目录中的 GeoJSON / CSV / SQLite 索引，使知识库与数据现状一致；过程中请勿关闭页面。</div>' +
-            '</div>'
-          : '<div class="admin-empty">知识库尚未构建。</div>' +
-            (canEdit ? '<div style="text-align:center;"><button class="admin-btn" id="kb-rebuild">重建知识库</button></div>' : ''));
-      setContent(html);
-
-      const btn = document.getElementById('kb-rebuild');
-      if (btn) btn.addEventListener('click', async () => {
-        let ok = false;
-        if (window.UI && window.UI.confirm) {
-          ok = await UI.confirm({ title: '重建知识库', message: '将从项目真实数据重建全部知识库表，过程中请勿关闭页面。确定继续吗？', danger: true });
-        } else {
-          ok = window.confirm('确定重建知识库吗？');
-        }
-        if (!ok) return;
-        btn.disabled = true;
-        const old = btn.innerHTML;
-        btn.textContent = '重建中…';
-        try {
-          await api('/api/admin/kb-rebuild', { method: 'POST' });
-          toast('知识库已重建', 'success');
-          this.openCategory('kb');
-        } catch (err) {
-          toast(err.message, 'error');
-          btn.disabled = false;
-          btn.innerHTML = old;
-        }
-      });
-    },
-
-    // ---------------- 设置（冰冻圈灾害大模型） ----------------
-    // 账号信息与修改密码已并入右上角头像菜单；此页只保留大模型配置。
-    async renderSetting() {
-      let roleCode = '';
-      try {
-        const meRes = await api('/api/auth/me');
-        roleCode = (meRes && meRes.role_code) || '';
-      } catch (e) { /* ignore */ }
-      const canEdit = roleCode !== 'viewer';
-
-      let cfg = {};
-      try {
-        const res = await api('/api/admin/agent-config');
-        cfg = (res && res.data) || {};
-      } catch (e) {
-        toast('大模型配置读取失败：' + (e && e.message ? e.message : '接口不可用'), 'error');
-      }
-
-      const model = cfg.model || '—';
-      const hasApiStatus = Object.prototype.hasOwnProperty.call(cfg, 'api_configured');
-      const apiReady = !!cfg.api_configured;
-      const hasAmapStatus = Object.prototype.hasOwnProperty.call(cfg, 'amap_configured');
-      const amapReady = !!cfg.amap_configured;
-      const isDefault = cfg.is_default !== false;
-      const prompt = cfg.system_prompt || '';
-      const updatedAt = cfg.updated_at || '—';
-
-      const html =
-        '<div class="setting-intro">' +
           '<div class="setting-intro-icon"><i class="fa fa-comments"></i></div>' +
           '<div class="setting-intro-text">' +
             '<div class="setting-intro-title">冰冻圈灾害大模型</div>' +
-            '<div class="setting-intro-desc">用于灾害机理解读、风险分级说明与应急对策问答。下方提示词定义它的角色与输出边界，保存后对新会话立即生效。</div>' +
+            '<div class="setting-intro-desc">用于灾害机理解读、风险分级说明与应急对策问答。这里统一管理它的底层密钥、角色提示词与检索用知识库。</div>' +
           '</div>' +
         '</div>' +
         '<div class="admin-stat-section">' +
@@ -687,51 +633,44 @@
           '<div class="admin-stats">' +
             '<div class="admin-stat"><div class="v" style="font-size:15px;">' + esc(model) + '</div><div class="k">底层模型</div></div>' +
             '<div class="admin-stat"><div class="v">' + (!hasApiStatus ? '<span class="badge badge-gray">未知</span>' : (apiReady ? '<span class="badge badge-ok">已配置</span>' : '<span class="badge badge-off">未配置</span>')) + '</div><div class="k">DeepSeek 接口密钥</div></div>' +
-            '<div class="admin-stat"><div class="v">' + (!hasAmapStatus ? '<span class="badge badge-gray">未知</span>' : (amapReady ? '<span class="badge badge-ok">已配置</span>' : '<span class="badge badge-off">未配置</span>')) + '</div><div class="k">高德地图 Key</div></div>' +
             '<div class="admin-stat"><div class="v" id="setting-prompt-source">' + (isDefault ? '内置默认' : '自定义') + '</div><div class="k">提示词来源</div></div>' +
             '<div class="admin-stat"><div class="v" id="setting-updated-at">' + esc(updatedAt) + '</div><div class="k">最近修改</div></div>' +
           '</div>' +
           (hasApiStatus && !apiReady
             ? '<div class="setting-warning"><i class="fa fa-exclamation-triangle"></i> 后端尚未配置 DeepSeek API 密钥，模型对话暂不可用；提示词仍可编辑。</div>'
             : '') +
-          (hasAmapStatus && !amapReady
-            ? '<div class="setting-warning"><i class="fa fa-exclamation-triangle"></i> 后端尚未配置高德地图 Key，在线影像底图可能无法加载。</div>'
-            : '') +
+        '</div>' +
+        // 知识库排在系统提示词之前（2026-11-28 用户定序）：先看数据、再改角色设定
+        '<div class="admin-stat-section">' +
+          '<div class="admin-toolbar">' +
+            '<div class="admin-stat-section-title" style="margin:0;">知识库 · 检索源</div>' +
+            '<span class="admin-toolbar-gap"></span>' +
+            (canEdit ? '<button class="admin-btn" id="kb-rebuild"><i class="fa fa-refresh"></i> 重建知识库</button>' : '<span class="setting-prompt-hint">当前角色只读</span>') +
+          '</div>' +
+          '<div class="setting-prompt-wrap">' +
+            (kb.built
+              ? '<div class="admin-stats" style="margin-top:12px;">' + kbStatCards + '</div>' +
+                '<table class="admin-table" style="margin-top:12px;">' +
+                  '<thead><tr><th>数据源</th><th>说明</th><th>大小</th><th>构建时间</th><th>状态</th></tr></thead>' +
+                  '<tbody>' + (kbRows || '<tr><td colspan="5" class="admin-empty">暂无数据源</td></tr>') + '</tbody>' +
+                '</table>' +
+                '<div class="setting-footnote">重建会重新读取项目目录中的 GeoJSON / CSV / SQLite 索引，使知识库与数据现状一致；过程中请勿关闭页面。</div>'
+              : '<div class="admin-empty" style="margin-top:12px;">知识库尚未构建，点击右上角「重建知识库」生成。</div>') +
+          '</div>' +
         '</div>' +
         '<div class="admin-stat-section">' +
           '<div class="admin-stat-section-title">系统提示词</div>' +
           '<div class="setting-prompt-wrap">' +
             '<div class="admin-form-row">' +
               '<label>角色设定与输出边界 <span class="setting-prompt-meta" id="setting-prompt-count">' + prompt.length + ' 字</span></label>' +
-              '<textarea id="agent-prompt" class="setting-prompt" rows="16"' + (canEdit ? '' : ' readonly') + '>' + esc(prompt) + '</textarea>' +
+              '<textarea id="agent-prompt" class="setting-prompt" rows="14"' + (canEdit ? '' : ' readonly') + '>' + esc(prompt) + '</textarea>' +
             '</div>' +
             (canEdit
               ? '<div class="setting-prompt-actions">' +
                   '<button class="admin-btn" id="agent-save">保存</button>' +
                   '<button class="admin-btn admin-btn-cancel" id="agent-reset">恢复默认</button>' +
-                  '<span class="setting-prompt-hint">修改后对所有用户的新会话生效</span>' +
                 '</div>'
               : '<div class="setting-prompt-actions"><span class="setting-prompt-hint">当前角色只读，无法修改配置</span></div>') +
-          '</div>' +
-          '<div class="setting-footnote">提示词只定义模型角色与回答边界，不提供实时数据；模型输出不能替代防洪决策。</div>' +
-        '</div>' +
-        '<div class="admin-stat-section">' +
-          '<div class="admin-stat-section-title">配置备份</div>' +
-          '<div class="setting-prompt-wrap">' +
-            '<div class="setting-intro-desc">备份文件包含用户、角色、权限、操作日志与大模型提示词（约 64 KB），不含 data/ 下的大体积数据。恢复前会自动把当前配置留一份 .bak。</div>' +
-            '<div class="setting-prompt-actions">' +
-              (canEdit
-                ? '<a class="admin-btn" style="text-decoration:none;display:inline-block;" href="/api/admin/config-backup" download><i class="fa fa-download"></i> 下载备份</a>'
-                : '<span class="setting-prompt-hint">当前角色只读</span>') +
-            '</div>' +
-            (canEdit
-              ? '<div class="admin-form-row" style="margin-top:16px;"><label>从备份恢复</label>' +
-                  '<input type="file" id="config-restore-file" accept=".db" style="padding:6px;" /></div>' +
-                '<div class="setting-prompt-actions">' +
-                  '<button class="admin-btn admin-btn-danger" id="config-restore-btn">恢复配置</button>' +
-                  '<span class="setting-prompt-hint">恢复后需要重新登录</span>' +
-                '</div>'
-              : '') +
           '</div>' +
         '</div>';
       setContent(html);
@@ -769,37 +708,31 @@
         try {
           await api('/api/admin/agent-config', { method: 'DELETE' });
           toast('已恢复默认', 'success');
-          this.openCategory('setting');
+          this.openCategory('llm');
         } catch (err) { toast(err.message, 'error'); }
       });
 
-      const restoreBtn = document.getElementById('config-restore-btn');
-      if (restoreBtn) restoreBtn.addEventListener('click', async () => {
-        const input = document.getElementById('config-restore-file');
-        const file = input && input.files && input.files[0];
-        if (!file) { toast('请先选择备份文件', 'error'); return; }
+      // 知识库重建（原「知识库管理」页的操作，合并到这里）
+      const kbBtn = document.getElementById('kb-rebuild');
+      if (kbBtn) kbBtn.addEventListener('click', async () => {
         let ok = false;
         if (window.UI && window.UI.confirm) {
-          ok = await UI.confirm({ title: '恢复配置', message: '将用上传的备份覆盖当前配置（当前配置会自动留一份 .bak）。确定继续吗？', danger: true });
+          ok = await UI.confirm({ title: '重建知识库', message: '将从项目真实数据重建全部知识库表，过程中请勿关闭页面。确定继续吗？', danger: true });
         } else {
-          ok = window.confirm('确定恢复配置吗？');
+          ok = window.confirm('确定重建知识库吗？');
         }
         if (!ok) return;
-        const fd = new FormData();
-        fd.append('file', file);
-        restoreBtn.disabled = true;
-        const old = restoreBtn.textContent;
-        restoreBtn.textContent = '恢复中…';
+        kbBtn.disabled = true;
+        const old = kbBtn.innerHTML;
+        kbBtn.textContent = '重建中…';
         try {
-          const resp = await fetch('/api/admin/config-restore', { method: 'POST', body: fd });
-          const data = await resp.json();
-          if (!resp.ok) throw new Error((data && data.message) || '恢复失败');
-          toast('配置已恢复，请重新登录', 'success');
-          setTimeout(() => { window.location.reload(); }, 1200);
+          await api('/api/admin/kb-rebuild', { method: 'POST' });
+          toast('知识库已重建', 'success');
+          this.openCategory('llm');
         } catch (err) {
           toast(err.message, 'error');
-          restoreBtn.disabled = false;
-          restoreBtn.textContent = old;
+          kbBtn.disabled = false;
+          kbBtn.innerHTML = old;
         }
       });
     },
@@ -815,12 +748,22 @@
     async renderStatus() {
       // 数据相关指标已收归「数据管理」页；这里只呈现系统运行指标，
       // 不再触发 /api/admin/data-tree 的几十 GB 递归统计。
-      const [stRes, sysRes] = await Promise.all([
+      // 2026-11-28：原「设置」页里的外部服务（高德 Key）与配置备份移到这里（运维视角）。
+      const [stRes, sysRes, cfgRes, meRes] = await Promise.all([
         api('/api/admin/stats'),
-        api('/api/system/status')
+        api('/api/system/status'),
+        api('/api/admin/agent-config').catch(function () { return {}; }),
+        api('/api/auth/me').catch(function () { return {}; })
       ]);
       const s = stRes.data || {};
       const sys = sysRes || {};
+      const cfg = (cfgRes && cfgRes.data) || {};
+      const canEdit = ((meRes && meRes.role_code) || '') !== 'viewer';
+      const hasAmapStatus = Object.prototype.hasOwnProperty.call(cfg, 'amap_configured');
+      const amapReady = !!cfg.amap_configured;
+      const hasApiStatus = Object.prototype.hasOwnProperty.call(cfg, 'api_configured');
+      const apiReady = !!cfg.api_configured;
+      const llmModel = cfg.model || '—';
       const ok = '<span style="color:#4ade80;font-weight:600;">正常</span>';
       const bad = '<span style="color:#f87171;font-weight:600;">异常</span>';
       const html =
@@ -853,7 +796,38 @@
           { v: s.logs_today != null ? s.logs_today : '—', k: '今日日志' },
           { v: sys.online_users != null ? sys.online_users : '—', k: '近24h活跃用户' },
           { v: sys.storage_usage_mb == null ? '<span style="color:#8496b0;">统计中…</span>' : fmtSize(sys.storage_usage_mb * 1024 * 1024), k: '后端程序目录占用' }
-        ]);
+        ]) +
+        // 外部服务：两个后端外部依赖（高德 Key / DeepSeek 接口），只读状态
+        '<div class="admin-stat-section">' +
+          '<div class="admin-stat-section-title">外部服务</div>' +
+          '<div class="admin-stats" style="grid-template-columns:repeat(auto-fill,minmax(200px,240px));">' +
+            '<div class="admin-stat"><div class="v">' +
+              (!hasAmapStatus ? '<span class="badge badge-gray">未知</span>' : (amapReady ? '<span class="badge badge-ok">已配置</span>' : '<span class="badge badge-off">未配置</span>')) +
+            '</div><div class="k">高德地图 Key</div></div>' +
+            '<div class="admin-stat"><div class="v">' +
+              (!hasApiStatus ? '<span class="badge badge-gray">未知</span>' : (apiReady ? '<span class="badge badge-ok">已配置</span>' : '<span class="badge badge-off">未配置</span>')) +
+            '</div><div class="k">DeepSeek 接口 · ' + esc(llmModel) + '</div></div>' +
+          '</div>' +
+          (hasAmapStatus && !amapReady
+            ? '<div class="setting-warning"><i class="fa fa-exclamation-triangle"></i> 后端尚未配置高德地图 Key，地名搜索将不可用。</div>'
+            : '') +
+          (hasApiStatus && !apiReady
+            ? '<div class="setting-warning"><i class="fa fa-exclamation-triangle"></i> 后端尚未配置 DeepSeek API 密钥，大模型问答暂不可用。</div>'
+            : '') +
+        '</div>' +
+        // 配置维护：admin.db 备份 / 恢复
+        '<div class="admin-stat-section">' +
+          '<div class="admin-stat-section-title">配置维护</div>' +
+          '<div class="setting-prompt-wrap">' +
+            '<div class="setting-prompt-actions">' +
+              (canEdit
+                ? '<a class="admin-btn" style="text-decoration:none;display:inline-block;" href="/api/admin/config-backup" download><i class="fa fa-download"></i> 下载备份</a>' +
+                  '<input type="file" id="config-restore-file" accept=".db" style="padding:6px;margin-left:6px;" />' +
+                  '<button class="admin-btn admin-btn-danger" id="config-restore-btn">恢复配置</button>'
+                : '<span class="setting-prompt-hint">当前角色只读</span>') +
+            '</div>' +
+          '</div>' +
+        '</div>';
       setContent(html);
 
       const clearBtn = document.getElementById('status-clear-cache');
@@ -867,6 +841,36 @@
           toast('已清除：' + list, 'success');
         } catch (err) { toast(err.message, 'error'); }
         finally { clearBtn.disabled = false; clearBtn.innerHTML = old; }
+      });
+
+      const restoreBtn = document.getElementById('config-restore-btn');
+      if (restoreBtn) restoreBtn.addEventListener('click', async () => {
+        const input = document.getElementById('config-restore-file');
+        const file = input && input.files && input.files[0];
+        if (!file) { toast('请先选择备份文件', 'error'); return; }
+        let okRestore = false;
+        if (window.UI && window.UI.confirm) {
+          okRestore = await UI.confirm({ title: '恢复配置', message: '将用上传的备份覆盖当前配置（当前配置会自动留一份 .bak）。确定继续吗？', danger: true });
+        } else {
+          okRestore = window.confirm('确定恢复配置吗？');
+        }
+        if (!okRestore) return;
+        const fd = new FormData();
+        fd.append('file', file);
+        restoreBtn.disabled = true;
+        const oldText = restoreBtn.textContent;
+        restoreBtn.textContent = '恢复中…';
+        try {
+          const resp = await fetch('/api/admin/config-restore', { method: 'POST', body: fd });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error((data && data.message) || '恢复失败');
+          toast('配置已恢复，请重新登录', 'success');
+          setTimeout(() => { window.location.reload(); }, 1200);
+        } catch (err) {
+          toast(err.message, 'error');
+          restoreBtn.disabled = false;
+          restoreBtn.textContent = oldText;
+        }
       });
     },
 

@@ -124,8 +124,9 @@
         .then(function (resp) { return resp.json().catch(function () { return {}; }).then(function (d) { return { ok: resp.ok, data: d }; }); })
         .then(function (r) {
           if (!r.ok) throw new Error((r.data && r.data.message) || '修改失败');
-          UI.toast('密码已修改，请重新登录', 'success');
-          setTimeout(function () { window.location.href = 'login.html'; }, 1200);
+          // 后端改密码不销毁会话，不需要把人踢去登录页（那也是「独立登录界面」的残留），
+          // 提一句「下次登录用新密码」即可，页面留在原处
+          UI.toast('密码已修改，下次登录请使用新密码', 'success');
         })
         .catch(function (err) { UI.toast(err.message || '修改失败', 'error'); });
     }
@@ -202,20 +203,26 @@
 
     logout.addEventListener('click', function () {
       logout.disabled = true;
-      // 服务端单线程，地图瓦片多时登出请求可能排队；最多等 3s，超时也照样跳登录页，
-      // 避免按钮点了像死掉（登录接口本身会 session.clear，不会残留旧身份）
+      // 服务端单线程，地图瓦片多时登出请求可能排队；最多等 3s，超时也照样处理，
+      // 避免按钮点了像死掉（登出接口本身会 session.clear，不会残留旧身份）
       var done = false;
       function go() {
         if (done) return;
         done = true;
-        // 退出后就地刷新回「未登录」形态（业务页显示登录按钮、后台页弹登录框），
-        // 不再跳到独立登录页；只有在没有登录弹窗组件时才回退跳页
-        if (window.AuthModal) window.location.reload();
-        else window.location.href = 'login.html';
+        // 后台页退出 = 离开后台，回首页（后台页未登录没有内容可看，留在原地只会盖个登录框）；
+        // 业务页退出 = 原地刷新成「未登录」形态，地图状态也不用丢；
+        // 没有登录弹窗组件时才回退独立登录页
+        if (currentPage() === 'admin.html') {
+          window.location.href = 'index.html';
+        } else if (window.AuthModal) {
+          window.location.reload();
+        } else {
+          window.location.href = 'login.html';
+        }
       }
       setTimeout(go, 3000);
       fetch('/api/auth/logout', { method: 'POST' })
-        .catch(function () { /* 会话已失效也继续跳转 */ })
+        .catch(function () { /* 会话已失效也继续处理 */ })
         .then(go);
     });
   }

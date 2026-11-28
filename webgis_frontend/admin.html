@@ -300,13 +300,13 @@
         <div class="admin-body">
           <div class="admin-nav">
             <div class="admin-nav-title">系统管理</div>
+            <!-- 侧栏定序（2026-11-28）：概览 → 内容资产（数据 / 大模型）→ 账号与审计 -->
             <a class="admin-nav-item active" data-cat="status"><i class="fa fa-dashboard"></i>系统状态</a>
             <a class="admin-nav-item" data-cat="data"><i class="fa fa-database"></i>数据管理</a>
+            <a class="admin-nav-item" data-cat="llm"><i class="fa fa-comments"></i>大模型管理</a>
             <a class="admin-nav-item" data-cat="user"><i class="fa fa-users"></i>用户管理</a>
             <a class="admin-nav-item" data-cat="role"><i class="fa fa-key"></i>角色与权限</a>
             <a class="admin-nav-item" data-cat="log"><i class="fa fa-history"></i>系统日志</a>
-            <a class="admin-nav-item" data-cat="kb"><i class="fa fa-book"></i>知识库管理</a>
-            <a class="admin-nav-item" data-cat="setting"><i class="fa fa-cog"></i>设置</a>
           </div>
           <div class="admin-content" id="admin-content"><div class="admin-empty">正在验证登录状态…</div></div>
         </div>
@@ -348,9 +348,10 @@
 
   <script src="js/ui-components.js"></script>
   <script src="js/lib/echarts.min.js"></script>
-  <script src="js/admin.js?v=20261128perf"></script>
+  <!-- 登录弹窗必须排在 admin.js 之前：后台页 401 时会立刻调用 AuthModal，晚加载就会退回跳 login.html -->
+  <script src="js/auth-modal.js?v=20261128e"></script>
+  <script src="js/admin.js?v=20261128trim2"></script>
   <script src="js/command-palette.js?v=20261128static"></script>
-  <script src="js/auth-modal.js?v=20261128c"></script>
-  <script src="js/user-menu.js?v=20261128p"></script>
+  <script src="js/user-menu.js?v=20261128r"></script>
 </body>
 </html>

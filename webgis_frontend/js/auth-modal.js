@@ -3,7 +3,7 @@
  *
  * 形态与「账号设置」弹窗一致：不跳页，直接浮在当前系统页面之上。
  * 两步：选账号 → 输密码；仍提交 POST /api/auth/login（账号密码，不是 OAuth）。
- * 登录成功后就地刷新当前页（身份区随之变成头像），不强制跳系统管理。
+ * 登录成功 = 进入系统管理：管理员跳 admin.html（后台概览），其他角色回来源页。
  *
  * 依赖：js/ui-components.js（UI.modal / UI.toast）
  * 用法：
@@ -273,8 +273,18 @@
                 opts.onSuccess(r.data);
                 return;
               }
-              // 只重渲染顶栏身份区，不整页刷新：地图、图层与播放状态都不打断。
-              // 后台页需要重新拉数据，自己传 onSuccess 做 reload。
+              // 登录成功 = 进入系统管理（管理员直接落到后台概览页），
+              // 其他角色没有后台权限，回来源页；
+              // 若目标页就是当前页，则不重载、只重渲染顶栏身份区。
+              var roleCode = (r.data && r.data.role_code) || '';
+              var here = window.location.pathname.split('/').pop() || 'index.html';
+              var target = (roleCode === 'admin')
+                ? 'admin.html'
+                : (opts.returnUrl || here);
+              if (target && target !== here) {
+                window.location.href = target;
+                return;
+              }
               if (window.UserMenu && typeof window.UserMenu.refresh === 'function') {
                 close();
                 window.UserMenu.refresh();
