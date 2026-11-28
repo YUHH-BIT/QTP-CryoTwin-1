@@ -6001,6 +6001,34 @@ body.rhs-v2 .risk-modal-reopen {
 }
 body.rhs-v2 .risk-modal-reopen:hover { box-shadow: 0 6px 20px var(--mod-line); }
 
+/* ---------- 专家免责声明：由警示黄改为模块紫（2026-11-28 15:00 用户要求统一）---------- */
+body.rhs-v2 .expert-disclaimer {
+  color: var(--rhs-ink);
+  background: var(--mod-soft);
+  border-color: var(--mod-line);
+}
+body.rhs-v2 .expert-disclaimer i { color: var(--mod-ink); }
+body.rhs-v2 .expert-disclaimer strong { color: var(--mod-ink); }
+
+/* ---------- 决策页说明条 / 列表滚动条：模块紫（2026-11-28 14:57）---------- */
+body.rhs-v2 .decision-content-note {
+  color: var(--rhs-ink);
+  background: var(--mod-soft);
+  border-color: var(--mod-line);
+}
+body.rhs-v2 .decision-content-note i { color: var(--mod-ink); }
+body.rhs-v2 .decision-content-list { scrollbar-color: var(--mod-line) transparent; }
+body.rhs-v2 .decision-content-list::-webkit-scrollbar-thumb { background: var(--mod-line); }
+/* 分类筛选 chips：active 原来是蓝色渐变，18:09 删旧规则时漏了补位 */
+body.rhs-v2 .decision-chip {
+  background: var(--rhs-card); border-color: var(--rhs-line-2); color: var(--rhs-ink-2);
+}
+body.rhs-v2 .decision-chip:hover { border-color: var(--mod); color: var(--rhs-ink); }
+body.rhs-v2 .decision-chip.active {
+  background: linear-gradient(135deg, var(--mod-deep), var(--mod));
+  border-color: var(--mod); color: #fff;
+}
+
 /* ---------- 决策页内容卡：模块紫贯穿（2026-11-27 18:09）---------- */
 body.rhs-v2 .decision-content-card {
   background: var(--rhs-card); border-color: var(--rhs-line);
